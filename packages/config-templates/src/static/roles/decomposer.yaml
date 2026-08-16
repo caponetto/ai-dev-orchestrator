@@ -1,0 +1,24 @@
+id: decomposer
+name: Decomposer
+description: Decomposes a feature specification into independent, scoped tasks
+owned_artifacts:
+  - task_breakdown
+readable_artifacts:
+  - canonical_specification
+  - codebase_context
+  - decomposition_review
+forbidden_artifacts:
+  - implementation
+  - test_plan
+reviewed_by:
+  - decomposition_reviewer
+reviews: []
+agreement_participation: []
+required_capabilities:
+  - reasoning
+  - structured_output
+  - long_context
+model: claude-opus-4-6
+max_tokens: null
+dispatch_type: agent
+runner: claude-code

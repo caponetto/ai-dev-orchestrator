@@ -1,0 +1,46 @@
+{
+  "name": "@ai-orchestrator/config-templates",
+  "version": "1.0.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/caponetto/ai-dev-orchestrator.git",
+    "directory": "packages/config-templates"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "copy:static": "cpy '**/*' '!**/__tests__/**' '!**/*.test.ts' ../../dist/static --cwd src/static",
+    "clean": "rimraf dist tsconfig.build.tsbuildinfo",
+    "build:base": "rimraf dist tsconfig.build.tsbuildinfo && tsc -p tsconfig.build.json && pnpm run copy:static",
+    "build:dev": "pnpm run build:base",
+    "build:prod": "pnpm run build:base --sourceMap false --declarationMap false",
+    "lint": "eslint src/",
+    "test:unit": "vitest run",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit"
+  },
+  "dependencies": {
+    "@ai-orchestrator/schemas": "workspace:*",
+    "@ai-orchestrator/utils": "workspace:*",
+    "@ai-orchestrator/workflow": "workspace:*",
+    "yaml": "^2.9.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@ai-orchestrator/build-config": "workspace:*",
+    "@types/node": "^26.1.0",
+    "cpy-cli": "^7.0.0",
+    "vitest": "^4.1.10"
+  }
+}

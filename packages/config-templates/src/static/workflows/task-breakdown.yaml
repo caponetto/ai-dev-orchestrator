@@ -1,0 +1,210 @@
+# Task Breakdown Workflow
+#
+# Autonomous feature decomposition: takes large features or epics,
+# analyzes scope and codebase, decomposes into independent tasks,
+# reviews decomposition quality, and produces a set of complete
+# canonical specifications ready for parallel `dev` workflow runs.
+#
+# Key design decisions:
+# - Fully autonomous (no human gate)
+# - Decomposition review loop with iteration limit (max 3)
+# - Dynamic parallel spec writing (one agent per task)
+# - Independence-first decomposition for maximum parallelism
+
+name: task-breakdown
+version: 1.0.0
+initial_state: INTAKE
+terminal_states:
+  - DONE
+  - FAILED
+  - ABORTED
+
+states:
+  # ──────────────────────────────────────────────────────────────
+  # INTAKE — analyze scope and boundaries
+  # ──────────────────────────────────────────────────────────────
+  INTAKE:
+    type: action
+    label: Intake
+    description: Analyze input broadly to understand full scope, natural boundaries, and overall intent
+    entry_actions:
+      - type: record_journal
+        params:
+          event: run_started
+      - type: dispatch_worker
+        params:
+          role: breakdown_analyst
+    transitions:
+      - target: CODEBASE_ANALYSIS
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: canonical_specification
+        governance_required: false
+        priority: 1
+      - target: FAILED
+        trigger: failure
+        guards: []
+        governance_required: false
+        priority: 2
+
+  # ──────────────────────────────────────────────────────────────
+  # CODEBASE_ANALYSIS — scan repo before decomposition
+  # ──────────────────────────────────────────────────────────────
+  CODEBASE_ANALYSIS:
+    type: action
+    label: Codebase Analysis
+    description: Scan repository structure, patterns, conventions, and affected files
+    entry_actions:
+      - type: dispatch_worker
+        params:
+          role: codebase_analyst
+    transitions:
+      - target: DECOMPOSITION
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: codebase_context
+        governance_required: false
+        priority: 1
+      - target: FAILED
+        trigger: failure
+        guards: []
+        governance_required: false
+        priority: 2
+
+  # ──────────────────────────────────────────────────────────────
+  # DECOMPOSITION — split feature into tasks
+  # ──────────────────────────────────────────────────────────────
+  DECOMPOSITION:
+    type: action
+    label: Decomposition
+    description: Decompose the feature into independent, scoped tasks
+    entry_actions:
+      - type: dispatch_worker
+        params:
+          role: decomposer
+    transitions:
+      - target: DECOMPOSITION_REVIEW
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: task_breakdown
+        governance_required: false
+        priority: 1
+      - target: FAILED
+        trigger: failure
+        guards: []
+        governance_required: false
+        priority: 2
+
+  # ──────────────────────────────────────────────────────────────
+  # DECOMPOSITION_REVIEW — review decomposition quality
+  # ──────────────────────────────────────────────────────────────
+  DECOMPOSITION_REVIEW:
+    type: review
+    label: Decomposition Review
+    description: Review the task breakdown for overlapping scopes, missing coverage, and unnecessary coupling
+    entry_actions:
+      - type: dispatch_worker
+        params:
+          role: decomposition_reviewer
+    transitions:
+      # Approved → proceed to spec authoring
+      - target: SPEC_AUTHORING
+        trigger: review_approved
+        guards: []
+        governance_required: false
+        priority: 1
+      # Rejected → iterate with decomposer
+      - target: DECOMPOSITION
+        trigger: review_rejected
+        guards:
+          - type: iteration_below_limit
+            params:
+              contract: decomposition_review_loop
+        governance_required: false
+        priority: 2
+      # Iteration exhausted → abort (input too ambiguous)
+      - target: ABORTED
+        trigger: iteration_exhausted
+        guards: []
+        governance_required: false
+        priority: 3
+      - target: FAILED
+        trigger: failure
+        guards: []
+        governance_required: false
+        priority: 4
+
+  # ──────────────────────────────────────────────────────────────
+  # SPEC_AUTHORING — write full specs for each task
+  # ──────────────────────────────────────────────────────────────
+  SPEC_AUTHORING:
+    type: action
+    label: Spec Authoring
+    description: Write a full canonical specification for each decomposed task
+    entry_actions:
+      - type: dispatch_dynamic_workers
+        params:
+          role: task_spec_writer
+          source_artifact: task_breakdown
+          items_path: tasks
+    transitions:
+      - target: DONE
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: task_specifications
+        governance_required: false
+        priority: 1
+      - target: FAILED
+        trigger: failure
+        guards: []
+        governance_required: false
+        priority: 2
+
+  # ──────────────────────────────────────────────────────────────
+  # DONE — workflow completed
+  # ──────────────────────────────────────────────────────────────
+  DONE:
+    type: terminal
+    label: Done
+    description: Task breakdown completed — task specifications ready for dev runs
+    entry_actions:
+      - type: produce_manifest
+        params: {}
+      - type: record_journal
+        params:
+          event: run_completed
+    transitions: []
+
+  # ──────────────────────────────────────────────────────────────
+  # FAILED — workflow failed
+  # ──────────────────────────────────────────────────────────────
+  FAILED:
+    type: terminal
+    label: Failed
+    description: Task breakdown failed due to process error or infrastructure failure
+    entry_actions:
+      - type: record_journal
+        params:
+          event: run_failed
+    transitions: []
+
+  # ──────────────────────────────────────────────────────────────
+  # ABORTED — workflow aborted
+  # ──────────────────────────────────────────────────────────────
+  ABORTED:
+    type: terminal
+    label: Aborted
+    description: Task breakdown aborted by user request or exhausted iterations
+    entry_actions:
+      - type: record_journal
+        params:
+          event: run_aborted
+    transitions: []

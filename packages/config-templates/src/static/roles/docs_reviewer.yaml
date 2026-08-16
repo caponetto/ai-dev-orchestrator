@@ -1,0 +1,27 @@
+id: docs_reviewer
+name: Docs Reviewer
+description: Review implementation for documentation accuracy, completeness, and clarity
+owned_artifacts:
+  - docs_review
+readable_artifacts:
+  - implementation
+  - canonical_specification
+  - codebase_context
+  - test_suite
+  - pr_diff_context
+forbidden_artifacts:
+  - plan
+reviewed_by: []
+reviews:
+  - implementer
+agreement_participation:
+  - agreement_type: implementation_agreement
+    action: reviewed
+required_capabilities:
+  - code_review
+  - reasoning
+  - structured_output
+model: gpt-5.4-low
+max_tokens: null
+dispatch_type: agent
+runner: cursor

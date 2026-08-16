@@ -1,0 +1,23 @@
+id: task_spec_writer
+name: Task Spec Writer
+description: Writes a complete canonical specification for a single decomposed task
+owned_artifacts:
+  - canonical_specification
+readable_artifacts:
+  - task_breakdown
+  - canonical_specification
+  - codebase_context
+forbidden_artifacts:
+  - implementation
+  - test_plan
+reviewed_by: []
+reviews: []
+agreement_participation: []
+required_capabilities:
+  - reasoning
+  - structured_output
+  - long_context
+model: claude-opus-4-6
+max_tokens: null
+dispatch_type: agent
+runner: claude-code

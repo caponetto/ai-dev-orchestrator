@@ -1,0 +1,91 @@
+# Governance policies for the orchestrator.
+# Controls iteration limits, quality gates, budgets, and permissions.
+
+# Maximum iterations before the engine escalates or halts.
+iteration_limits:
+  # How many times reviewers can request changes before escalation.
+  max_review_iterations: 5
+  # How many times the judge can arbitrate non-converging review loops.
+  max_judge_arbitrations: 3
+  # How many clarification rounds the analyst can request from the user.
+  max_clarification_rounds: 3
+  # How many acceptance validation cycles before escalating to human.
+  max_acceptance_iterations: 3
+
+# Quality gates that artifacts must pass before advancing.
+quality_gates:
+  # Gate: canonical specification completeness check.
+  specification_readiness:
+    # Minimum completeness score (0.0–1.0) for the specification.
+    min_completeness_score: 0.8
+  # Gate: implementation review thresholds.
+  implementation_review:
+    # Maximum high-severity findings allowed (0 = must fix all).
+    max_high_severity_findings: 0
+    # Maximum medium-severity findings allowed before blocking.
+    max_medium_severity_findings: 3
+# Confidence-based escalation gate (optional).
+# When present, agent confidence scores are evaluated to decide
+# whether to escalate to a stronger model or to a human.
+# confidence_gate:
+#   # Minimum blended score to pass without model escalation (0.0–1.0).
+#   model_escalation_threshold: 0.5
+#   # Minimum blended score before escalating to a human (0.0–1.0).
+#   human_escalation_threshold: 0.3
+#   # Weight of heuristic signals vs agent self-reported confidence (0.0–1.0).
+#   heuristic_weight: 0.3
+#   heuristic_signals:
+#     penalize_hedging_language: true
+#     penalize_high_retry_count: true
+#     penalize_unresolved_findings: true
+
+# Token budget enforcement (null = unlimited).
+# Per-workflow budgets in workflow YAML files take precedence over this default.
+budget:
+  # Default maximum total tokens (input + output) per orchestrator run.
+  max_tokens_per_run: 6000000
+
+# Permission policy for filesystem and tool access by agents.
+#
+# Evaluation order:
+#   1. Deny rules (first match wins)
+#   2. Grant rules (first match wins)
+#   3. Previously approved operations (approval store)
+#   4. Auto-grant for .ai/ run directory operations
+#   5. Auto-grant for read-only operations (all trust levels):
+#      - file_read actions
+#      - Read-only tools (Read, Glob, Grep, etc.)
+#      - Read-only git commands (diff, show, log, rev-parse, status, blame, fetch, etc.)
+#      - Read-only gh commands (pr view/diff/list/checks/status, issue view/list, etc.)
+#   6. Trust level check (none → deny, high → grant, medium → continue)
+#   7. Safe tool/command check (medium trust only)
+#   8. Default action
+permission_policy:
+  # Default action for unmatched permission requests: grant, deny, or ask_human.
+  default_action: ask_human
+  # Trust level per role (high, medium, none). Higher trust = fewer prompts.
+  # Roles with "none" trust can still read files and run read-only VCS commands
+  # (git diff/show/log, gh pr view/diff, etc.) via the built-in read-only auto-grant.
+  role_trust:
+    implementer: high
+    verifier: medium
+    planner: medium
+    static_reviewer: none
+    design_reviewer: none
+    security_reviewer: none
+    performance_reviewer: none
+    adversarial_reviewer: none
+    docs_reviewer: none
+    ux_reviewer: none
+    plan_reviewer: none
+  # Commands auto-granted for medium-trust roles without prompting.
+  # Prefix-matched: e.g. the node entry matches any script under ~/.ai/scripts/.
+  safe_commands:
+    - npm test
+    - node --experimental-strip-types --experimental-detect-module ~/.ai/scripts
+  # Custom permission rules (evaluated in order, first match wins).
+  rules:
+    # Allow all roles to write anywhere in repo root.
+    - action: file_write
+      decision: grant
+      scope: '${repoRoot}/**'

@@ -1,0 +1,38 @@
+{
+  "name": "@ai-orchestrator/build-config",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/caponetto/ai-dev-orchestrator.git",
+    "directory": "packages/build-config"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "clean": "rimraf dist tsconfig.build.tsbuildinfo",
+    "build:base": "rimraf dist tsconfig.build.tsbuildinfo && tsc -p tsconfig.build.json",
+    "build:dev": "pnpm run build:base",
+    "build:prod": "pnpm run build:base --sourceMap false --declarationMap false",
+    "lint": "eslint src/",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit"
+  },
+  "dependencies": {
+    "vitest": "^4.1.10"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0"
+  }
+}

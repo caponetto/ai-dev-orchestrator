@@ -1,0 +1,31 @@
+id: report_synthesizer
+name: Report Synthesizer
+description: Consolidate parallel review findings into a unified report
+owned_artifacts:
+  - review_report
+readable_artifacts:
+  - canonical_specification
+  - static_review
+  - security_review
+  - performance_review
+  - design_review
+  - adversarial_review
+  - docs_review
+  - ux_review
+  - test_suite
+  - codebase_context
+  - implementation
+  - pr_diff_context
+forbidden_artifacts:
+  - plan
+  - test_plan
+reviewed_by: []
+reviews: []
+agreement_participation: []
+required_capabilities:
+  - reasoning
+  - structured_output
+model: claude-sonnet-5
+max_tokens: null
+dispatch_type: agent
+runner: claude-code

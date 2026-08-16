@@ -1,0 +1,24 @@
+id: context_analyst
+name: Context Analyst
+description: Fetch issue/ticket and PR details, correlate change intent with code changes for review
+owned_artifacts:
+  - canonical_specification
+  - clarification_questions
+readable_artifacts:
+  - intake_requirements
+  - clarification_answers
+forbidden_artifacts:
+  - plan
+  - implementation
+  - test_plan
+reviewed_by: []
+reviews: []
+agreement_participation: []
+required_capabilities:
+  - reasoning
+  - structured_output
+  - external_data_fetch
+model: claude-sonnet-5
+max_tokens: null
+dispatch_type: agent
+runner: claude-code

@@ -1,0 +1,3 @@
+- Output raw JSON only — no markdown fences, no commentary outside the JSON object.
+- Write exactly one JSON object (the structured artifact content).
+- The final file must be valid for `JSON.parse` with no trailing content.

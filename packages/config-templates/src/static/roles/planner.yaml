@@ -1,0 +1,26 @@
+id: planner
+name: Planner
+description: Create implementation plans from the specification
+owned_artifacts:
+  - plan
+readable_artifacts:
+  - canonical_specification
+  - codebase_context
+  - plan_review
+  - plan
+forbidden_artifacts:
+  - implementation
+  - test_plan
+reviewed_by:
+  - plan_reviewer
+reviews: []
+agreement_participation:
+  - agreement_type: planning_agreement
+    action: reviewed
+required_capabilities:
+  - reasoning
+  - structured_output
+model: claude-opus-4-6
+max_tokens: null
+dispatch_type: agent
+runner: claude-code

@@ -1,0 +1,12 @@
+{
+  "extends": ["//"],
+  "tags": ["composition"],
+  "tasks": {
+    "build:dev": {
+      "inputs": ["../config-templates/src/static/**"]
+    },
+    "build:prod": {
+      "inputs": ["../config-templates/src/static/**"]
+    }
+  }
+}

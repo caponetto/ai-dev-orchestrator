@@ -1,0 +1,39 @@
+{
+  "name": "@ai-orchestrator/agent-protocol",
+  "version": "1.0.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/caponetto/ai-dev-orchestrator.git",
+    "directory": "packages/agent-protocol"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "clean": "rimraf dist tsconfig.build.tsbuildinfo",
+    "build:base": "rimraf dist tsconfig.build.tsbuildinfo && tsc -p tsconfig.build.json",
+    "build:dev": "pnpm run build:base",
+    "build:prod": "pnpm run build:base --sourceMap false --declarationMap false",
+    "lint": "eslint src/",
+    "test:unit": "vitest run",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit"
+  },
+  "dependencies": {
+    "@ai-orchestrator/schemas": "workspace:*"
+  },
+  "devDependencies": {
+    "@ai-orchestrator/build-config": "workspace:*",
+    "vitest": "^4.1.10"
+  }
+}

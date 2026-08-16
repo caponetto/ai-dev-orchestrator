@@ -1,0 +1,28 @@
+id: verifier
+name: Verifier
+description: Run tests and verify acceptance criteria
+owned_artifacts:
+  - verification
+readable_artifacts:
+  - implementation
+  - test_plan
+  - test_suite
+  - canonical_specification
+  - plan
+  - codebase_context
+  - review_report
+forbidden_artifacts: []
+reviewed_by: []
+reviews: []
+agreement_participation:
+  - agreement_type: verification_agreement
+    action: reviewed
+required_capabilities:
+  - reasoning
+  - structured_output
+model: claude-sonnet-5
+max_tokens: null
+dispatch_type: agent
+runner: claude-code
+agent_config:
+  timeoutMs: 1200000

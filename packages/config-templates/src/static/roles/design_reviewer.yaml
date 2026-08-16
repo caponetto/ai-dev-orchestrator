@@ -1,0 +1,27 @@
+id: design_reviewer
+name: Design Reviewer
+description: Review implementation for architecture, abstractions, and developer experience
+owned_artifacts:
+  - design_review
+readable_artifacts:
+  - implementation
+  - canonical_specification
+  - codebase_context
+  - test_suite
+  - pr_diff_context
+forbidden_artifacts:
+  - plan
+reviewed_by: []
+reviews:
+  - implementer
+agreement_participation:
+  - agreement_type: implementation_agreement
+    action: reviewed
+required_capabilities:
+  - code_review
+  - reasoning
+  - structured_output
+model: gpt-5.4-medium
+max_tokens: null
+dispatch_type: agent
+runner: cursor

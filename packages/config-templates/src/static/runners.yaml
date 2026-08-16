@@ -1,0 +1,15 @@
+runners:
+  - id: claude-code
+    name: Claude Code
+    models:
+      - claude-opus-4-6
+      - claude-sonnet-5
+      - claude-haiku-4-5
+  - id: cursor
+    name: Cursor
+    models:
+      - gpt-5.4-low
+      - gpt-5.4-medium
+      - gpt-5.4-high
+      - gpt-5.4-xhigh
+      - gemini-3.1-pro

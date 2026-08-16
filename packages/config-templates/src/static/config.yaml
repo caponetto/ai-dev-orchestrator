@@ -1,0 +1,19 @@
+# Runtime settings for ai-dev-orchestrator.
+# All runtime data lives in the project-local .ai/runs/ directory.
+
+# Minimum log verbosity: debug, info, warn, or error.
+log_level: info
+
+# Optional path to write a summary report after each run completes.
+# report_output_path: ./report.md
+
+# Default workflow to use when none is specified via --workflow flag.
+# Must match a filename (without .yaml) in the workflows/ directory.
+default_workflow: dev
+
+# Semantic version label for the workflow configuration.
+workflow_version: '1.0'
+
+# Maximum total state transitions before the engine halts (safety limit).
+# Prevents infinite loops in misconfigured workflows.
+global_transition_limit: 200

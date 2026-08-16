@@ -1,0 +1,71 @@
+{
+  "name": "ai-dev-orchestrator",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/caponetto/ai-dev-orchestrator.git"
+  },
+  "type": "module",
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build:dev": "turbo build:dev",
+    "build:prod": "turbo build:prod",
+    "clean": "turbo run clean",
+    "format": "prettier --write .",
+    "format:check": "turbo run //#format:check:run",
+    "format:check:run": "prettier --check .",
+    "link:cli": "pnpm build:prod && pnpm add -g ./packages/cli",
+    "lint": "turbo lint",
+    "prepare": "husky",
+    "test:e2e": "turbo test:e2e",
+    "test:e2e:install": "pnpm --dir ./packages/dashboard exec playwright install chromium --with-deps",
+    "test:integration": "turbo test:integration",
+    "test:unit": "turbo test:unit",
+    "test:unit:coverage": "turbo test:unit -- --coverage",
+    "typecheck": "turbo typecheck",
+    "knip": "turbo run //#knip:run",
+    "knip:run": "knip",
+    "syncpack:check": "turbo run //#syncpack:check:run",
+    "syncpack:check:run": "syncpack lint",
+    "publint": "turbo run //#publint:run",
+    "publint:run": "pnpm -r --filter='./packages/*' --filter='!@ai-orchestrator/dashboard' --filter='!@ai-orchestrator/cli' exec publint",
+    "unlink:cli": "pnpm remove -g @ai-orchestrator/cli"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{js,jsx,cjs,mjs}": [
+      "prettier --write"
+    ],
+    "*.{json,md,yaml,yml,css,html}": [
+      "prettier --write"
+    ]
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.1",
+    "@commitlint/config-conventional": "^21.2.0",
+    "@vitest/coverage-v8": "^4.1.10",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.5",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-import-x": "^4.12.2",
+    "husky": "^9.1.7",
+    "knip": "^6.32.1",
+    "lint-staged": "^17.0.8",
+    "prettier": "^3.9.4",
+    "publint": "^0.3.23",
+    "rimraf": "^6.1.3",
+    "syncpack": "^15.3.3",
+    "turbo": "^2.10.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.35.1",
+    "vitest": "^4.1.10"
+  }
+}

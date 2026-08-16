@@ -1,0 +1,22 @@
+id: breakdown_analyst
+name: Breakdown Analyst
+description: Analyzes input to understand full scope and natural decomposition boundaries
+owned_artifacts:
+  - canonical_specification
+readable_artifacts:
+  - intake_requirements
+forbidden_artifacts:
+  - plan
+  - implementation
+  - test_plan
+reviewed_by: []
+reviews: []
+agreement_participation: []
+required_capabilities:
+  - reasoning
+  - structured_output
+  - external_data_fetch
+model: claude-opus-4-6
+max_tokens: null
+dispatch_type: agent
+runner: claude-code

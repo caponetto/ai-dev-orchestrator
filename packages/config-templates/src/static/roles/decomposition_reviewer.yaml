@@ -1,0 +1,23 @@
+id: decomposition_reviewer
+name: Decomposition Reviewer
+description: Reviews task decomposition for coverage, independence, and quality
+owned_artifacts:
+  - decomposition_review
+readable_artifacts:
+  - task_breakdown
+  - canonical_specification
+  - codebase_context
+forbidden_artifacts:
+  - implementation
+  - test_plan
+reviewed_by: []
+reviews:
+  - decomposer
+agreement_participation: []
+required_capabilities:
+  - reasoning
+  - structured_output
+model: claude-sonnet-5
+max_tokens: null
+dispatch_type: agent
+runner: claude-code

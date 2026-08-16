@@ -1,0 +1,102 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": ["tsconfig.base.json", ".nvmrc"],
+  "globalEnv": ["NODE_ENV", "CI"],
+  "boundaries": {
+    "tags": {
+      "foundation": {
+        "dependencies": {
+          "deny": [
+            "contracts",
+            "domain",
+            "infrastructure",
+            "orchestration",
+            "application",
+            "composition"
+          ]
+        }
+      },
+      "contracts": {
+        "dependencies": {
+          "deny": ["domain", "infrastructure", "orchestration", "application", "composition"]
+        }
+      },
+      "domain": {
+        "dependencies": {
+          "deny": ["infrastructure", "orchestration", "application", "composition"]
+        }
+      },
+      "infrastructure": {
+        "dependencies": {
+          "deny": ["orchestration", "application", "composition"]
+        }
+      },
+      "orchestration": {
+        "dependencies": {
+          "deny": ["application", "composition"]
+        }
+      },
+      "application": {
+        "dependencies": {
+          "deny": ["composition"]
+        }
+      }
+    }
+  },
+  "tasks": {
+    "clean": {
+      "cache": false
+    },
+    "//#format:check:run": {
+      "inputs": ["$TURBO_DEFAULT$"],
+      "outputs": []
+    },
+    "//#syncpack:check:run": {
+      "inputs": ["package.json", "packages/**/package.json", "pnpm-lock.yaml"],
+      "outputs": []
+    },
+    "//#publint:run": {
+      "inputs": ["package.json", "packages/**/package.json", "pnpm-lock.yaml"],
+      "outputs": []
+    },
+    "//#knip:run": {
+      "inputs": ["$TURBO_DEFAULT$"],
+      "outputs": []
+    },
+    "lint": {
+      "dependsOn": ["build:dev"],
+      "inputs": ["$TURBO_DEFAULT$", "eslint.config.*", "../../eslint.config.*"],
+      "outputs": []
+    },
+    "typecheck": {
+      "dependsOn": ["^build:dev"],
+      "inputs": ["$TURBO_DEFAULT$", "tsconfig*.json"],
+      "outputs": []
+    },
+    "test:unit": {
+      "dependsOn": ["typecheck"],
+      "outputs": ["coverage/**"],
+      "inputs": ["src/**", "test/**", "vitest.config.*"]
+    },
+    "test:e2e": {
+      "dependsOn": ["test:unit"],
+      "inputs": ["src/**", "e2e/**", "playwright.config.*"],
+      "outputs": ["playwright-report/**", "test-results/**"]
+    },
+    "test:integration": {
+      "dependsOn": ["typecheck"],
+      "inputs": ["src/**", "test/**", "vitest.*.config.*"],
+      "outputs": []
+    },
+    "build:dev": {
+      "dependsOn": ["^build:dev", "typecheck"],
+      "inputs": ["$TURBO_DEFAULT$", "tsconfig*.json"],
+      "outputs": ["dist/**"]
+    },
+    "build:prod": {
+      "dependsOn": ["^build:prod", "typecheck"],
+      "inputs": ["$TURBO_DEFAULT$", "tsconfig*.json"],
+      "outputs": ["dist/**"]
+    }
+  }
+}

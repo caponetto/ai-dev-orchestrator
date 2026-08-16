@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="hub-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#22d3ee" stop-opacity="0.9"/>
+      <stop offset="60%" stop-color="#06b6d4" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#0891b2" stop-opacity="0.4"/>
+    </radialGradient>
+    <radialGradient id="node-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#22d3ee" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#06b6d4" stop-opacity="0.3"/>
+    </radialGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="glow-strong">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="96" fill="#0a0a12"/>
+
+  <g filter="url(#glow)" stroke="#06b6d4" stroke-width="3" stroke-opacity="0.6">
+    <line x1="256" y1="256" x2="120" y2="120"/>
+    <line x1="256" y1="256" x2="392" y2="120"/>
+    <line x1="256" y1="256" x2="120" y2="392"/>
+    <line x1="256" y1="256" x2="392" y2="392"/>
+  </g>
+
+  <!-- Central hub hexagon -->
+  <g filter="url(#glow-strong)" transform="translate(256,256)">
+    <polygon points="0,-56 48,-28 48,28 0,56 -48,28 -48,-28"
+             fill="url(#hub-glow)" stroke="#22d3ee" stroke-width="3"/>
+  </g>
+
+  <!-- Agent node: top-left -->
+  <g filter="url(#glow)" transform="translate(120,120)">
+    <polygon points="0,-22 19,-11 19,11 0,22 -19,11 -19,-11"
+             fill="url(#node-glow)" stroke="#22d3ee" stroke-width="2"/>
+  </g>
+
+  <!-- Agent node: top-right -->
+  <g filter="url(#glow)" transform="translate(392,120)">
+    <polygon points="0,-22 19,-11 19,11 0,22 -19,11 -19,-11"
+             fill="url(#node-glow)" stroke="#22d3ee" stroke-width="2"/>
+  </g>
+
+  <!-- Agent node: bottom-left -->
+  <g filter="url(#glow)" transform="translate(120,392)">
+    <polygon points="0,-22 19,-11 19,11 0,22 -19,11 -19,-11"
+             fill="url(#node-glow)" stroke="#22d3ee" stroke-width="2"/>
+  </g>
+
+  <!-- Agent node: bottom-right -->
+  <g filter="url(#glow)" transform="translate(392,392)">
+    <polygon points="0,-22 19,-11 19,11 0,22 -19,11 -19,-11"
+             fill="url(#node-glow)" stroke="#22d3ee" stroke-width="2"/>
+  </g>
+</svg>

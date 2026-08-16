@@ -1,0 +1,47 @@
+{
+  "name": "@ai-orchestrator/prompt-engine",
+  "version": "1.0.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/caponetto/ai-dev-orchestrator.git",
+    "directory": "packages/prompt-engine"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "clean": "rimraf dist tsconfig.build.tsbuildinfo",
+    "build:base": "rimraf dist tsconfig.build.tsbuildinfo && tsc -p tsconfig.build.json",
+    "build:dev": "pnpm run build:base",
+    "build:prod": "pnpm run build:base --sourceMap false --declarationMap false",
+    "lint": "eslint src/",
+    "test:unit": "vitest run",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit"
+  },
+  "dependencies": {
+    "@ai-orchestrator/artifacts": "workspace:*",
+    "@ai-orchestrator/ports": "workspace:*",
+    "@ai-orchestrator/schemas": "workspace:*",
+    "@ai-orchestrator/utils": "workspace:*",
+    "diff": "^9.0.0",
+    "yaml": "^2.9.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@ai-orchestrator/build-config": "workspace:*",
+    "@types/diff": "^8.0.0",
+    "@types/node": "^26.1.0",
+    "vitest": "^4.1.10"
+  }
+}

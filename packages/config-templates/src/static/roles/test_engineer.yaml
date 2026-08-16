@@ -1,0 +1,27 @@
+id: test_engineer
+name: Test Engineer
+description: Write independent tests for edge cases, boundary inputs, and adversarial scenarios
+owned_artifacts:
+  - test_suite
+readable_artifacts:
+  - canonical_specification
+  - codebase_context
+  - plan
+  - implementation
+  - test_plan
+  - test_suite
+forbidden_artifacts: []
+reviewed_by: []
+reviews: []
+agreement_participation:
+  - agreement_type: implementation_agreement
+    action: reviewed
+required_capabilities:
+  - code_generation
+  - reasoning
+model: claude-sonnet-5
+max_tokens: null
+dispatch_type: agent
+runner: claude-code
+agent_config:
+  timeoutMs: 1200000

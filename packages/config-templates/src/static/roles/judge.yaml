@@ -1,0 +1,31 @@
+id: judge
+name: Judge
+description: Arbitrate when reviewers and implementer cannot converge
+owned_artifacts:
+  - judge_decision
+readable_artifacts:
+  - implementation
+  - static_review
+  - security_review
+  - performance_review
+  - design_review
+  - adversarial_review
+  - docs_review
+  - ux_review
+  - review_report
+  - plan
+  - canonical_specification
+  - codebase_context
+  - test_suite
+forbidden_artifacts: []
+reviewed_by: []
+reviews:
+  - implementer
+agreement_participation: []
+required_capabilities:
+  - reasoning
+  - structured_output
+model: claude-opus-4-6
+max_tokens: null
+dispatch_type: agent
+runner: claude-code

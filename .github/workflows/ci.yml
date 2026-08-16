@@ -1,0 +1,154 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - LICENSE
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - LICENSE
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Quality checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup
+        uses: ./.github/actions/setup
+        with:
+          turbo-cache-suffix: quality
+
+      - name: Check formatting
+        id: format
+        run: pnpm format:check
+        continue-on-error: true
+
+      - name: Check boundaries
+        id: boundaries
+        run: pnpm exec turbo boundaries
+        continue-on-error: true
+
+      - name: Typecheck
+        id: typecheck
+        run: pnpm typecheck
+        continue-on-error: true
+
+      - name: Syncpack
+        id: syncpack
+        run: pnpm syncpack:check
+        continue-on-error: true
+
+      - name: Build production
+        id: build
+        run: pnpm build:prod
+        continue-on-error: true
+
+      - name: Lint
+        id: lint
+        run: pnpm lint
+        continue-on-error: true
+
+      - name: Publint
+        id: publint
+        run: pnpm publint
+        continue-on-error: true
+
+      - name: Knip
+        id: knip
+        run: pnpm knip
+        continue-on-error: true
+
+      - name: Audit dependencies
+        run: pnpm audit --prod --audit-level=high
+        continue-on-error: true
+
+      - name: Verify all checks passed
+        if: always()
+        run: |
+          failures=""
+          [[ "${{ steps.format.outcome }}" == "failure" ]] && failures="$failures format"
+          [[ "${{ steps.boundaries.outcome }}" == "failure" ]] && failures="$failures boundaries"
+          [[ "${{ steps.typecheck.outcome }}" == "failure" ]] && failures="$failures typecheck"
+          [[ "${{ steps.syncpack.outcome }}" == "failure" ]] && failures="$failures syncpack"
+          [[ "${{ steps.build.outcome }}" == "failure" ]] && failures="$failures build"
+          [[ "${{ steps.lint.outcome }}" == "failure" ]] && failures="$failures lint"
+          [[ "${{ steps.publint.outcome }}" == "failure" ]] && failures="$failures publint"
+          [[ "${{ steps.knip.outcome }}" == "failure" ]] && failures="$failures knip"
+          if [[ -n "$failures" ]]; then
+            echo "::error::Failed checks:$failures"
+            exit 1
+          fi
+
+  test:
+    name: Unit and integration tests
+    needs: [quality]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup
+        uses: ./.github/actions/setup
+        with:
+          turbo-cache-suffix: quality
+
+      - name: Unit tests
+        run: pnpm test:unit:coverage
+
+      - name: Integration tests
+        run: pnpm test:integration
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: coverage-report
+          path: packages/**/coverage/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  e2e:
+    name: End-to-end tests
+    needs: [test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup
+        uses: ./.github/actions/setup
+        with:
+          turbo-cache-suffix: quality
+
+      - name: Install Playwright browsers
+        run: pnpm test:e2e:install
+
+      - name: E2E tests
+        run: pnpm test:e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-report
+          path: |
+            packages/dashboard/playwright-report/
+            packages/dashboard/test-results/
+          retention-days: 7

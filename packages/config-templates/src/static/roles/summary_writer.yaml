@@ -1,0 +1,37 @@
+id: summary_writer
+name: Summary Writer
+description: Generate commit message and PR description from completed work
+owned_artifacts:
+  - release_summary
+readable_artifacts:
+  - canonical_specification
+  - plan
+  - plan_review
+  - implementation
+  - test_plan
+  - test_suite
+  - static_review
+  - security_review
+  - performance_review
+  - design_review
+  - adversarial_review
+  - docs_review
+  - ux_review
+  - judge_decision
+  - review_report
+  - verification
+  - acceptance_validation
+  - codebase_context
+forbidden_artifacts: []
+reviewed_by: []
+reviews: []
+agreement_participation:
+  - agreement_type: release_agreement
+    action: reviewed
+required_capabilities:
+  - reasoning
+  - structured_output
+model: claude-haiku-4-5
+max_tokens: null
+dispatch_type: agent
+runner: claude-code

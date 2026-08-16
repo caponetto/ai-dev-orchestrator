@@ -1,0 +1,13 @@
+# Pre-commit quality gates for automated and agent-driven commits.
+
+pnpm exec lint-staged
+pnpm typecheck
+pnpm lint
+pnpm format:check
+pnpm syncpack:check
+pnpm build:prod
+pnpm publint
+pnpm knip
+pnpm test:unit:coverage
+pnpm test:integration
+pnpm test:e2e

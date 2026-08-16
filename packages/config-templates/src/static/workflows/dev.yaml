@@ -1,0 +1,869 @@
+# Production Development Workflow
+#
+# Full software delivery pipeline: intake → requirements → codebase analysis → planning
+# → plan review → implementation → test authoring → parallel code reviews
+# → review synthesis → test execution → acceptance validation → release.
+#
+# Key design decisions:
+# - Plan review approval proceeds directly to implementation (no human gate)
+# - Review synthesis approval proceeds directly to test execution (no human gate)
+# - Human gates only at: requirements approval, escalation, non-fixable acceptance failures
+# - Independent test authoring by dedicated test engineer after implementation
+# - Review synthesis deduplicates and consolidates all parallel reviewer outputs
+# - Verification split into test execution (run checks) and acceptance validation (spec criteria)
+
+name: dev
+version: 1.0.0
+initial_state: INTAKE
+budget:
+  max_tokens_per_run: 20000000
+terminal_states:
+  - DONE
+  - FAILED
+  - ABORTED
+
+states:
+  # ──────────────────────────────────────────────────────────────
+  # INTAKE — receive and validate input specification
+  # ──────────────────────────────────────────────────────────────
+  INTAKE:
+    type: action
+    label: Intake
+    description: Receive and validate input specification, check feasibility
+    entry_actions:
+      - type: record_journal
+        params:
+          event: run_started
+      - type: dispatch_worker
+        params:
+          role: requirements_analyst
+    transitions:
+      # Feasible + has clarification needs → deeper requirements discovery
+      - target: REFINEMENT
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: canonical_specification
+          - type: specification_feasible
+            params: {}
+          - type: has_clarification_needs
+            params: {}
+        governance_required: false
+        priority: 1
+      # Feasible + no clarification needs → straight to codebase analysis
+      - target: CODEBASE_ANALYSIS
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: canonical_specification
+          - type: specification_feasible
+            params: {}
+        governance_required: false
+        priority: 2
+      # Not feasible → human must revise
+      - target: WAITING_FOR_HUMAN
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: canonical_specification
+        governance_required: false
+        priority: 3
+      - target: FAILED
+        trigger: failure
+        guards: []
+        governance_required: false
+        priority: 4
+
+  # ──────────────────────────────────────────────────────────────
+  # REFINEMENT — discover and clarify requirements
+  # ──────────────────────────────────────────────────────────────
+  REFINEMENT:
+    type: action
+    label: Refinement
+    description: Refine and clarify requirements via questions
+    entry_actions:
+      - type: dispatch_worker
+        params:
+          role: requirements_analyst
+    transitions:
+      - target: WAITING_FOR_HUMAN
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: clarification_questions
+        governance_required: false
+        priority: 1
+      - target: WAITING_FOR_HUMAN
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: canonical_specification
+        governance_required: false
+        priority: 2
+      - target: FAILED
+        trigger: failure
+        guards: []
+        governance_required: false
+        priority: 3
+
+  # ──────────────────────────────────────────────────────────────
+  # WAITING_FOR_HUMAN — central hub for human interaction
+  # ──────────────────────────────────────────────────────────────
+  WAITING_FOR_HUMAN:
+    type: wait
+    label: Waiting for Human
+    description: Waiting for human input — clarification, escalation, or approval
+    entry_actions:
+      - type: notify_human
+        params:
+          reason: input_needed
+    transitions:
+      # Clarification loop — human answers, back to requirements
+      - target: REFINEMENT
+        trigger: human_input
+        guards:
+          - type: waiting_context_matches
+            params:
+              requesting_state: REFINEMENT
+        governance_required: false
+        priority: 1
+      # Human provides input after review synthesis escalation
+      - target: IMPLEMENTATION
+        trigger: human_input
+        guards:
+          - type: waiting_context_matches
+            params:
+              requesting_state: REVIEW_SYNTHESIS
+        governance_required: false
+        priority: 2
+      # Human provides input after remediation triage escalation
+      - target: IMPLEMENTATION
+        trigger: human_input
+        guards:
+          - type: waiting_context_matches
+            params:
+              requesting_state: REMEDIATION_TRIAGE
+        governance_required: false
+        priority: 3
+      # Human provides input after judge escalation
+      - target: PLANNING
+        trigger: human_input
+        guards:
+          - type: waiting_context_matches
+            params:
+              requesting_state: JUDGE_REVIEW
+        governance_required: false
+        priority: 4
+      # Human provides input after plan review escalation
+      - target: PLANNING
+        trigger: human_input
+        guards:
+          - type: waiting_context_matches
+            params:
+              requesting_state: PLAN_REVIEW
+        governance_required: false
+        priority: 5
+      # Human provides input after acceptance validation non-fixable
+      - target: IMPLEMENTATION
+        trigger: human_input
+        guards:
+          - type: waiting_context_matches
+            params:
+              requesting_state: ACCEPTANCE_VALIDATION
+        governance_required: false
+        priority: 6
+      # Human rejects intake spec → back to intake for revision
+      - target: INTAKE
+        trigger: human_rejected
+        guards:
+          - type: waiting_context_matches
+            params:
+              requesting_state: INTAKE
+        governance_required: false
+        priority: 7
+      # Human approves intake spec → proceed to codebase analysis
+      - target: CODEBASE_ANALYSIS
+        trigger: human_approved
+        guards:
+          - type: waiting_context_matches
+            params:
+              requesting_state: INTAKE
+        governance_required: false
+        priority: 8
+      # Human approves requirements → proceed to codebase analysis
+      - target: CODEBASE_ANALYSIS
+        trigger: human_approved
+        guards:
+          - type: waiting_context_matches
+            params:
+              requesting_state: REFINEMENT
+        governance_required: false
+        priority: 9
+      # Human approves after judge escalation → proceed to planning
+      - target: PLANNING
+        trigger: human_approved
+        guards:
+          - type: waiting_context_matches
+            params:
+              requesting_state: JUDGE_REVIEW
+        governance_required: false
+        priority: 10
+      # Human approves after plan review escalation → proceed to implementation
+      - target: IMPLEMENTATION
+        trigger: human_approved
+        guards:
+          - type: waiting_context_matches
+            params:
+              requesting_state: PLAN_REVIEW
+        governance_required: false
+        priority: 11
+      # Human approves after acceptance validation non-fixable → proceed to release
+      - target: WRAP_UP
+        trigger: human_approved
+        guards:
+          - type: waiting_context_matches
+            params:
+              requesting_state: ACCEPTANCE_VALIDATION
+        governance_required: false
+        priority: 12
+      # Human approves after code review budget escalation → proceed to review synthesis
+      - target: REVIEW_SYNTHESIS
+        trigger: human_approved
+        guards:
+          - type: waiting_context_matches
+            params:
+              requesting_state: CODE_REVIEW
+        governance_required: false
+        priority: 13
+      # Human approves after review synthesis escalation → proceed to test execution
+      - target: TEST_EXECUTION
+        trigger: human_approved
+        guards:
+          - type: waiting_context_matches
+            params:
+              requesting_state: REVIEW_SYNTHESIS
+        governance_required: false
+        priority: 14
+      # Human approves after remediation triage escalation → proceed to implementation
+      - target: IMPLEMENTATION
+        trigger: human_approved
+        guards:
+          - type: waiting_context_matches
+            params:
+              requesting_state: REMEDIATION_TRIAGE
+        governance_required: false
+        priority: 15
+      # Human rejects requirements → back to requirements
+      - target: REFINEMENT
+        trigger: human_rejected
+        guards:
+          - type: waiting_context_matches
+            params:
+              requesting_state: REFINEMENT
+        governance_required: false
+        priority: 16
+      # Human rejects after plan review → back to requirements
+      - target: REFINEMENT
+        trigger: human_rejected
+        guards:
+          - type: waiting_context_matches
+            params:
+              requesting_state: PLAN_REVIEW
+        governance_required: false
+        priority: 17
+      # Human rejects after acceptance validation → back to implementation
+      - target: IMPLEMENTATION
+        trigger: human_rejected
+        guards:
+          - type: waiting_context_matches
+            params:
+              requesting_state: ACCEPTANCE_VALIDATION
+        governance_required: false
+        priority: 18
+      # Fallback rejection → abort
+      - target: ABORTED
+        trigger: human_rejected
+        guards: []
+        governance_required: false
+        priority: 19
+
+  # ──────────────────────────────────────────────────────────────
+  # CODEBASE_ANALYSIS — scan repo before planning
+  # ──────────────────────────────────────────────────────────────
+  CODEBASE_ANALYSIS:
+    type: action
+    label: Codebase Analysis
+    description: Scan repository structure, patterns, conventions, and affected files
+    entry_actions:
+      - type: dispatch_worker
+        params:
+          role: codebase_analyst
+    transitions:
+      - target: PLANNING
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: codebase_context
+          # When project context is available from previous runs, confidence
+          # in codebase analysis is higher — proceed to planning.
+          - type: project_context_available
+            params:
+              category: codebase
+        governance_required: false
+        priority: 1
+      - target: PLANNING
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: codebase_context
+        governance_required: false
+        priority: 2
+      - target: FAILED
+        trigger: failure
+        guards: []
+        governance_required: false
+        priority: 3
+
+  # ──────────────────────────────────────────────────────────────
+  # PLANNING — generate implementation plan
+  # ──────────────────────────────────────────────────────────────
+  PLANNING:
+    type: action
+    label: Planning
+    description: Generate or revise implementation plan
+    entry_actions:
+      - type: dispatch_worker
+        params:
+          role: planner
+    transitions:
+      - target: PLAN_REVIEW
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: plan
+          - type: plan_structure_valid
+            params: {}
+        governance_required: false
+        priority: 1
+      - target: FAILED
+        trigger: failure
+        guards: []
+        governance_required: false
+        priority: 2
+
+  # ──────────────────────────────────────────────────────────────
+  # PLAN_REVIEW — review plan (auto-proceed on approval)
+  # ──────────────────────────────────────────────────────────────
+  PLAN_REVIEW:
+    type: review
+    label: Plan Review
+    description: Review the plan for completeness and correctness
+    entry_actions:
+      - type: dispatch_worker
+        params:
+          role: plan_reviewer
+      - type: generate_agreement
+        params:
+          type: planning_agreement
+    transitions:
+      # Approved → proceed directly to implementation (no human gate)
+      - target: IMPLEMENTATION
+        trigger: review_approved
+        guards: []
+        governance_required: false
+        priority: 1
+      # Rejected → iterate with planner
+      - target: PLANNING
+        trigger: review_rejected
+        guards:
+          - type: iteration_below_limit
+            params:
+              contract: plan_review_loop
+        governance_required: false
+        priority: 2
+      # Iteration exhausted → escalate to human
+      - target: WAITING_FOR_HUMAN
+        trigger: iteration_exhausted
+        guards: []
+        governance_required: false
+        priority: 3
+      - target: WAITING_FOR_HUMAN
+        trigger: escalation
+        guards: []
+        governance_required: false
+        priority: 4
+      - target: FAILED
+        trigger: failure
+        guards: []
+        governance_required: false
+        priority: 5
+
+  # ──────────────────────────────────────────────────────────────
+  # IMPLEMENTATION — execute the plan
+  # ──────────────────────────────────────────────────────────────
+  IMPLEMENTATION:
+    type: action
+    label: Implementation
+    description: Implement the plan
+    entry_actions:
+      - type: dispatch_worker
+        params:
+          role: implementer
+    transitions:
+      # High confidence → proceed to test authoring
+      - target: TEST_AUTHORING
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: implementation
+          - type: confidence_threshold
+            params:
+              min_confidence: 0.7
+        governance_required: false
+        priority: 1
+      # Lower confidence → still proceed (confidence is advisory here)
+      - target: TEST_AUTHORING
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: implementation
+        governance_required: false
+        priority: 2
+      - target: FAILED
+        trigger: failure
+        guards: []
+        governance_required: false
+        priority: 3
+
+  # ──────────────────────────────────────────────────────────────
+  # TEST_AUTHORING — independent test writing
+  # ──────────────────────────────────────────────────────────────
+  TEST_AUTHORING:
+    type: action
+    label: Test Authoring
+    description: Independent test writing for edge cases, boundary inputs, and adversarial scenarios
+    entry_actions:
+      - type: dispatch_worker
+        params:
+          role: test_engineer
+    transitions:
+      - target: CODE_REVIEW
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: test_suite
+        governance_required: false
+        priority: 1
+      - target: FAILED
+        trigger: failure
+        guards: []
+        governance_required: false
+        priority: 2
+
+  # ──────────────────────────────────────────────────────────────
+  # CODE_REVIEW — parallel review (always flows to synthesis)
+  # ──────────────────────────────────────────────────────────────
+  CODE_REVIEW:
+    type: review
+    label: Code Review
+    description: Parallel code review by all configured reviewers
+    entry_actions:
+      - type: dispatch_parallel_workers
+        params:
+          roles:
+            - static_reviewer
+            - design_reviewer
+            - security_reviewer
+            - performance_reviewer
+            - adversarial_reviewer
+            - docs_reviewer
+            - ux_reviewer
+          docs_only_roles:
+            - docs_reviewer
+      - type: generate_agreement
+        params:
+          type: implementation_agreement
+    transitions:
+      # All outcomes flow to synthesis — approved, rejected, or exhausted
+      - target: REVIEW_SYNTHESIS
+        trigger: review_approved
+        guards: []
+        governance_required: false
+        priority: 1
+      - target: REVIEW_SYNTHESIS
+        trigger: review_rejected
+        guards: []
+        governance_required: false
+        priority: 2
+      - target: REVIEW_SYNTHESIS
+        trigger: iteration_exhausted
+        guards: []
+        governance_required: false
+        priority: 3
+      - target: WAITING_FOR_HUMAN
+        trigger: escalation
+        guards: []
+        governance_required: false
+        priority: 4
+      - target: FAILED
+        trigger: failure
+        guards: []
+        governance_required: false
+        priority: 5
+
+  # ──────────────────────────────────────────────────────────────
+  # REVIEW_SYNTHESIS — consolidate parallel review findings
+  # ──────────────────────────────────────────────────────────────
+  REVIEW_SYNTHESIS:
+    type: action
+    label: Review Synthesis
+    description: Consolidate parallel review findings into a unified report
+    entry_actions:
+      - type: dispatch_worker
+        params:
+          role: report_synthesizer
+    transitions:
+      # All reviewers approved → proceed directly to test execution (no human gate)
+      - target: TEST_EXECUTION
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: review_report
+          - type: synthesis_approved
+            params: {}
+        governance_required: false
+        priority: 1
+      # Not approved + within iteration limit → triage findings before implementation
+      - target: REMEDIATION_TRIAGE
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: review_report
+          - type: iteration_below_limit
+            params:
+              contract: implementation_review_loop
+        governance_required: false
+        priority: 2
+      # Not approved + iteration exhausted → judge arbitration
+      - target: JUDGE_REVIEW
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: review_report
+        governance_required: false
+        priority: 3
+      - target: WAITING_FOR_HUMAN
+        trigger: escalation
+        guards: []
+        governance_required: false
+        priority: 4
+      - target: FAILED
+        trigger: failure
+        guards: []
+        governance_required: false
+        priority: 5
+
+  # ──────────────────────────────────────────────────────────────
+  # JUDGE_REVIEW — arbitrate when loop fails to converge
+  # ──────────────────────────────────────────────────────────────
+  JUDGE_REVIEW:
+    type: judge
+    label: Judge Review
+    description: Judge arbitrates when implementer-reviewer loop fails to converge
+    entry_actions:
+      - type: dispatch_worker
+        params:
+          role: judge
+    transitions:
+      - target: TEST_EXECUTION
+        trigger: judge_approved
+        guards: []
+        governance_required: false
+        priority: 1
+      - target: PLANNING
+        trigger: judge_rejected
+        guards:
+          - type: findings_indicate_plan_issue
+            params: {}
+        governance_required: false
+        priority: 2
+      - target: REMEDIATION_TRIAGE
+        trigger: judge_rejected
+        guards:
+          - type: iteration_below_limit
+            params:
+              contract: implementation_review_loop
+        governance_required: false
+        priority: 3
+      # Judge rejected + iteration exhausted → human decides
+      - target: WAITING_FOR_HUMAN
+        trigger: judge_rejected
+        guards: []
+        governance_required: false
+        priority: 4
+      - target: WAITING_FOR_HUMAN
+        trigger: escalation
+        guards: []
+        governance_required: false
+        priority: 5
+      - target: FAILED
+        trigger: failure
+        guards: []
+        governance_required: false
+        priority: 6
+
+  # ──────────────────────────────────────────────────────────────
+  # REMEDIATION_TRIAGE — classify findings before re-implementation
+  # ──────────────────────────────────────────────────────────────
+  REMEDIATION_TRIAGE:
+    type: action
+    label: Remediation Triage
+    description: Triage review findings into an actionable fix plan before re-entering implementation
+    entry_actions:
+      - type: dispatch_worker
+        params:
+          role: remediation_triage
+    transitions:
+      # Known failure pattern → re-plan (learned from previous runs)
+      - target: PLANNING
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: remediation_plan
+          - type: known_failure_pattern
+            params:
+              pattern_substring: plan-level
+        governance_required: false
+        priority: 1
+      # Findings indicate plan-level issue → re-plan
+      - target: PLANNING
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: remediation_plan
+          - type: triage_indicates_plan_issue
+            params: {}
+        governance_required: false
+        priority: 2
+      # Findings require human judgment → escalate
+      - target: WAITING_FOR_HUMAN
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: remediation_plan
+          - type: triage_needs_human
+            params: {}
+        governance_required: false
+        priority: 3
+      # Default: implementation-level fixes → back to implementation
+      - target: IMPLEMENTATION
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: remediation_plan
+        governance_required: false
+        priority: 4
+      - target: FAILED
+        trigger: failure
+        guards: []
+        governance_required: false
+        priority: 5
+
+  # ──────────────────────────────────────────────────────────────
+  # TEST_EXECUTION — run all checks (tests, lint, type check, build)
+  # ──────────────────────────────────────────────────────────────
+  TEST_EXECUTION:
+    type: action
+    label: Test Execution
+    description: Run tests, type checks, linting, and build
+    entry_actions:
+      - type: dispatch_worker
+        params:
+          role: verifier
+    transitions:
+      # All checks pass → proceed to acceptance validation
+      - target: ACCEPTANCE_VALIDATION
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: verification
+          - type: verification_passed
+            params: {}
+        governance_required: false
+        priority: 1
+      # Fixable failures → back to implementation
+      - target: IMPLEMENTATION
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: verification
+          - type: verification_failures_are_fixable
+            params: {}
+        governance_required: false
+        priority: 2
+      # Non-fixable failures → back to implementation (no human gate)
+      - target: IMPLEMENTATION
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: verification
+        governance_required: false
+        priority: 3
+      - target: IMPLEMENTATION
+        trigger: failure
+        guards: []
+        governance_required: false
+        priority: 4
+
+  # ──────────────────────────────────────────────────────────────
+  # ACCEPTANCE_VALIDATION — cross-reference with spec criteria
+  # ──────────────────────────────────────────────────────────────
+  ACCEPTANCE_VALIDATION:
+    type: action
+    label: Acceptance Validation
+    description: Validate implementation against specification acceptance criteria
+    entry_actions:
+      - type: dispatch_worker
+        params:
+          role: acceptance_validator
+      - type: generate_agreement
+        params:
+          type: verification_agreement
+    transitions:
+      # All acceptance criteria met + high confidence → proceed to release
+      - target: WRAP_UP
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: acceptance_validation
+          - type: acceptance_passed
+            params: {}
+          - type: confidence_threshold
+            params:
+              min_confidence: 0.8
+        governance_required: false
+        priority: 1
+      # All acceptance criteria met → proceed to release
+      - target: WRAP_UP
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: acceptance_validation
+          - type: acceptance_passed
+            params: {}
+        governance_required: false
+        priority: 2
+      # Criteria not met, within iteration limit → back to implementation
+      - target: IMPLEMENTATION
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: acceptance_validation
+          - type: iteration_below_limit
+            params:
+              contract: acceptance_validation_loop
+        governance_required: false
+        priority: 3
+      # Criteria not met, iteration limit exhausted → human decides
+      - target: WAITING_FOR_HUMAN
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: acceptance_validation
+        governance_required: false
+        priority: 4
+      # Failure → fail
+      - target: FAILED
+        trigger: failure
+        guards: []
+        governance_required: false
+        priority: 5
+
+  # ──────────────────────────────────────────────────────────────
+  # WRAP_UP — generate commit message and PR description
+  # ──────────────────────────────────────────────────────────────
+  WRAP_UP:
+    type: action
+    label: Wrap Up
+    description: Generate commit message and PR description from completed work
+    entry_actions:
+      - type: dispatch_worker
+        params:
+          role: summary_writer
+      - type: generate_agreement
+        params:
+          type: release_agreement
+    transitions:
+      - target: DONE
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: release_summary
+        governance_required: false
+        priority: 1
+      - target: FAILED
+        trigger: failure
+        guards: []
+        governance_required: false
+        priority: 2
+
+  # ──────────────────────────────────────────────────────────────
+  # Terminal states
+  # ──────────────────────────────────────────────────────────────
+  DONE:
+    type: terminal
+    label: Done
+    description: Workflow completed successfully
+    entry_actions:
+      - type: produce_manifest
+        params: {}
+      - type: record_journal
+        params:
+          event: run_completed
+    transitions: []
+
+  FAILED:
+    type: terminal
+    label: Failed
+    description: Workflow failed due to process error, schema violation, or infrastructure failure
+    entry_actions:
+      - type: record_journal
+        params:
+          event: run_failed
+    transitions: []
+
+  ABORTED:
+    type: terminal
+    label: Aborted
+    description: Workflow aborted by user request or escalation
+    entry_actions:
+      - type: record_journal
+        params:
+          event: run_aborted
+    transitions: []

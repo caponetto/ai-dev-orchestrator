@@ -1,0 +1,21 @@
+id: codebase_analyst
+name: Codebase Analyst
+description: Scan repository structure, patterns, conventions, and affected files before planning
+owned_artifacts:
+  - codebase_context
+readable_artifacts:
+  - canonical_specification
+forbidden_artifacts:
+  - plan
+  - implementation
+  - test_plan
+reviewed_by: []
+reviews: []
+agreement_participation: []
+required_capabilities:
+  - reasoning
+  - code_review
+model: claude-sonnet-5
+max_tokens: null
+dispatch_type: agent
+runner: claude-code

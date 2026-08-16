@@ -1,0 +1,48 @@
+{
+  "name": "@ai-orchestrator/utils",
+  "version": "1.0.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/caponetto/ai-dev-orchestrator.git",
+    "directory": "packages/utils"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./formatters": {
+      "types": "./dist/formatters.d.ts",
+      "import": "./dist/formatters.js"
+    },
+    "./key-converters": {
+      "types": "./dist/key-converters.d.ts",
+      "import": "./dist/key-converters.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "clean": "rimraf dist tsconfig.build.tsbuildinfo",
+    "build:base": "rimraf dist tsconfig.build.tsbuildinfo && tsc -p tsconfig.build.json",
+    "build:dev": "pnpm run build:base",
+    "build:prod": "pnpm run build:base --sourceMap false --declarationMap false",
+    "lint": "eslint src/",
+    "test:unit": "vitest run",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit"
+  },
+  "dependencies": {
+    "yaml": "^2.9.0"
+  },
+  "devDependencies": {
+    "@ai-orchestrator/build-config": "workspace:*",
+    "@types/node": "^26.1.0",
+    "vitest": "^4.1.10"
+  }
+}

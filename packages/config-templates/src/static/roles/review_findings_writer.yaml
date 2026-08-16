@@ -1,0 +1,26 @@
+id: review_findings_writer
+name: Review Findings Writer
+description: Produce a compact, human-readable findings report from the review synthesis
+owned_artifacts:
+  - review_findings
+readable_artifacts:
+  - canonical_specification
+  - review_report
+  - static_review
+  - security_review
+  - performance_review
+  - design_review
+  - adversarial_review
+  - docs_review
+  - ux_review
+forbidden_artifacts: []
+reviewed_by: []
+reviews: []
+agreement_participation: []
+required_capabilities:
+  - reasoning
+  - structured_output
+model: claude-haiku-4-5
+max_tokens: null
+dispatch_type: agent
+runner: claude-code

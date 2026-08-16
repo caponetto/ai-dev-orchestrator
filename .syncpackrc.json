@@ -1,0 +1,21 @@
+{
+  "$schema": "https://jamiemason.github.io/syncpack/config/syncpackrc.json",
+  "semverGroups": [
+    {
+      "label": "Use workspace protocol for internal packages",
+      "packages": ["**"],
+      "dependencies": ["@ai-orchestrator/**"],
+      "dependencyTypes": ["dev", "prod"],
+      "range": "workspace:*"
+    }
+  ],
+  "versionGroups": [
+    {
+      "label": "Internal packages use workspace protocol",
+      "packages": ["**"],
+      "dependencies": ["@ai-orchestrator/**"],
+      "dependencyTypes": ["dev", "prod"],
+      "pinVersion": "workspace:*"
+    }
+  ]
+}

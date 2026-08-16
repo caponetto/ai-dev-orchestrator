@@ -1,0 +1,72 @@
+/* Ensure nodes always render above edges */
+.react-flow__node {
+  z-index: 1 !important;
+}
+
+.state-pulse {
+  z-index: 2 !important;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes state-pulse {
+    0%,
+    100% {
+      box-shadow:
+        0 0 0 3px rgba(45, 212, 191, 0.35),
+        0 0 0 0 rgba(20, 184, 166, 0.45);
+    }
+    50% {
+      box-shadow:
+        0 0 0 3px rgba(45, 212, 191, 0.5),
+        0 0 18px 6px rgba(20, 184, 166, 0.35);
+    }
+  }
+
+  .state-pulse {
+    animation: state-pulse 2s ease-in-out infinite;
+  }
+}
+
+/* Controls — dark theme */
+.workflow-controls {
+  background: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+.workflow-controls button {
+  background: var(--card) !important;
+  color: var(--muted-foreground) !important;
+  border-bottom-color: var(--border) !important;
+  width: 28px !important;
+  height: 28px !important;
+}
+.workflow-controls button:hover {
+  background: var(--accent) !important;
+  color: var(--foreground) !important;
+}
+.workflow-controls button svg {
+  fill: currentColor !important;
+}
+
+/* Raise node z-index when role tooltip is visible */
+.react-flow__node.role-tooltip-open {
+  z-index: 9999 !important;
+}
+
+/* Make all handles invisible (still functional for edge routing) */
+.react-flow__handle {
+  width: 1px !important;
+  height: 1px !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* MiniMap — dark theme */
+.react-flow__minimap {
+  background: var(--background) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 8px !important;
+}

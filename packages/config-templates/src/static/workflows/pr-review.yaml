@@ -1,0 +1,263 @@
+# PR Review Workflow
+#
+# Production-hardened workflow for reviewing pull requests through explicit
+# source resolution, context synthesis, conditional review dispatch,
+# outcome triage, and fail-closed synthesis. Designed for predictable
+# behavior under partial failure and missing artifacts.
+
+name: pr-review
+version: 1.0.0
+initial_state: SETUP
+budget:
+  max_tokens_per_run: 3000000
+terminal_states:
+  - DONE
+  - FAILED
+  - ABORTED
+states:
+  SETUP:
+    type: action
+    label: Setup
+    description: Clone PR repository and check out the PR branch to a temp directory
+    entry_actions:
+      - type: run_script
+        params:
+          script: setup-pr-repo.ts
+          timeout: 120000
+    transitions:
+      - target: INTAKE
+        trigger: completion
+        guards: []
+        governance_required: false
+        priority: 1
+      - target: FAILED
+        trigger: failure
+        guards: []
+        governance_required: false
+        priority: 2
+  INTAKE:
+    type: action
+    label: Intake
+    description: Validate inputs and resolve source references into structured metadata
+    entry_actions:
+      - type: record_journal
+        params:
+          event: run_started
+      - type: dispatch_worker
+        params:
+          role: context_analyst
+    transitions:
+      - target: DIFF_COMPUTATION
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: canonical_specification
+        governance_required: false
+        priority: 1
+      - target: FAILED
+        trigger: failure
+        guards: []
+        governance_required: false
+        priority: 2
+  DIFF_COMPUTATION:
+    type: action
+    label: Diff Computation
+    description: Pre-compute PR diff and index codebase for symbol-level context
+    entry_actions:
+      - type: run_script
+        params:
+          script: compute-pr-diff.ts
+          timeout: 30000
+      - type: run_script
+        params:
+          script: index-codebase.ts
+          timeout: 150000
+    transitions:
+      - target: REVIEW_EXECUTION
+        trigger: completion
+        guards: []
+        governance_required: false
+        priority: 1
+      - target: FAILED
+        trigger: failure
+        guards: []
+        governance_required: false
+        priority: 2
+  REVIEW_EXECUTION:
+    type: review
+    label: Code Review
+    description: Parallel multi-perspective review of the PR
+    entry_actions:
+      - type: dispatch_parallel_workers
+        params:
+          roles:
+            - static_reviewer
+            - design_reviewer
+            - security_reviewer
+            - performance_reviewer
+            - adversarial_reviewer
+            - docs_reviewer
+            - ux_reviewer
+          docs_only_roles:
+            - docs_reviewer
+    transitions:
+      - target: REVIEW_SYNTHESIS
+        trigger: review_approved
+        guards: []
+        governance_required: false
+        priority: 1
+      - target: REVIEW_SYNTHESIS
+        trigger: review_rejected
+        guards: []
+        governance_required: false
+        priority: 2
+      - target: ABORTED
+        trigger: iteration_exhausted
+        guards: []
+        governance_required: false
+        priority: 3
+      - target: FAILED
+        trigger: failure
+        guards: []
+        governance_required: false
+        priority: 4
+      - target: ABORTED
+        trigger: human_input
+        guards: []
+        governance_required: false
+        priority: 5
+  REVIEW_SYNTHESIS:
+    type: action
+    label: Review Synthesis
+    description: Synthesize review findings into a unified report (only runs with complete inputs)
+    entry_actions:
+      - type: dispatch_worker
+        params:
+          role: report_synthesizer
+    transitions:
+      # With project context, synthesis can leverage patterns from previous reviews
+      - target: WRAP_UP
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: review_report
+          - type: project_context_available
+            params:
+              category: run_history
+        governance_required: false
+        priority: 1
+      - target: WRAP_UP
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: review_report
+        governance_required: false
+        priority: 2
+      - target: FAILED
+        trigger: failure
+        guards: []
+        governance_required: false
+        priority: 3
+      - target: FAILED
+        trigger: completion
+        guards: []
+        governance_required: false
+        priority: 4
+  WRAP_UP:
+    type: action
+    label: Wrap Up
+    description: Generate compact findings report from the review synthesis
+    entry_actions:
+      - type: run_script
+        params:
+          script: review-findings-writer.ts
+          timeout: 30000
+          store_output:
+            artifact_type: review_findings
+            produced_by: script
+    transitions:
+      - target: PUBLISH_FINDINGS
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: review_findings
+        governance_required: false
+        priority: 1
+      - target: FAILED
+        trigger: failure
+        guards: []
+        governance_required: false
+        priority: 2
+  PUBLISH_FINDINGS:
+    type: action
+    label: Publish Findings
+    description: Upload review findings to a GitHub Gist for sharing
+    entry_actions:
+      - type: run_script
+        params:
+          script: upload-findings-gist.ts
+          timeout: 30000
+    transitions:
+      - target: CLEANUP
+        trigger: completion
+        guards: []
+        governance_required: false
+        priority: 1
+      - target: FAILED
+        trigger: failure
+        guards: []
+        governance_required: false
+        priority: 2
+  CLEANUP:
+    type: action
+    label: Cleanup
+    description: Remove cloned repository temp directory
+    entry_actions:
+      - type: run_script
+        params:
+          script: cleanup-pr-repo.ts
+          timeout: 30000
+    transitions:
+      - target: DONE
+        trigger: completion
+        guards: []
+        governance_required: false
+        priority: 1
+      - target: DONE
+        trigger: failure
+        guards: []
+        governance_required: false
+        priority: 2
+  DONE:
+    type: terminal
+    label: Done
+    description: Review completed — unified review synthesis produced
+    entry_actions:
+      - type: produce_manifest
+        params: {}
+      - type: record_journal
+        params:
+          event: run_completed
+    transitions: []
+  FAILED:
+    type: terminal
+    label: Failed
+    description: Review failed due to process error, schema violation, or infrastructure failure
+    entry_actions:
+      - type: record_journal
+        params:
+          event: run_failed
+    transitions: []
+  ABORTED:
+    type: terminal
+    label: Aborted
+    description: Review aborted by user request, exhausted iterations, or escalation
+    entry_actions:
+      - type: record_journal
+        params:
+          event: run_aborted
+    transitions: []

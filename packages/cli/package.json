@@ -1,0 +1,65 @@
+{
+  "name": "@ai-orchestrator/cli",
+  "version": "1.0.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/caponetto/ai-dev-orchestrator.git",
+    "directory": "packages/cli"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "ai": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@ai-orchestrator/agent-adapters": "workspace:*",
+    "@ai-orchestrator/artifacts": "workspace:*",
+    "@ai-orchestrator/code-intelligence": "workspace:*",
+    "@ai-orchestrator/config-templates": "workspace:*",
+    "@ai-orchestrator/core": "workspace:*",
+    "@ai-orchestrator/dependency-graph": "workspace:*",
+    "@ai-orchestrator/execution-analytics": "workspace:*",
+    "@ai-orchestrator/run-manifest": "workspace:*",
+    "@ai-orchestrator/runner": "workspace:*",
+    "@ai-orchestrator/workflow": "workspace:*",
+    "@ai-orchestrator/dashboard-server": "workspace:*",
+    "@ai-orchestrator/journal": "workspace:*",
+    "@ai-orchestrator/governance": "workspace:*",
+    "@ai-orchestrator/policy-engine": "workspace:*",
+    "@ai-orchestrator/ports": "workspace:*",
+    "@ai-orchestrator/project-context": "workspace:*",
+    "@ai-orchestrator/prompt-engine": "workspace:*",
+    "@ai-orchestrator/recovery": "workspace:*",
+    "@ai-orchestrator/role-system": "workspace:*",
+    "@ai-orchestrator/schemas": "workspace:*",
+    "@ai-orchestrator/utils": "workspace:*",
+    "@sourcegraph/scip-typescript": "^0.4.0",
+    "commander": "^15.0.0",
+    "write-file-atomic": "^8.0.0",
+    "yaml": "^2.9.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@ai-orchestrator/build-config": "workspace:*",
+    "@types/node": "^26.1.0",
+    "esbuild": "^0.28.0",
+    "tsx": "^4.19.4",
+    "vitest": "^4.1.10"
+  },
+  "scripts": {
+    "clean": "rimraf dist tsconfig.build.tsbuildinfo",
+    "build:base": "rimraf dist && node esbuild.config.js && cp -r ../config-templates/src/static dist/static",
+    "build:dev": "NODE_ENV=development pnpm run build:base",
+    "build:prod": "pnpm run build:base",
+    "dev": "tsx src/index.ts",
+    "lint": "eslint src/",
+    "test:unit": "vitest run",
+    "typecheck": "tsc --noEmit"
+  }
+}

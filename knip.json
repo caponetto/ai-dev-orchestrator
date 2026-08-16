@@ -1,0 +1,26 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreBinaries": ["playwright"],
+  "ignoreDependencies": ["turbo"],
+  "ignoreWorkspaces": ["packages/dashboard"],
+  "workspaces": {
+    "packages/*": {
+      "entry": ["src/index.ts", "src/**/*.test.ts", "test/**/*.test.ts"],
+      "project": ["src/**/*.ts", "test/**/*.ts"]
+    },
+    "packages/cli": {
+      "entry": ["src/index.ts", "src/**/*.test.ts", "esbuild.config.js"],
+      "project": ["src/**/*.ts"],
+      "ignoreDependencies": ["@sourcegraph/scip-typescript", "write-file-atomic"]
+    },
+    "packages/prompt-engine": {
+      "entry": ["src/index.ts", "src/**/*.test.ts"],
+      "project": ["src/**/*.ts"],
+      "ignoreDependencies": ["@types/diff"]
+    },
+    "packages/build-config": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts"]
+    }
+  }
+}

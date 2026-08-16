@@ -1,0 +1,44 @@
+id: implementer
+name: Implementer
+description: Implement the plan, producing code and artifacts
+owned_artifacts:
+  - implementation
+  - test_plan
+readable_artifacts:
+  - canonical_specification
+  - codebase_context
+  - plan
+  - test_plan
+  - static_review
+  - security_review
+  - performance_review
+  - design_review
+  - adversarial_review
+  - docs_review
+  - ux_review
+  - implementation
+  - verification
+  - acceptance_validation
+forbidden_artifacts: []
+reviewed_by:
+  - static_reviewer
+  - security_reviewer
+  - performance_reviewer
+  - design_reviewer
+  - adversarial_reviewer
+  - docs_reviewer
+  - ux_reviewer
+reviews: []
+agreement_participation:
+  - agreement_type: implementation_agreement
+    action: reviewed
+required_capabilities:
+  - code_generation
+  - long_context
+  - reasoning
+model: claude-opus-4-6
+max_tokens: null
+dispatch_type: agent
+runner: claude-code
+agent_config:
+  timeoutMs: 1200000

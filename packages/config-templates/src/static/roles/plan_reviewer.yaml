@@ -1,0 +1,24 @@
+id: plan_reviewer
+name: Plan Reviewer
+description: Review implementation plans for completeness and correctness
+owned_artifacts:
+  - plan_review
+readable_artifacts:
+  - plan
+  - canonical_specification
+  - codebase_context
+forbidden_artifacts:
+  - implementation
+reviewed_by: []
+reviews:
+  - planner
+agreement_participation:
+  - agreement_type: planning_agreement
+    action: reviewed
+required_capabilities:
+  - reasoning
+  - code_review
+model: gpt-5.4-medium
+max_tokens: null
+dispatch_type: agent
+runner: cursor

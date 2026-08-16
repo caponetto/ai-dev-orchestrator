@@ -1,0 +1,25 @@
+id: acceptance_validator
+name: Acceptance Validator
+description: Cross-reference test results against specification acceptance criteria
+owned_artifacts:
+  - acceptance_validation
+readable_artifacts:
+  - canonical_specification
+  - plan
+  - implementation
+  - verification
+  - test_suite
+  - codebase_context
+forbidden_artifacts: []
+reviewed_by: []
+reviews: []
+agreement_participation:
+  - agreement_type: verification_agreement
+    action: reviewed
+required_capabilities:
+  - reasoning
+  - structured_output
+model: gpt-5.4-medium
+max_tokens: null
+dispatch_type: agent
+runner: cursor

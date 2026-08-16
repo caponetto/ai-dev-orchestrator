@@ -1,0 +1,44 @@
+{
+  "name": "@ai-orchestrator/code-intelligence",
+  "version": "1.0.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/caponetto/ai-dev-orchestrator.git",
+    "directory": "packages/code-intelligence"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "clean": "rimraf dist tsconfig.build.tsbuildinfo",
+    "build:base": "rimraf dist tsconfig.build.tsbuildinfo && tsc -p tsconfig.build.json",
+    "build:dev": "pnpm run build:base",
+    "build:prod": "pnpm run build:base --sourceMap false --declarationMap false",
+    "lint": "eslint src/",
+    "test:unit": "vitest run",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit"
+  },
+  "dependencies": {
+    "@ai-orchestrator/ports": "workspace:*",
+    "@ai-orchestrator/schemas": "workspace:*",
+    "@bufbuild/protobuf": "^2.13.0",
+    "@scip-code/scip": "^0.9.0",
+    "@sourcegraph/scip-typescript": "^0.4.0"
+  },
+  "devDependencies": {
+    "@ai-orchestrator/build-config": "workspace:*",
+    "@types/node": "^26.1.0",
+    "vitest": "^4.1.10"
+  }
+}

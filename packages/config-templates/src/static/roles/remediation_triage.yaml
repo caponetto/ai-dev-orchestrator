@@ -1,0 +1,23 @@
+id: remediation_triage
+name: Remediation Triage
+description: Triage review findings into an actionable fix plan before re-entering implementation
+owned_artifacts:
+  - remediation_plan
+readable_artifacts:
+  - review_report
+  - canonical_specification
+  - plan
+  - implementation
+  - codebase_context
+  - judge_decision
+forbidden_artifacts: []
+reviewed_by: []
+reviews: []
+agreement_participation: []
+required_capabilities:
+  - reasoning
+  - structured_output
+model: claude-sonnet-5
+max_tokens: null
+dispatch_type: agent
+runner: claude-code
