@@ -49,11 +49,11 @@
     "timeago.js": "^4.0.2"
   },
   "devDependencies": {
-    "@playwright/test": "^1.61.1",
-    "@tailwindcss/vite": "^4.1.10",
+    "@playwright/test": "^1.62.1",
+    "@tailwindcss/vite": "^4.3.3",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
-    "@testing-library/user-event": "^14.6.1",
+    "@testing-library/user-event": "^14.6.4",
     "@types/linkify-it": "^5.0.0",
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.1.6",
@@ -61,7 +61,7 @@
     "jsdom": "^26.1.0",
     "linkify-it": "^6.1.0",
     "msw": "^2.8.4",
-    "tailwindcss": "^4.1.10",
+    "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
     "vite": "^6.3.5",
     "@ai-orchestrator/build-config": "workspace:*",
