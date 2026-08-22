@@ -32,3 +32,12 @@ runs:
     - name: Install dependencies
       shell: bash
       run: pnpm install --frozen-lockfile
+
+    - name: Verify no uncommitted changes after install
+      shell: bash
+      run: |
+        if ! git diff --quiet -- . ':(exclude).turbo'; then
+          echo "::error::Install produced changes that are not committed. Run 'pnpm install' locally and commit the result."
+          git --no-pager diff -- . ':(exclude).turbo'
+          exit 1
+        fi
