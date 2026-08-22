@@ -47,9 +47,9 @@
   },
   "devDependencies": {
     "@ai-orchestrator/build-config": "workspace:*",
-    "@types/node": "^26.1.0",
-    "esbuild": "^0.28.0",
-    "tsx": "^4.19.4",
+    "@types/node": "^26.2.0",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.12",
     "vitest": "^4.1.10"
   },
   "scripts": {
