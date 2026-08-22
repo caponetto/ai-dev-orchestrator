@@ -22,10 +22,20 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-graph': ['@xyflow/react'],
-          'vendor-markdown': ['react-markdown', 'remark-gfm', 'rehype-highlight', 'highlight.js'],
+        manualChunks(id) {
+          if (!id.includes('node_modules')) {
+            return undefined;
+          }
+          if (/[/\\](react|react-dom|react-router-dom)[/\\]/.test(id)) {
+            return 'vendor-react';
+          }
+          if (id.includes('@xyflow/react')) {
+            return 'vendor-graph';
+          }
+          if (/[/\\](react-markdown|remark-gfm|rehype-highlight|highlight\.js)[/\\]/.test(id)) {
+            return 'vendor-markdown';
+          }
+          return undefined;
         },
       },
     },
