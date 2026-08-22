@@ -49,6 +49,7 @@ function makeRunner(): RunnerSystem {
     getWorkerStatus: vi.fn().mockReturnValue(null),
     cancelWorker: vi.fn(),
     cancelAllWorkers: vi.fn().mockResolvedValue(undefined),
+    setWorkerCounter: vi.fn(),
   };
 }
 
@@ -73,6 +74,7 @@ function makeReviewRunner(): RunnerSystem {
     getWorkerStatus: vi.fn().mockReturnValue(null),
     cancelWorker: vi.fn(),
     cancelAllWorkers: vi.fn().mockResolvedValue(undefined),
+    setWorkerCounter: vi.fn(),
   };
 }
 
@@ -424,6 +426,7 @@ describe('LifecycleController', () => {
       getWorkerStatus: vi.fn().mockReturnValue(null),
       cancelWorker: vi.fn(),
       cancelAllWorkers: vi.fn().mockResolvedValue(undefined),
+      setWorkerCounter: vi.fn(),
     };
 
     const controller = new LifecycleController({
@@ -873,6 +876,7 @@ describe('LifecycleController', () => {
       getWorkerStatus: vi.fn().mockReturnValue(null),
       cancelWorker: vi.fn(),
       cancelAllWorkers: vi.fn().mockResolvedValue(undefined),
+      setWorkerCounter: vi.fn(),
     };
 
     const controller = new LifecycleController({
@@ -923,6 +927,7 @@ describe('LifecycleController', () => {
       getWorkerStatus: vi.fn().mockReturnValue(null),
       cancelWorker: vi.fn(),
       cancelAllWorkers: vi.fn().mockResolvedValue(undefined),
+      setWorkerCounter: vi.fn(),
     };
 
     const controller = new LifecycleController({
@@ -973,6 +978,7 @@ describe('LifecycleController', () => {
       getWorkerStatus: vi.fn().mockReturnValue(null),
       cancelWorker: vi.fn(),
       cancelAllWorkers: vi.fn().mockResolvedValue(undefined),
+      setWorkerCounter: vi.fn(),
     };
 
     const controller = new LifecycleController({
@@ -1140,6 +1146,7 @@ describe('LifecycleController', () => {
         getWorkerStatus: vi.fn().mockReturnValue(null),
         cancelWorker: vi.fn(),
         cancelAllWorkers: vi.fn().mockResolvedValue(undefined),
+        setWorkerCounter: vi.fn(),
       };
 
       let getLatestCount = 0;
@@ -1226,6 +1233,7 @@ describe('LifecycleController', () => {
         getWorkerStatus: vi.fn().mockReturnValue(null),
         cancelWorker: vi.fn(),
         cancelAllWorkers: vi.fn().mockResolvedValue(undefined),
+        setWorkerCounter: vi.fn(),
       };
 
       const store = makeStore();
@@ -1320,6 +1328,7 @@ describe('LifecycleController', () => {
         getWorkerStatus: vi.fn().mockReturnValue(null),
         cancelWorker: vi.fn(),
         cancelAllWorkers: vi.fn().mockResolvedValue(undefined),
+        setWorkerCounter: vi.fn(),
       };
 
       const store = makeStore();
@@ -1762,6 +1771,7 @@ describe('LifecycleController', () => {
         getWorkerStatus: vi.fn().mockReturnValue(null),
         cancelWorker: vi.fn(),
         cancelAllWorkers: vi.fn().mockResolvedValue(undefined),
+        setWorkerCounter: vi.fn(),
       };
 
       const store = makeStore();

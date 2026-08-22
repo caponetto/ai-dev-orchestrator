@@ -63,7 +63,6 @@ Before producing output, perform this internal analysis. Do not include private 
 4. **Classify each finding:**
    - **fix** — Implementation-level issue the implementer can address directly. The fix is clear and scoped.
    - **defer** — Valid finding but low priority; can be addressed in a follow-up. Only use for `minor` severity findings with no correctness impact.
-   - **dismiss** — False positive, duplicate of an already-addressed finding, or subjective preference that doesn't warrant changes. Must provide a reason.
    - **escalate** — Ambiguous finding where the correct action requires human judgment. The finding may be valid but the trade-offs are unclear.
 5. **Determine routing flags:**
    - Set `planLevelIssue: true` only when one or more findings indicate the plan's approach is fundamentally wrong — not just suboptimal.
@@ -134,15 +133,15 @@ A triage plan is well-formed when:
 
 Produce a {{constraints.requiredOutputType}} artifact with these required fields:
 
-| Field             | Type    | Constraint                                                |
-| ----------------- | ------- | --------------------------------------------------------- |
-| version           | number  | Always 1                                                  |
-| summary           | string  | Brief summary of triage outcome (2-3 sentences)           |
-| planLevelIssue    | boolean | true only if findings indicate the plan approach is wrong |
-| needsHuman        | boolean | true only if findings require human judgment to resolve   |
-| actionItems       | array   | Prioritized list of findings to act on                    |
-| dismissedFindings | array   | Findings dismissed with reasons (optional, omit if none)  |
-| createdAt         | string  | ISO 8601 timestamp                                        |
+| Field             | Type    | Constraint                                                                                                                                  |
+| ----------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| version           | number  | Always 1                                                                                                                                    |
+| summary           | string  | Brief summary of triage outcome (2-3 sentences)                                                                                             |
+| planLevelIssue    | boolean | true only if findings indicate the plan approach is wrong                                                                                   |
+| needsHuman        | boolean | true only if findings require human judgment to resolve                                                                                     |
+| actionItems       | array   | Prioritized list of findings to act on                                                                                                      |
+| dismissedFindings | array   | Findings dismissed as false positives or noise, with reasons. Use exclusively for dismissed items — do not also include them in actionItems |
+| createdAt         | string  | ISO 8601 timestamp                                                                                                                          |
 
 Each entry in `actionItems` must have:
 
@@ -150,7 +149,7 @@ Each entry in `actionItems` must have:
 | ----------- | ------ | ------------------------------------------------- |
 | id          | string | Unique identifier (e.g., `"RT-001"`)              |
 | findingRef  | string | ID of the original finding from the review report |
-| action      | string | One of: `fix`, `defer`, `dismiss`, `escalate`     |
+| action      | string | One of: `fix`, `defer`, `escalate`                |
 | description | string | Actionable explanation of what to do              |
 | priority    | string | One of: `critical`, `high`, `medium`, `low`       |
 | file        | string | File path if applicable (null if not)             |

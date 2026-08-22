@@ -34,6 +34,7 @@ function makeRunner(overrides: Partial<RunnerSystem> = {}): RunnerSystem {
     getWorkerStatus: vi.fn().mockReturnValue(null),
     cancelWorker: vi.fn(),
     cancelAllWorkers: vi.fn().mockResolvedValue(undefined),
+    setWorkerCounter: vi.fn(),
     ...overrides,
   };
 }

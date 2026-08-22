@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 
-import { generateWorkerId, resetWorkerCounter } from '../worker-spawner';
+import { generateWorkerId, resetWorkerCounter, setWorkerCounter } from '../worker-spawner';
 
 describe('generateWorkerId', () => {
   beforeEach(() => {
@@ -33,6 +33,24 @@ describe('resetWorkerCounter', () => {
     generateWorkerId();
     generateWorkerId();
     resetWorkerCounter();
+    expect(generateWorkerId()).toBe('worker-000001');
+  });
+});
+
+describe('setWorkerCounter', () => {
+  beforeEach(() => {
+    resetWorkerCounter();
+  });
+
+  it('resumes generation from the given value', () => {
+    setWorkerCounter(5);
+    expect(generateWorkerId()).toBe('worker-000006');
+    expect(generateWorkerId()).toBe('worker-000007');
+  });
+
+  it('setting to 0 behaves like reset', () => {
+    generateWorkerId();
+    setWorkerCounter(0);
     expect(generateWorkerId()).toBe('worker-000001');
   });
 });

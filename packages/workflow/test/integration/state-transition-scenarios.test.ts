@@ -129,6 +129,7 @@ function createScenarioRunner(
     getWorkerStatus: vi.fn().mockReturnValue(null),
     cancelWorker: vi.fn(),
     cancelAllWorkers: vi.fn().mockResolvedValue(undefined),
+    setWorkerCounter: vi.fn(),
   };
 }
 
@@ -453,6 +454,7 @@ describe('State Transition Scenarios', () => {
         getWorkerStatus: vi.fn().mockReturnValue(null),
         cancelWorker: vi.fn(),
         cancelAllWorkers: vi.fn().mockResolvedValue(undefined),
+        setWorkerCounter: vi.fn(),
       };
 
       const controller = new LifecycleController({
@@ -733,8 +735,8 @@ describe('State Transition Scenarios', () => {
   });
 
   describe('budget limit scenarios', () => {
-    describe('budget exhaustion mid-workflow → repeated approvals drive to completion', () => {
-      it('completes via DONE after multiple budget escalation approvals', async () => {
+    describe('budget exhaustion mid-workflow → single approval drives to completion', () => {
+      it('completes via DONE after a single budget escalation approval', async () => {
         const artifactStore = createMockArtifactStore();
         const runner = createScenarioRunner(artifactStore);
 
@@ -772,8 +774,9 @@ describe('State Transition Scenarios', () => {
         expect(state.waitingContext?.budgetExhaustion?.limit).toBe(400);
         expect(state.waitingContext?.budgetExhaustion?.current).toBeGreaterThan(400);
 
-        // Each approval lets the workflow advance one state before hitting budget again.
-        // driveToCompletion repeatedly approves until a terminal state is reached.
+        // A single budget approval lets the workflow continue without further
+        // budget prompts — the approval is persistent for the rest of the run.
+        // driveToCompletion handles remaining regular (non-budget) WAITING_FOR_HUMAN states.
         const finalResult = await driveToCompletion(controller, 20);
         expect(finalResult.finalState).toBe('DONE');
 
@@ -785,7 +788,7 @@ describe('State Transition Scenarios', () => {
             'reason' in e.data &&
             e.data.reason === 'token_budget_exceeded',
         );
-        expect(budgetEvents.length).toBeGreaterThanOrEqual(2);
+        expect(budgetEvents.length).toBe(1);
       });
     });
 

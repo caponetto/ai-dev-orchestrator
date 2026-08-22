@@ -55,21 +55,28 @@ Before producing output, perform this internal analysis. Do not include private 
 
 1. **Analyze complexity.** Read the full specification. Identify the total scope, number of distinct features, integration points, and technical unknowns.
 2. **State assumptions.** List everything you are taking for granted that is not explicitly confirmed in the specification. Each assumption is a potential failure point if wrong.
-3. **Surface open questions.** Identify uncertainties that could change the plan if answered differently. These are not clarification needs (those were resolved earlier) — they are architectural or implementation ambiguities.
+3. **Surface open questions — only genuine ones.** Identify uncertainties that could change the plan if answered differently AND cannot be resolved from the specification, codebase context, or existing conventions. Before adding an open question, check: does the codebase context show how the existing system handles this? Does the specification or an existing implementation already define the behavior? If so, resolve it as an assumption with rationale — do not defer it as an open question. An open question that has a clear answer in the available context is a plan defect, not an uncertainty.
 4. **Identify natural boundaries.** Find module boundaries, layer separations (data / logic / presentation), service boundaries, and shared infrastructure. Each boundary suggests a step break.
-5. **Define implementation steps.** For each step:
+5. **Identify quality guidance.** When codebase context is available, extract quality-relevant information for the implementer:
+   - List reuse targets: existing utilities, shared modules, validation helpers, error handling patterns the implementer should leverage instead of reinventing.
+   - Surface DRY opportunities: logic that already exists in the codebase and should be called, not duplicated.
+   - Note codebase conventions: error handling patterns, naming conventions, module structure, test patterns the implementer must follow.
+   - Identify established patterns: how the codebase handles similar problems (e.g., "services use constructor injection", "errors are wrapped in AppError with error codes").
+   - **Verify reference pattern completeness:** When citing an existing implementation as a reference, enumerate ALL aspects of that pattern — not just the primary logic, but also registration, configuration, validation, and safety layers. Then verify every aspect appears in a task. A cited reference with uncovered aspects signals a gap in the plan.
+6. **Trace execution paths.** For features that handle requests, data flow, or event processing, trace the complete path from the system entry point through every layer to the final output. Identify each layer the data passes through — routing, middleware, dispatch, handler, storage. Each layer that requires a change must become a task or part of a task. If the codebase uses multi-layer dispatch (e.g., a top-level router delegates to sub-routers for specific path prefixes), adding a new path requires changes at EVERY layer in the chain, not just the innermost handler.
+7. **Define implementation steps.** For each step:
    - State what it produces (a concrete deliverable)
    - List its dependencies (which prior steps must complete first)
    - Estimate scope (small / medium / large)
    - Identify risks (what could go wrong, what is uncertain)
    - Define success criteria (how to verify this step is done correctly)
-6. **Order by dependency.** Arrange steps so that no step depends on a later step. Prefer building foundational layers first (data models, core logic, then integration, then UI).
-7. **Verify coverage.** Map every specification requirement to at least one step. Flag any requirement that cannot be mapped — this indicates a gap.
-8. **Define test strategy.** For each step, specify what tests validate it. Include unit tests for isolated logic, integration tests for boundaries, and acceptance tests for user-facing behavior.
-9. **Cross-check commands against the codebase.** For every build, lint, type-check, or test command referenced in tasks or success criteria, verify the exact script name exists in the relevant `package.json`. If codebase context lists available scripts, use those names verbatim — do not assume standard names like `test`, `build`, or `type-check` exist. Also ensure every test suite the plan creates has a corresponding verification step that actually runs it.
-10. **Assess overall risk.** Identify the highest-risk steps and propose mitigations (spikes, fallback approaches, incremental delivery).
-11. **Enumerate edge cases.** For each step, list tricky scenarios the implementer must explicitly handle — boundary inputs, failure modes, concurrency issues, empty states.
-12. **Identify affected files.** When working in an existing codebase, list specific files that will be created, modified, or deleted.
+8. **Order by dependency.** Arrange steps so that no step depends on a later step. Prefer building foundational layers first (data models, core logic, then integration, then UI).
+9. **Verify coverage.** Map every specification requirement to at least one step. Flag any requirement that cannot be mapped — this indicates a gap.
+10. **Define test strategy and cross-check commands.** For each step, specify what tests validate it. Include unit tests for isolated logic, integration tests for boundaries, and acceptance tests for user-facing behavior. For every build, lint, type-check, or test command referenced in tasks or success criteria, verify the exact script name exists in the relevant `package.json`. If codebase context lists available scripts, use those names verbatim — do not assume standard names like `test`, `build`, or `type-check` exist. Also ensure every test suite the plan creates has a corresponding verification step that actually runs it.
+11. **Assess overall risk.** Identify the highest-risk steps and propose mitigations (spikes, fallback approaches, incremental delivery).
+12. **Enumerate edge cases.** For each step, list tricky scenarios the implementer must explicitly handle — boundary inputs, failure modes, concurrency issues, empty states. For features that consume configuration (files, env vars, mounted volumes, ConfigMaps), enumerate edge-case-but-valid config values and verify a task exists for validating them against all downstream constraints — not just immediate field presence, but the invariants of every framework/library API they will be passed to. For operations reachable through retryable transports (HTTP endpoints, queue consumers, reconciliation loops), enumerate idempotency requirements — what happens on double-execution, and how is it prevented.
+13. **Identify trust boundaries.** For features that forward credentials (tokens, cookies, API keys) to other services, identify the trust boundary. If the destination is configurable, plan a validation task that constrains allowed targets. For features that set security-critical values (auth headers, session IDs) in a pipeline, verify that later stages cannot overwrite them with config-controlled values.
+14. **Identify affected files.** When working in an existing codebase, list specific files that will be created, modified, or deleted.
 
 ## Specification
 
@@ -100,15 +107,16 @@ Address this feedback in your revised plan.
 The plan reviewer rejected the previous plan with the findings below. You MUST:
 
 1. **Address every finding.** For each finding, either fix the gap or explain why the current plan already covers it.
-2. **Do not introduce new gaps.** After fixing, re-verify the entire plan — ensure every test suite has a run step, every build/type-check command exists, and every modified package has a verification step. Fixing one finding must not create a new one.
-3. **Self-check before output.** Walk through each task's success criteria and test strategy. For every command referenced, confirm it exists. For every test file created, confirm a later step runs it. For every package modified, confirm a verification step covers it.
+2. **Resolve, do not defer.** If a finding identifies a blocking design decision, make a concrete choice in the revised plan. Do NOT move the problem into `openQuestions` — an open question that a reviewer could flag as critical or major is a plan defect, not an open question. State your decision and the reasoning as an assumption.
+3. **Check for regressions.** After fixing, trace the impact through the entire plan. When you add or modify a task, check whether other tasks that reference the same files, paths, APIs, or test scenarios need updating. Fixing one finding must not create an inconsistency elsewhere.
+4. **Re-verify the entire plan.** After all fixes, walk through each task's success criteria and test strategy. For every command referenced, confirm it exists. For every test file created, confirm a later step runs it. For every package modified, confirm a verification step covers it.
 
 {{{previousFindings}}}
 {{/if}}
 
-## Plan Quality Criteria
+## Self-Check Before Output
 
-A plan is complete when:
+Before producing the artifact, verify:
 
 - Every specification requirement maps to at least one implementation step
 - No step has unresolved dependencies on a later step
@@ -119,7 +127,15 @@ A plan is complete when:
 - The overall plan can be executed sequentially without backtracking
 - Assumptions are stated explicitly — nothing is taken for granted silently
 - Open questions are surfaced, not hidden
-- Edge cases are enumerated for steps involving external integration or user input
+- Edge cases are enumerated for steps involving external integration, user input, or configuration consumption
+- **Configuration validation coverage:** For features that read configuration (files, env vars, mounted volumes), verify a task plans validation of config values against all downstream constraints — not just field presence, but framework/library API invariants (e.g., path format requirements, uniqueness constraints, value ranges).
+- **Trust boundary and credential flow:** For features that forward credentials to configurable destinations, verify the plan constrains allowed targets. For features that set security-critical values in a middleware/proxy chain, verify the plan addresses override prevention.
+- **Backward compatibility:** For tasks that modify API responses, event schemas, configuration shapes, or public interfaces, verify the plan addresses whether the change is backward-compatible. Breaking changes (adding required fields, renaming/removing fields, changing types or defaults) require a migration strategy, versioning, or deprecation plan.
+- **Initialization and shutdown ordering:** For features that introduce new subsystems, background workers, or resource-managing components, verify the plan addresses: (1) what happens when initialization fails partway through — are already-initialized components cleaned up? (2) shutdown ordering — are dependencies shut down after their dependents, not before?
+- **End-to-end path trace:** For features that handle requests or data flow, trace the full path from entry point to final output. Verify every layer in that path is covered by a task — not just the handler, but also routing, middleware, dispatch, and registration. If an existing feature follows a multi-layer pattern, the plan must cover all layers.
+- **Reuse target consumption:** Every item listed in `qualityGuidance.reuseTargets` must be explicitly referenced in the task that consumes it. If a reuse target is listed but no task uses it, either add the usage or remove the target — a listed-but-unused reuse target signals a gap in the plan.
+- **Convention enforcement:** Every convention cited in `qualityGuidance.conventions` must be reflected in the description of each task it applies to. A convention that says "handlers are registered at both bare and prefixed paths" but whose corresponding task only describes bare-path registration is a gap — the task description must commit to the full convention.
+- **Test coverage completeness:** For every distinct capability, behavior, or safety property a task introduces, verify that a specific test scenario exists in the test strategy of that task or a dedicated test task. If a task says "handle TLS and non-TLS upstreams" but the test strategy only covers TLS, the non-TLS path is untested. Walk each task's description and check that every verb has a matching test.
 
 ## Anti-Patterns
 
@@ -137,19 +153,20 @@ A plan is complete when:
 
 Produce a {{constraints.requiredOutputType}} artifact with these required fields:
 
-| Field             | Type   | Constraint                                                                               |
-| ----------------- | ------ | ---------------------------------------------------------------------------------------- |
-| version           | number | Starts at 1                                                                              |
-| specificationRef  | object | References the source specification (id, version)                                        |
-| createdAt         | string | ISO 8601 timestamp                                                                       |
-| summary           | string | Concise implementation-plan summary                                                      |
-| tasks             | array  | Non-empty ordered task objects with `taskId`, `description`, `files`, and `dependencies` |
-| assumptions       | array  | Strings: things taken for granted but not verified                                       |
-| openQuestions     | array  | Strings: uncertainties that could change the plan                                        |
-| edgeCases         | array  | Each object: `stepId`, `description`                                                     |
-| filesAffected     | array  | Optional. Each object: `path`, `action` (create/modify/delete)                           |
-| migrationStrategy | string | Optional. How to transition safely from current to target state                          |
-| rollbackStrategy  | string | Optional. What to do if the change needs to be reverted                                  |
+| Field             | Type   | Constraint                                                                                            |
+| ----------------- | ------ | ----------------------------------------------------------------------------------------------------- |
+| version           | number | Positive integer (>= 1). Current iteration: {{run.iterationCount}}                                    |
+| specificationRef  | object | References the source specification (id, version)                                                     |
+| createdAt         | string | ISO 8601 timestamp                                                                                    |
+| summary           | string | Concise implementation-plan summary                                                                   |
+| tasks             | array  | Non-empty ordered task objects with `taskId`, `description`, `files`, and `dependencies`              |
+| assumptions       | array  | Strings: things taken for granted but not verified                                                    |
+| openQuestions     | array  | Strings: uncertainties that could change the plan                                                     |
+| edgeCases         | array  | Each object: `stepId`, `description`                                                                  |
+| filesAffected     | array  | Optional. Each object: `path`, `action` (create/modify/delete)                                        |
+| migrationStrategy | string | Optional. How to transition safely from current to target state                                       |
+| rollbackStrategy  | string | Optional. What to do if the change needs to be reverted                                               |
+| qualityGuidance   | object | Optional. Reuse targets, conventions, and DRY opportunities from codebase context for the implementer |
 
 {{>json_write_rules}}
 
@@ -227,6 +244,20 @@ Iteration: {{run.iterationCount}}.
     { "path": "src/middleware/auth.ts", "action": "modify" }
   ],
   "migrationStrategy": "Apply database migration first (backward-compatible). Deploy auth service behind feature flag.",
-  "rollbackStrategy": "Disable feature flag to revert to password-only auth. Run down migration."
+  "rollbackStrategy": "Disable feature flag to revert to password-only auth. Run down migration.",
+  "qualityGuidance": {
+    "reuseTargets": [
+      "src/utils/validation.ts — input validation helpers (validateEmail, validateId)",
+      "src/middleware/error-handler.ts — error wrapping with AppError"
+    ],
+    "conventions": [
+      "All services use constructor injection via the DI container",
+      "Errors extend AppError with numeric error codes",
+      "Test files use describe/it blocks with factory helpers from tests/factories/"
+    ],
+    "dryOpportunities": [
+      "src/config/parser.ts already handles YAML/JSON parsing — extend rather than duplicate"
+    ]
+  }
 }
 ```

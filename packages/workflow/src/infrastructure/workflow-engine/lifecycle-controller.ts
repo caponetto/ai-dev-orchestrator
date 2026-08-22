@@ -138,7 +138,7 @@ export class LifecycleController implements WorkflowEngine {
   private workerFailuresByRole: Record<string, { error: string; model?: string }[]> = {};
   private workerModelByRole: Record<string, string> = {};
   private lastConfidenceScore: number | null = null;
-  private budgetApprovedForNextAction = false;
+  private budgetApproved = false;
   private interruptedActionResults: readonly ActionResult[] | null = null;
 
   constructor(opts: LifecycleControllerOptions) {
@@ -205,6 +205,7 @@ export class LifecycleController implements WorkflowEngine {
     this.dispatcher.setRunDir(config.runDir ?? '');
     if (state.dispatchCounter != null) {
       this.dispatcher.setDispatchCounter(state.dispatchCounter);
+      this.runner.setWorkerCounter(state.dispatchCounter);
     }
 
     this.contractRegistry.restoreIterationCounts(new Map(Object.entries(state.iterationCounts)));
@@ -501,7 +502,7 @@ export class LifecycleController implements WorkflowEngine {
         `[LifecycleController] Budget escalation approved — resuming state '${targetState}'`,
       );
 
-      this.budgetApprovedForNextAction = true;
+      this.budgetApproved = true;
       const savedResults = this.interruptedActionResults ?? undefined;
       this.interruptedActionResults = null;
       await this.saveCheckpoint();
@@ -595,7 +596,6 @@ export class LifecycleController implements WorkflowEngine {
         this.stateEnteredAt = new Date().toISOString();
         this.transitionCount += 1;
         this.stateHistory.record(this.currentState);
-        this.recordTransition(fromState, this.currentState, trigger);
 
         if (trigger === 'human_rejected') {
           const requestingState = savedWaitingContext?.requestingState ?? fromState;
@@ -635,6 +635,7 @@ export class LifecycleController implements WorkflowEngine {
             guardsPassed: evaluated.guardsResult.filter((g) => g.passed).length,
             governanceRequired: evaluated.definition.governanceRequired,
             governanceOutcome: 'allowed',
+            contractId: this.contractRegistry.getContractForState(this.currentState)?.id,
           },
         });
       } else {
@@ -804,6 +805,10 @@ export class LifecycleController implements WorkflowEngine {
   ): Promise<RunResult> {
     const definition = config.workflowDefinition;
 
+    this.shutdownCoordinator?.onShutdown(() => {
+      this.runner.cancelAllWorkers().catch(() => undefined);
+    });
+
     while (!definition.terminalStates.includes(this.currentState) && !this.aborted) {
       if (this.transitionCount >= transitionLimit) {
         throw new MaxTransitionsExceededError(this.transitionCount, transitionLimit);
@@ -836,7 +841,7 @@ export class LifecycleController implements WorkflowEngine {
       if (
         config.budgetMaxTokens != null &&
         stateDefinition.type !== 'wait' &&
-        !this.budgetApprovedForNextAction
+        !this.budgetApproved
       ) {
         const totalTokens = this.cumulativeInputTokens + this.cumulativeOutputTokens;
         if (totalTokens > config.budgetMaxTokens) {
@@ -962,6 +967,14 @@ export class LifecycleController implements WorkflowEngine {
         this.checkAlertThresholds();
       }
 
+      // After worker dispatch returns, check if shutdown was requested while awaiting.
+      // Without this, a killed worker's failure result flows into the transition evaluator
+      // and lands in FAILED instead of ABORTED.
+      if (this.shutdownCoordinator?.isShutdownRequested()) {
+        await this.abort(`shutdown:${this.shutdownCoordinator.getShutdownReason()}`);
+        break;
+      }
+
       const confidenceReport = extractConfidenceReport(actionResults);
       if (confidenceReport) {
         this.lastConfidenceScore = confidenceReport.score;
@@ -976,7 +989,7 @@ export class LifecycleController implements WorkflowEngine {
         this.dispatcher.setConfigVariables(this.buildConfigVariables(config));
       }
 
-      if (config.budgetMaxTokens != null && !this.budgetApprovedForNextAction) {
+      if (config.budgetMaxTokens != null && !this.budgetApproved) {
         const totalTokens = this.cumulativeInputTokens + this.cumulativeOutputTokens;
         if (totalTokens > config.budgetMaxTokens) {
           this.logger.warn(
@@ -1006,8 +1019,6 @@ export class LifecycleController implements WorkflowEngine {
           break;
         }
       }
-
-      this.budgetApprovedForNextAction = false;
 
       const trigger = await this.reviewInterpreter.interpret(
         actionResults,
@@ -1091,6 +1102,11 @@ export class LifecycleController implements WorkflowEngine {
 
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- defensive: abort() may fire during await
       if (this.aborted) {
+        break;
+      }
+
+      if (this.shutdownCoordinator?.isShutdownRequested()) {
+        await this.abort(`shutdown:${this.shutdownCoordinator.getShutdownReason()}`);
         break;
       }
 

@@ -76,6 +76,7 @@ export interface DashboardDataSources {
   ) => string | null;
   readonly getRunConfig: (runId: string) => Record<string, unknown> | null;
   readonly getRunEvents?: (runId: string) => readonly DashboardEvent[];
+  readonly isProcessAlive?: (runId: string) => boolean;
   readonly clock: () => string;
   readonly getSessionSnapshots?: (runId: string) => readonly AgentSessionSnapshot[];
 }
@@ -102,6 +103,11 @@ export class DefaultDashboardDataProvider
     const manifest = this.sources.getManifest(runId);
     const repoRoot = manifest?.repoRoot;
 
+    const processAlive =
+      view.status === 'running' && this.sources.isProcessAlive
+        ? this.sources.isProcessAlive(runId)
+        : undefined;
+
     if (view.status === 'running') {
       if (
         manifest &&
@@ -109,11 +115,16 @@ export class DefaultDashboardDataProvider
         manifest.status !== 'interrupted' &&
         manifest.status !== 'waiting'
       ) {
-        return ok({ ...view, status: manifest.status as RunStateView['status'], repoRoot });
+        return ok({
+          ...view,
+          status: manifest.status as RunStateView['status'],
+          repoRoot,
+          processAlive,
+        });
       }
     }
 
-    return ok({ ...view, repoRoot });
+    return ok({ ...view, repoRoot, processAlive });
   }
 
   /** @inheritdoc */

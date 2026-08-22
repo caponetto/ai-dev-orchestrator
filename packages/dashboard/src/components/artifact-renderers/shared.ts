@@ -77,6 +77,8 @@ export interface SourceEntry {
   title?: string;
   path?: string;
   uri?: string;
+  location?: string;
+  identifier?: string;
   content?: string;
   relevance?: string;
   fieldsMapped?: string[];
@@ -304,12 +306,16 @@ export function omitKeys(obj: JsonObject, keys: Iterable<string>): JsonObject {
 }
 
 export function renderSourceEntry(src: SourceEntry): string {
-  const srcTitle = src.title ?? src.path ?? src.uri ?? src.type ?? 'Source';
+  const srcTitle =
+    src.title ?? src.identifier ?? src.path ?? src.uri ?? src.location ?? src.type ?? 'Source';
+  const srcLocation = src.location ?? src.path ?? src.uri;
   const srcContent = src.content ?? src.relevance ?? '';
 
   const parts: string[] = [];
   if (srcContent) {
     parts.push(`**${srcTitle}:** ${srcContent}`);
+  } else if (srcLocation && srcLocation !== srcTitle) {
+    parts.push(`**${srcTitle}:** ${srcLocation}`);
   } else {
     parts.push(`**${srcTitle}**`);
   }

@@ -99,6 +99,11 @@ Before producing output, perform this internal analysis. Do not include private 
    - Adversarial inputs described in the specification
    - Missing integration-level tests between components
    - State transition edge cases (empty → populated, populated → empty, re-initialization)
+   - Configuration-driven edge cases — values that pass field validation but violate downstream framework/library contracts (e.g., duplicate registrations, reserved path collisions, conflicting option combinations)
+   - Resource lifecycle on error/early-return paths — does the test verify that resources (handles, connections, contexts) are cleaned up when the operation fails partway through?
+   - Idempotency and retry safety — for operations reachable through retryable transports, is double-execution tested?
+   - Backward compatibility — for changes to API responses, event schemas, or config shapes, are existing consumers' expectations tested?
+   - Error context preservation — do tests verify that errors crossing module boundaries carry actionable context (operation, input, stage) and preserve their type?
 5. **Prioritize gaps by risk — and drop low-value ones.** Not all gaps deserve a test. Prioritize by:
    - Impact of failure (data corruption > UI glitch)
    - Likelihood of occurrence (common user mistakes > exotic inputs)
@@ -167,6 +172,8 @@ A test suite is complete and high-quality when it is necessary and purposeful �
 - Tests are deterministic — no flakiness from timing, randomness, or external dependencies
 - Test names describe the scenario and expected outcome, not the implementation mechanism
 - Setup and teardown are clean — no leaked state between test cases
+- Tests assert expected outputs and state changes, not just the absence of errors — an error-only assertion proves the function didn't crash, not that it produced the correct result
+- Test helpers that construct production-equivalent configuration share code with the production path rather than reimplementing it — divergence between test and production wiring silently masks regressions
 
 ## Anti-Patterns
 

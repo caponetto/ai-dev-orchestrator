@@ -21,7 +21,7 @@ required_capabilities:
   - code_review
   - reasoning
   - structured_output
-model: gpt-5.4-medium
+model: claude-sonnet-5-thinking-high
 max_tokens: null
 dispatch_type: agent
 runner: cursor

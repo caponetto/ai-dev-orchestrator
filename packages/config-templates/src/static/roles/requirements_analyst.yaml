@@ -21,7 +21,7 @@ required_capabilities:
   - reasoning
   - structured_output
   - external_data_fetch
-model: gpt-5.4-high
+model: claude-opus-4-6
 max_tokens: null
 dispatch_type: agent
-runner: cursor
+runner: claude-code

@@ -99,7 +99,6 @@ import type { LiveRequestStore } from '@ai-orchestrator/runner';
 import type {
   BudgetConfig,
   MergedConfiguration,
-  PolicyDefinition,
   PartialMap,
   PromptTemplate,
   RoleContract,
@@ -527,7 +526,7 @@ async function buildOrchestratorInfra(params: InfraParams): Promise<InfraResult>
       }
     : (() => {
         const policyRegistry = new DefaultPolicyRegistry();
-        const policies = buildPoliciesWithBudget(config);
+        const policies = loadPoliciesFromGovernance(config.governance);
         const policyResolver = new PolicyResolver(policies);
         const policyEngine = new DefaultPolicyEngine(policyRegistry, policyResolver);
         return new DefaultGovernanceEngine(contractRegistry, {
@@ -769,24 +768,6 @@ export function createRunConfig(
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
-
-function buildPoliciesWithBudget(config: MergedConfiguration): readonly PolicyDefinition[] {
-  const basePolicies = loadPoliciesFromGovernance(config.governance);
-  const budget = config.governance.budget;
-  if (!budget || budget.maxTokensPerRun === undefined) {
-    return basePolicies;
-  }
-  const budgetPolicy: PolicyDefinition = {
-    id: 'config:token_budget',
-    type: 'token_budget',
-    scope: {},
-    config: {
-      maxTokens: budget.maxTokensPerRun,
-    },
-    enabled: true,
-  };
-  return [...basePolicies, budgetPolicy];
-}
 
 /** Produce a safe config snapshot for the dashboard (no secrets). */
 function sanitizeConfigForDashboard(

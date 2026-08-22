@@ -25,3 +25,12 @@ If no `pr_diff_context` artifact is present (e.g., the pre-compute script failed
 {{>diff_retrieval_strategy}}
 
 **Token budget:** Limit file reads to files directly referenced in the diff or specification. Do not explore the broader repository structure, read unrelated tests, or scan for conventions unless a specific finding requires verification. A focused review of the changed files is more valuable than a broad survey.
+
+{{#if humanFeedback}}
+
+### Human Feedback
+
+The human reviewer provided the following feedback:
+{{{humanFeedback}}}
+Consider this feedback when evaluating your review.
+{{/if}}

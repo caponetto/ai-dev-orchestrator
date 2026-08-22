@@ -59,12 +59,29 @@ export async function approveCommand(
     formatter.warn(w);
   }
 
+  const onUncaught = (err: unknown): void => {
+    const message = err instanceof Error ? err.message : String(err);
+    ctx.journalWriter.append({
+      timestamp: new Date().toISOString(),
+      runId,
+      sequence: 0,
+      type: 'error',
+      data: { kind: 'error', errorCode: 'uncaught_exception', message, recoverable: false },
+    });
+    process.exitCode = ExitCode.RUN_FAILED;
+  };
+  process.on('uncaughtException', onUncaught);
+  process.on('unhandledRejection', onUncaught);
+
   let result: RunResult;
   try {
     result = await ctx.engine.resume({ type: action, content });
   } catch (error: unknown) {
     formatter.error(toCLIError(error));
     return ExitCode.RUN_FAILED;
+  } finally {
+    process.removeListener('uncaughtException', onUncaught);
+    process.removeListener('unhandledRejection', onUncaught);
   }
 
   if (options.json) {

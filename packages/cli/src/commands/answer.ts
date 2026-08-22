@@ -107,12 +107,29 @@ export async function answerCommand(
       formatter.warn(w);
     }
 
+    const onUncaught = (err: unknown): void => {
+      const msg = err instanceof Error ? err.message : String(err);
+      ctx.journalWriter.append({
+        timestamp: new Date().toISOString(),
+        runId,
+        sequence: 0,
+        type: 'error',
+        data: { kind: 'error', errorCode: 'uncaught_exception', message: msg, recoverable: false },
+      });
+      process.exitCode = ExitCode.RUN_FAILED;
+    };
+    process.on('uncaughtException', onUncaught);
+    process.on('unhandledRejection', onUncaught);
+
     let result: RunResult;
     try {
       result = await ctx.engine.resume({ type: 'text', content: answerContent });
     } catch (error: unknown) {
       formatter.error(toCLIError(error));
       return ExitCode.RUN_FAILED;
+    } finally {
+      process.removeListener('uncaughtException', onUncaught);
+      process.removeListener('unhandledRejection', onUncaught);
     }
 
     if (options.json) {
@@ -192,12 +209,29 @@ export async function answerCommand(
     formatter.warn(w);
   }
 
+  const onUncaughtFb = (err: unknown): void => {
+    const msg = err instanceof Error ? err.message : String(err);
+    ctx.journalWriter.append({
+      timestamp: new Date().toISOString(),
+      runId,
+      sequence: 0,
+      type: 'error',
+      data: { kind: 'error', errorCode: 'uncaught_exception', message: msg, recoverable: false },
+    });
+    process.exitCode = ExitCode.RUN_FAILED;
+  };
+  process.on('uncaughtException', onUncaughtFb);
+  process.on('unhandledRejection', onUncaughtFb);
+
   let result: RunResult;
   try {
     result = await ctx.engine.resume({ type: 'text', content: answerContent });
   } catch (error: unknown) {
     formatter.error(toCLIError(error));
     return ExitCode.RUN_FAILED;
+  } finally {
+    process.removeListener('uncaughtException', onUncaughtFb);
+    process.removeListener('unhandledRejection', onUncaughtFb);
   }
 
   if (options.json) {

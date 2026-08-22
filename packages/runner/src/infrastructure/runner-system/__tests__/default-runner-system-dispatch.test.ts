@@ -781,6 +781,101 @@ describe('Sprint 12 Runner System Enhancements', () => {
       expect(event.type).toBe('worker_failed');
       expect(event.data).toMatchObject({ status: 'failure', error: '/files: required' });
     });
+
+    it('emits stream event when agent output fails validation', async () => {
+      resetWorkerCounter();
+      const mockRunner = makeMockRunner({ artifactContent: 'invalid json' });
+      const registry = new Map<string, AgentRunner>([['claude-code', mockRunner]]);
+      const streamEvents: Array<{ type: string; content: string }> = [];
+
+      const engine = makeAgentPromptEngine();
+      (engine.render as ReturnType<typeof vi.fn>).mockResolvedValue({
+        text: 'rendered prompt',
+        templateRef: { role: 'implementer', version: '1.0', source: 'built-in' },
+        tokenEstimate: 50,
+        truncations: [],
+        outputContract: {
+          role: 'implementer',
+          artifactType: 'implementation',
+          schema: { type: 'object', properties: { files: { type: 'array' } }, required: ['files'] },
+          format: 'json',
+          required: true,
+          repairEnabled: false,
+          maxRepairAttempts: 0,
+        },
+        metadata: {
+          templateVersion: '1.0',
+          resolvedFrom: 'implementer.md',
+          renderedAt: '2024-01-01T00:00:00Z',
+          inputArtifactRefs: [],
+          variablesUsed: [],
+          partialsIncluded: [],
+        },
+      });
+      (engine.validateOutput as ReturnType<typeof vi.fn>).mockReturnValue({
+        valid: false,
+        errors: [{ path: '/files', message: 'required', expected: 'array', actual: 'undefined' }],
+      });
+
+      const runner = new DefaultRunnerSystem(
+        makeAgentArtifactStore(),
+        makeAgentRoleRegistry(),
+        engine,
+        makeEventBus(),
+        { runnerRegistry: registry },
+      );
+
+      await runner.dispatch(
+        {
+          runId: createRunId('run-1'),
+          stateId: 'state-1',
+          role: 'implementer',
+          inputArtifacts: [],
+        },
+        (event) => {
+          streamEvents.push(event);
+        },
+      );
+
+      const errorEvent = streamEvents.find((e) => e.type === 'stderr');
+      expect(errorEvent).toBeDefined();
+      expect(errorEvent?.content).toContain('[output-validation-error]');
+      expect(errorEvent?.content).toContain('role=implementer');
+      expect(errorEvent?.content).toContain('/files: required');
+    });
+
+    it('emits stream event when agent result is not success', async () => {
+      resetWorkerCounter();
+      const mockRunner = makeMockRunner({ status: 'failure', error: 'agent crashed' });
+      const registry = new Map<string, AgentRunner>([['claude-code', mockRunner]]);
+      const streamEvents: Array<{ type: string; content: string }> = [];
+
+      const runner = new DefaultRunnerSystem(
+        makeAgentArtifactStore(),
+        makeAgentRoleRegistry(),
+        makeAgentPromptEngine(),
+        makeEventBus(),
+        { runnerRegistry: registry },
+      );
+
+      await runner.dispatch(
+        {
+          runId: createRunId('run-1'),
+          stateId: 'state-1',
+          role: 'implementer',
+          inputArtifacts: [],
+        },
+        (event) => {
+          streamEvents.push(event);
+        },
+      );
+
+      const errorEvent = streamEvents.find((e) => e.type === 'stderr');
+      expect(errorEvent).toBeDefined();
+      expect(errorEvent?.content).toContain('[agent-result-error]');
+      expect(errorEvent?.content).toContain('role=implementer');
+      expect(errorEvent?.content).toContain('agent crashed');
+    });
   });
 
   it('emits input artifact refs on task_prompt and output refs when produced', async () => {

@@ -192,6 +192,14 @@ export function RunHeader({
           Awaiting human approval
         </div>
       )}
+      {state.processAlive === false && state.status === 'running' && (
+        <div
+          role="alert"
+          className="rounded bg-red-500/20 px-3 py-1 text-xs font-medium text-red-400"
+        >
+          Process not responding — the agent may have crashed
+        </div>
+      )}
       {(canAbort || canRetry || canRerun) && (
         <div className="ml-auto flex gap-2">
           {canRerun && (

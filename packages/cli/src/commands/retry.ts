@@ -56,6 +56,42 @@ export async function retryCommand(
   const state = ctx.engine.getState();
   formatter.info(`Retrying from state: ${state.currentState}`);
 
+  const onUncaughtException = (err: Error): void => {
+    ctx.journalWriter.append({
+      timestamp: new Date().toISOString(),
+      runId,
+      sequence: 0,
+      type: 'error',
+      data: {
+        kind: 'error',
+        errorCode: 'uncaught_exception',
+        message: err.message,
+        recoverable: false,
+      },
+    });
+    process.exitCode = ExitCode.RUN_FAILED;
+  };
+
+  const onUnhandledRejection = (reason: unknown): void => {
+    const message = reason instanceof Error ? reason.message : String(reason);
+    ctx.journalWriter.append({
+      timestamp: new Date().toISOString(),
+      runId,
+      sequence: 0,
+      type: 'error',
+      data: {
+        kind: 'error',
+        errorCode: 'unhandled_rejection',
+        message,
+        recoverable: false,
+      },
+    });
+    process.exitCode = ExitCode.RUN_FAILED;
+  };
+
+  process.on('uncaughtException', onUncaughtException);
+  process.on('unhandledRejection', onUnhandledRejection);
+
   formatter.startSpinner('Retrying workflow…');
 
   let result: RunResult;
@@ -69,6 +105,9 @@ export async function retryCommand(
   } catch (error: unknown) {
     formatter.error(toCLIError(error));
     return ExitCode.RUN_FAILED;
+  } finally {
+    process.removeListener('uncaughtException', onUncaughtException);
+    process.removeListener('unhandledRejection', onUnhandledRejection);
   }
 
   formatter.clearSpinner();

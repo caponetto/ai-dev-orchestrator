@@ -94,7 +94,7 @@ export class FileBackedPermissionApprovalStore implements PermissionApprovalStor
       const content = await readFile(this.filePath, 'utf-8');
       const parsed = permissionApprovalFileSchema.safeParse(JSON.parse(content));
       if (parsed.success) {
-        this.cache = parsed.data;
+        this.cache = { version: parsed.data.version, approvals: [...parsed.data.approvals] };
       } else {
         this.cache = { version: 1 as const, approvals: [] };
       }
