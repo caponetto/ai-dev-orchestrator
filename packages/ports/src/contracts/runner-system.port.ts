@@ -31,4 +31,7 @@ export interface RunnerSystem {
 
   /** Cancel all active workers. Called on abort to clean up running subprocesses. */
   cancelAllWorkers(): Promise<void>;
+
+  /** Set the worker ID counter to resume from a persisted dispatch count. */
+  setWorkerCounter(counter: number): void;
 }

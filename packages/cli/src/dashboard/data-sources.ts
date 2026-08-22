@@ -14,6 +14,7 @@ import type {
   ArtifactType,
   DashboardEvent,
   PersistedState,
+  RunId,
   TransitionRecord,
   WorkflowDefinition,
 } from '@ai-orchestrator/schemas';
@@ -791,6 +792,13 @@ export function buildDataSources(
       } catch {
         return null;
       }
+    },
+    isProcessAlive: (runId: string) => {
+      const probe = statePersistence.probeLock(runId as RunId);
+      if (!probe.exists) {
+        return false;
+      }
+      return probe.pidRunning;
     },
     clock: () => new Date().toISOString(),
     getSessionSnapshots: (runId: string) => {

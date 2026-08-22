@@ -12,4 +12,10 @@ runners:
       - gpt-5.4-medium
       - gpt-5.4-high
       - gpt-5.4-xhigh
+      - gpt-5.4-mini-high
+      - claude-sonnet-5-thinking-high
       - gemini-3.1-pro
+      - grok-4.6-low
+      - grok-4.6-medium
+      - grok-4.6-high
+      - grok-4.6-xhigh

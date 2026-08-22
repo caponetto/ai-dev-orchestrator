@@ -1275,6 +1275,61 @@ describe('DefaultDashboardDataProvider', () => {
     });
   });
 
+  describe('getRunState processAlive', () => {
+    it('includes processAlive true when process is alive', () => {
+      const provider = new DefaultDashboardDataProvider(
+        makeSources({
+          isProcessAlive: () => true,
+        }),
+      );
+      const result = provider.getRunState('run-1');
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.processAlive).toBe(true);
+      }
+    });
+
+    it('includes processAlive false when process is dead', () => {
+      const provider = new DefaultDashboardDataProvider(
+        makeSources({
+          isProcessAlive: () => false,
+        }),
+      );
+      const result = provider.getRunState('run-1');
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.processAlive).toBe(false);
+      }
+    });
+
+    it('omits processAlive when isProcessAlive is not provided', () => {
+      const provider = new DefaultDashboardDataProvider(makeSources());
+      const result = provider.getRunState('run-1');
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.processAlive).toBeUndefined();
+      }
+    });
+
+    it('omits processAlive for terminal states', () => {
+      const terminalEngine = {
+        ...engine,
+        currentState: 'DONE',
+      };
+      const provider = new DefaultDashboardDataProvider(
+        makeSources({
+          getEngineState: () => terminalEngine,
+          isProcessAlive: () => false,
+        }),
+      );
+      const result = provider.getRunState('run-1');
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.processAlive).toBeUndefined();
+      }
+    });
+  });
+
   describe('getArtifactDetail', () => {
     it('returns error when artifact not found', () => {
       const provider = new DefaultDashboardDataProvider(

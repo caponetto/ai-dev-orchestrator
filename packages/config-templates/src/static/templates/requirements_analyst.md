@@ -145,7 +145,7 @@ Produce a {{constraints.requiredOutputType}} artifact with these required fields
 | Field                     | Type   | Constraint                                                                                                                                                                          |
 | ------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | id                        | string | Unique identifier, stable across iterations                                                                                                                                         |
-| version                   | number | Starts at 1, increments on revision                                                                                                                                                 |
+| version                   | number | Positive integer (>= 1). Current iteration: {{run.iterationCount}}                                                                                                                  |
 | title                     | string | Max 200 characters                                                                                                                                                                  |
 | businessGoal              | string | Max 1000 characters                                                                                                                                                                 |
 | createdAt                 | string | ISO 8601 timestamp                                                                                                                                                                  |
@@ -156,6 +156,7 @@ Produce a {{constraints.requiredOutputType}} artifact with these required fields
 | adversarialScenarios      | array  | Each object: `id`, `category` (failure/boundary_input/concurrency/performance), `description`, `affectedRequirements` (array of requirement IDs)                                    |
 | feasibility               | object | `{ feasible: boolean, reason?: string }`. Set `feasible: false` with a `reason` if the request cannot be fulfilled; otherwise `feasible: true`                                      |
 | extensions                | object | Optional. Must include `changeType`: `"docs_only"` if the task involves ONLY documentation changes (README, guides, comments) with no runtime code; otherwise `"code"` or `"mixed"` |
+| clarificationNeeds        | array  | Optional. Each object: `id`, `question`, `context`. Ambiguities needing human clarification before implementation can begin                                                         |
 
 {{>json_write_rules}}
 

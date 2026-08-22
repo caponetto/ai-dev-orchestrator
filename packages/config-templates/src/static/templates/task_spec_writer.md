@@ -57,8 +57,8 @@ Before producing output, perform this internal analysis. Do not include private 
 6. **Write functional requirements.** For each requirement in scope, produce a detailed description with automatable acceptance criteria. Every acceptance criterion must be verifiable by a command — a test, linter, type checker, build, or file-system check. Do not produce criteria that require subjective judgment.
 7. **Write non-functional requirements.** Include performance, security, or other quality attributes relevant to this task's scope. Quantify them (not "fast" but "< 200ms p95").
 8. **Write constraints.** Include technology constraints, conventions, and patterns from the codebase context that the implementation must follow.
-9. **Write adversarial scenarios.** For each functional requirement, identify failure modes, boundary inputs, concurrency issues, and performance concerns specific to this task's scope.
-10. **Set feasibility.** Always `{ feasible: true }` — the decomposition reviewer already validated feasibility.
+9. **Write adversarial scenarios.** For each functional requirement, identify failure modes, boundary inputs, concurrency issues, and performance concerns specific to this task's scope. For features that consume configuration (files, env vars, mounted volumes), include config-driven adversarial scenarios: edge-case-but-valid values, empty/missing config, values that pass field validation but violate downstream framework or library contracts (e.g., duplicate registrations, reserved path collisions, invalid formats). For features that forward credentials, include scenarios where the destination is outside the expected trust domain.
+10. **Set feasibility.** Default to `{ feasible: true }` since the decomposition reviewer validated feasibility at the task level. If during spec writing you discover a fundamental blocker not visible at decomposition time (e.g., a required API doesn't exist, a dependency is incompatible), set `{ feasible: false, reason: "..." }` and explain the blocker.
 11. **Validate self-containment.** Read the spec as if you knew nothing about the parent specification or other tasks. Can you implement this task from this spec alone? If not, add the missing context.
 
 ## Task Item
@@ -112,7 +112,7 @@ Produce a {{constraints.requiredOutputType}} artifact with these required fields
 | `nonFunctionalRequirements` | array  | Requirement objects with `id`, `description`, and `category`                                                         |
 | `constraints`               | array  | Constraint objects with `id` and `description`                                                                       |
 | `adversarialScenarios`      | array  | Each: `id`, `category` (failure/boundary_input/concurrency/performance), `description`, `affectedRequirements`       |
-| `feasibility`               | object | Always `{ feasible: true }`                                                                                          |
+| `feasibility`               | object | Default `{ feasible: true }`. Set `false` with reason if a blocker is discovered during deep analysis                |
 | `extensions`                | object | Must include `changeType` and `taskRef: { taskId, sequenceOrder, dependencies }` referencing back to the parent task |
 
 {{>json_write_rules}}

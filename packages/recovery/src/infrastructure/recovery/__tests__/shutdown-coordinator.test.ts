@@ -334,4 +334,46 @@ describe('ShutdownCoordinator', () => {
       expect(journalEvent.data.status).toBe('paused');
     });
   });
+
+  describe('onShutdown', () => {
+    it('invokes listeners when shutdown is requested', () => {
+      const sp = makeMockStatePersistence();
+      const jw = makeMockJournalWriter();
+      coordinator = new ShutdownCoordinator(sp, jw, 5000);
+
+      const listener = vi.fn();
+      coordinator.onShutdown(listener);
+      coordinator.requestShutdown('signal');
+
+      expect(listener).toHaveBeenCalledOnce();
+    });
+
+    it('invokes multiple listeners in order', () => {
+      const sp = makeMockStatePersistence();
+      const jw = makeMockJournalWriter();
+      coordinator = new ShutdownCoordinator(sp, jw, 5000);
+
+      const order: number[] = [];
+      coordinator.onShutdown(() => order.push(1));
+      coordinator.onShutdown(() => order.push(2));
+      coordinator.requestShutdown('abort');
+
+      expect(order).toEqual([1, 2]);
+    });
+
+    it('continues invoking listeners even if one throws', () => {
+      const sp = makeMockStatePersistence();
+      const jw = makeMockJournalWriter();
+      coordinator = new ShutdownCoordinator(sp, jw, 5000);
+
+      const second = vi.fn();
+      coordinator.onShutdown(() => {
+        throw new Error('boom');
+      });
+      coordinator.onShutdown(second);
+      coordinator.requestShutdown('signal');
+
+      expect(second).toHaveBeenCalledOnce();
+    });
+  });
 });

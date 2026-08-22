@@ -446,6 +446,28 @@ describe('RunnerContextAssembler', () => {
     expect(renderCall.systemContext.iterationCount).toBe(3);
   });
 
+  it('floors iterationCount to 1 when 0 is provided', async () => {
+    const promptEngine = makePromptEngine();
+    const assembler = new RunnerContextAssembler(
+      makeArtifactStore(),
+      makeRoleRegistry(),
+      promptEngine,
+    );
+
+    await assembler.assemble({
+      runId: createRunId('run-1'),
+      stateId: 'REFINEMENT',
+      role: 'architect',
+      inputArtifacts: [],
+      iterationCount: 0,
+    });
+
+    const renderCall = (promptEngine.render as ReturnType<typeof vi.fn>).mock.calls[0][0] as {
+      systemContext: { iterationCount: number };
+    };
+    expect(renderCall.systemContext.iterationCount).toBe(1);
+  });
+
   it('defaults iterationCount to 1 when not provided', async () => {
     const promptEngine = makePromptEngine();
     const assembler = new RunnerContextAssembler(

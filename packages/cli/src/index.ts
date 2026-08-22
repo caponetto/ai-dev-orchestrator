@@ -1,3 +1,6 @@
+import { appendFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { getErrorMessage } from '@ai-orchestrator/utils';
 import { Command } from 'commander';
 
@@ -382,6 +385,27 @@ function createEarlyFormatter(): OutputFormatter {
     verbose: process.argv.includes('--verbose'),
   });
 }
+
+function logCrash(label: string, err: unknown): void {
+  const message = err instanceof Error ? (err.stack ?? err.message) : String(err);
+  const line = `[${new Date().toISOString()}] ${label}: ${message}\n`;
+  process.stderr.write(line);
+  try {
+    const runsDir = join(process.env['AI_ORCHESTRATOR_HOME'] ?? join(process.cwd(), '.ai'), 'runs');
+    appendFileSync(join(runsDir, 'crash.log'), line);
+  } catch {
+    // best-effort
+  }
+}
+
+process.on('uncaughtException', (err) => {
+  logCrash('uncaughtException', err);
+  process.exitCode = ExitCode.RUN_FAILED;
+});
+process.on('unhandledRejection', (reason) => {
+  logCrash('unhandledRejection', reason);
+  process.exitCode = ExitCode.RUN_FAILED;
+});
 
 program.parseAsync(process.argv).catch((error: unknown) => {
   if (!(error instanceof Error) || !('code' in error) || typeof error.code !== 'string') {

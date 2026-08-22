@@ -43,7 +43,7 @@ import { MetricsRecorder } from './metrics-recorder';
 import { ParallelManager } from './parallel-manager';
 import { RunnerContextAssembler } from './runner-context-assembler';
 import { SessionArtifactTracker } from './session-artifact-tracker';
-import { generateWorkerId } from './worker-spawner';
+import { generateWorkerId, setWorkerCounter } from './worker-spawner';
 
 interface RunnerSystemOptions {
   readonly maxConcurrency?: number;
@@ -314,6 +314,7 @@ export class DefaultRunnerSystem implements RunnerSystem {
         context,
         metricsInput,
         emitOutputArtifacts,
+        onStreamEvent,
       );
     } catch (error: unknown) {
       this.updateWorkerState(workerId, 'failed');
@@ -367,6 +368,11 @@ export class DefaultRunnerSystem implements RunnerSystem {
     if (status) {
       this.activeWorkers.set(workerId, { ...status, state: 'failed' });
     }
+  }
+
+  /** @inheritdoc */
+  setWorkerCounter(counter: number): void {
+    setWorkerCounter(counter);
   }
 
   /** @inheritdoc */
@@ -487,6 +493,7 @@ export class DefaultRunnerSystem implements RunnerSystem {
     },
     metricsInput: MetricsInput,
     emitOutputArtifacts: (refs: readonly ArtifactRef[]) => void,
+    onStreamEvent?: StreamEventCallback,
   ): Promise<DispatchResult> {
     if (agentResult.status !== 'success' || !agentResult.artifactContent) {
       this.updateWorkerState(workerId, 'failed');
@@ -507,6 +514,12 @@ export class DefaultRunnerSystem implements RunnerSystem {
         message: agentResult.error ?? 'Agent dispatch failed',
         retryable: false,
       };
+
+      onStreamEvent?.({
+        timestamp: new Date().toISOString(),
+        type: 'stderr',
+        content: `[agent-result-error] role=${request.role} worker=${workerId}: ${workerError.message}`,
+      });
 
       this.metricsRecorder.emitFailed(metricsInput, workerError, metrics, false);
       this.recordJournal(
@@ -558,6 +571,12 @@ export class DefaultRunnerSystem implements RunnerSystem {
         message: validation.errors.map((e) => `${e.path}: ${e.message}`).join('; '),
         retryable: false,
       };
+
+      onStreamEvent?.({
+        timestamp: new Date().toISOString(),
+        type: 'stderr',
+        content: `[output-validation-error] role=${request.role} worker=${workerId}: ${workerError.message}`,
+      });
 
       this.metricsRecorder.emitFailed(metricsInput, workerError, metrics, false);
       this.recordJournal(metricsInput, [], 'failure', metrics, workerError);

@@ -89,6 +89,7 @@ states:
         params:
           role: requirements_analyst
     transitions:
+      # Explicit clarification questions artifact → ask human
       - target: WAITING_FOR_HUMAN
         trigger: completion
         guards:
@@ -97,6 +98,31 @@ states:
               artifact_type: clarification_questions
         governance_required: false
         priority: 1
+      # Spec feasible but has embedded clarification needs → ask human
+      - target: WAITING_FOR_HUMAN
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: canonical_specification
+          - type: specification_feasible
+            params: {}
+          - type: has_clarification_needs
+            params: {}
+        governance_required: false
+        priority: 2
+      # Spec feasible + no clarification needs (priorities 1-2 didn't match) → bypass human gate
+      - target: CODEBASE_ANALYSIS
+        trigger: completion
+        guards:
+          - type: artifact_exists
+            params:
+              artifact_type: canonical_specification
+          - type: specification_feasible
+            params: {}
+        governance_required: false
+        priority: 3
+      # Spec exists but not feasible → ask human
       - target: WAITING_FOR_HUMAN
         trigger: completion
         guards:
@@ -104,12 +130,12 @@ states:
             params:
               artifact_type: canonical_specification
         governance_required: false
-        priority: 2
+        priority: 4
       - target: FAILED
         trigger: failure
         guards: []
         governance_required: false
-        priority: 3
+        priority: 5
 
   # ──────────────────────────────────────────────────────────────
   # WAITING_FOR_HUMAN — central hub for human interaction

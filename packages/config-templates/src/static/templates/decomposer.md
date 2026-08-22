@@ -49,12 +49,11 @@ Before producing output, perform this internal analysis. Do not include private 
 2. **Map requirements to code.** For each functional requirement, identify which packages, modules, and files it touches. Use the codebase context's `affectedFiles` and `existingPatterns` to ground this mapping in reality.
 3. **Identify candidate boundaries.** Look for natural split points: package boundaries, module boundaries, API contract boundaries, data model boundaries. Prefer boundaries that align with existing code structure over conceptual boundaries.
 4. **Draft task scopes.** For each candidate task, define what's in and what's out. A task should: touch a minimal set of packages, have a clear entry and exit point, be independently testable, and produce artifacts that are useful without the other tasks being complete.
-5. **Assess independence.** For each pair of tasks, check: do they modify the same files? Do they depend on each other's output types? Can they run in parallel? Classify each dependency as `full` (no dependency), `partial` (can start in parallel, needs integration later), or `blocked` (must wait).
-6. **Minimize coupling.** If two tasks share significant file overlap, consider merging them or restructuring the boundary. If a task has `blocked` dependencies, investigate whether the boundary can be moved to make it `partial` or `full`. The goal is maximum parallelism.
-7. **Handle cross-cutting concerns.** Shared types, schemas, or infrastructure changes should be extracted into their own task (typically the first in sequence) rather than duplicated across multiple tasks.
-8. **Determine sequencing.** Assign `sequenceOrder` tiers — tasks at the same tier can run in parallel. Foundation tasks (shared types, schemas, infrastructure) are tier 1. Consumer tasks are higher tiers.
-9. **Write decomposition strategy.** Summarize the approach — why these boundaries, what alternatives were considered, what trade-offs were made.
-10. **Validate completeness.** Verify every requirement from the specification is covered by at least one task. Verify no requirement is duplicated across tasks (unless it's a cross-cutting concern with clearly different scopes per task).
+5. **Assess independence and minimize coupling.** For each pair of tasks, check: do they modify the same files? Do they depend on each other's output types? Can they run in parallel? Classify each dependency as `full` (no dependency), `partial` (can start in parallel, needs integration later), or `blocked` (must wait). If two tasks share significant file overlap, merge them or restructure the boundary. If a task has `blocked` dependencies, investigate whether the boundary can be moved to `partial` or `full`. The goal is maximum parallelism.
+6. **Handle cross-cutting concerns.** Shared types, schemas, or infrastructure changes should be extracted into their own task (typically the first in sequence) rather than duplicated across multiple tasks.
+7. **Determine sequencing.** Assign `sequenceOrder` tiers — tasks at the same tier can run in parallel. Foundation tasks (shared types, schemas, infrastructure) are tier 1. Consumer tasks are higher tiers.
+8. **Write decomposition strategy.** Summarize the approach — why these boundaries, what alternatives were considered, what trade-offs were made.
+9. **Validate completeness.** Verify every requirement from the specification is covered by at least one task. Verify no requirement is duplicated across tasks (unless it's a cross-cutting concern with clearly different scopes per task).
 
 ## Input
 
@@ -102,14 +101,14 @@ Address this feedback in your revised output.
 
 Produce a {{constraints.requiredOutputType}} artifact with these required fields:
 
-| Field                    | Type   | Constraint                                    |
-| ------------------------ | ------ | --------------------------------------------- |
-| `id`                     | string | Format: `breakdown-<slug>-<seq>`              |
-| `version`                | number | Starts at 1, increments on revision           |
-| `sourceSpecificationId`  | string | ID of the input canonical specification       |
-| `decompositionStrategy`  | string | 2-4 sentences explaining the split approach   |
-| `independenceAssessment` | string | Summary of parallelizability across all tasks |
-| `tasks`                  | array  | 2-7 task objects                              |
+| Field                    | Type   | Constraint                                                         |
+| ------------------------ | ------ | ------------------------------------------------------------------ |
+| `id`                     | string | Format: `breakdown-<slug>-<seq>`                                   |
+| `version`                | number | Positive integer (>= 1). Current iteration: {{run.iterationCount}} |
+| `sourceSpecificationId`  | string | ID of the input canonical specification                            |
+| `decompositionStrategy`  | string | 2-4 sentences explaining the split approach                        |
+| `independenceAssessment` | string | Summary of parallelizability across all tasks                      |
+| `tasks`                  | array  | 2-7 task objects                                                   |
 
 Each task object:
 

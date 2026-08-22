@@ -142,6 +142,8 @@ export function renderPermissionResponseLine(line: DashboardAgentStreamEvent): R
     return renderDefaultLine(line);
   }
   const granted = pm.payload.granted === true;
+  const message = str(pm.payload.message);
+  const label = granted ? '✓ Approved' : '✗ Did not approve';
   return (
     <div
       className={cn(
@@ -150,7 +152,7 @@ export function renderPermissionResponseLine(line: DashboardAgentStreamEvent): R
       )}
     >
       <Timestamp iso={line.timestamp} />
-      <span>{granted ? '✓ Approved' : '✗ Denied'}</span>
+      <span>{message ? `${label}: ${message}` : label}</span>
     </div>
   );
 }

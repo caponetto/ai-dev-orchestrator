@@ -5,7 +5,7 @@ description: Analyzes input to understand full scope and natural decomposition b
 variables:
   - name: input
     type: artifact
-    required: false
+    required: true
     artifact_type: intake_requirements
 partials:
   - agent_time_management
@@ -75,7 +75,7 @@ Produce a {{constraints.requiredOutputType}} artifact with these required fields
 | Field                     | Type   | Constraint                                                                                                                                                     |
 | ------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | id                        | string | Unique identifier, stable across iterations                                                                                                                    |
-| version                   | number | Starts at 1, increments on revision                                                                                                                            |
+| version                   | number | Positive integer (>= 1). Current iteration: {{run.iterationCount}}                                                                                             |
 | title                     | string | Max 200 characters                                                                                                                                             |
 | businessGoal              | string | Max 1000 characters                                                                                                                                            |
 | createdAt                 | string | ISO 8601 timestamp                                                                                                                                             |
@@ -84,7 +84,7 @@ Produce a {{constraints.requiredOutputType}} artifact with these required fields
 | nonFunctionalRequirements | array  | Requirement objects with `id`, `description`, and `category`                                                                                                   |
 | constraints               | array  | Constraint objects with `id` and `description`                                                                                                                 |
 | adversarialScenarios      | array  | Focus on cross-area failure modes; each: `id`, `category`, `description`, `affectedRequirements`                                                               |
-| feasibility               | object | Always `{ feasible: true }` — if infeasible at this level, the workflow is wrong                                                                               |
+| feasibility               | object | Default `{ feasible: true }`. Set `{ feasible: false, reason: "..." }` only if analysis reveals a fundamental blocker not visible at intake                    |
 | extensions                | object | Must include `changeType` and `decompositionHints` (see below)                                                                                                 |
 
 The `extensions.decompositionHints` object must include:

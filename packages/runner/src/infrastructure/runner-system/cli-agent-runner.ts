@@ -929,12 +929,14 @@ export class CliAgentRunner implements SessionCapableRunner {
           transport,
         );
         if (granted && this.approvalStore) {
-          void this.approvalStore.record({
-            action: payload.action,
-            resource: payload.resource,
-            detail: payload.detail,
-            createdByRole: task.role,
-          });
+          this.approvalStore
+            .record({
+              action: payload.action,
+              resource: payload.resource,
+              detail: payload.detail,
+              createdByRole: task.role,
+            })
+            .catch(() => {});
         }
       } else {
         await this.liveRequestStore.writeResponse({
@@ -1245,22 +1247,6 @@ export function buildAgentTaskPrompt(task: AgentTask, taskFilePath: string): str
     '- Aim for 3-5 progress lines per task, not 10-20. Silence is fine while working.',
     '- If stream-json mode is enabled, emit progress and completion events on stdout while working.',
   );
-
-  if (task.humanFeedback) {
-    lines.push(
-      '',
-      'IMPORTANT — Human Feedback (must be addressed in your output):',
-      task.humanFeedback,
-    );
-  }
-
-  if (task.previousFindings) {
-    lines.push(
-      '',
-      'IMPORTANT — Previous Review Findings (must be addressed in your output):',
-      task.previousFindings,
-    );
-  }
 
   if (task.iterationCount && task.iterationCount > 1) {
     lines.push(

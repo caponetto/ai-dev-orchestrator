@@ -14,6 +14,7 @@ export class ShutdownCoordinator {
   private shutdownReason: ShutdownReason = 'signal';
   private shutdownRequestedAt: string | null = null;
   private readonly boundHandler: () => void;
+  private readonly shutdownListeners: Array<() => void> = [];
 
   constructor(
     statePersistence: StatePersistence,
@@ -44,10 +45,21 @@ export class ShutdownCoordinator {
     return this.shutdownRequested;
   }
 
+  onShutdown(listener: () => void): void {
+    this.shutdownListeners.push(listener);
+  }
+
   requestShutdown(reason: ShutdownReason): void {
     this.shutdownRequested = true;
     this.shutdownReason = reason;
     this.shutdownRequestedAt = new Date().toISOString();
+    for (const listener of this.shutdownListeners) {
+      try {
+        listener();
+      } catch {
+        // best-effort — don't let one failing listener block others
+      }
+    }
   }
 
   getShutdownReason(): ShutdownReason {

@@ -7,6 +7,7 @@ import {
   TRANSITION_TRIGGERS,
   type Action,
   type Guard,
+  workflowBudgetSchema,
 } from './workflow-engine';
 
 /**
@@ -50,6 +51,7 @@ export const workflowSchema = z.object({
   initialState: z.string().min(1),
   terminalStates: z.array(z.string()).min(1),
   states: z.record(z.string(), workflowFileStateSchema),
+  budget: workflowBudgetSchema.optional(),
 });
 
 export type WorkflowFile = z.infer<typeof workflowSchema>;

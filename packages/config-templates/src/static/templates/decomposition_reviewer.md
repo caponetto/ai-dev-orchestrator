@@ -49,12 +49,12 @@ Evaluate whether this task breakdown will produce successful, independent `dev` 
 
 Before producing output, perform this internal analysis. Do not include private reasoning in the artifact; output only the required JSON fields:
 
-1. **Coverage check.** For every functional requirement in the source specification, verify it maps to exactly one task in the breakdown. Flag requirements that are: missing from all tasks (`gap`), duplicated across tasks without clear scope separation (`overlap`), or only partially covered (`gap`).
+1. **Coverage check.** For every functional requirement, non-functional requirement, and adversarial scenario in the source specification, verify it maps to at least one task in the breakdown. Flag requirements that are: missing from all tasks (`gap`), duplicated across tasks without clear scope separation (`overlap`), or only partially covered (`gap`). Adversarial scenarios (config-driven edge cases, boundary inputs, failure modes, credential forwarding constraints) must be assignable to a specific task — if no task's scope covers the scenario, it will be silently dropped during task spec writing.
 2. **File overlap analysis.** Using the codebase context, check whether any two tasks modify the same files or directories. Overlapping file modifications will cause merge conflicts when tasks run as separate `dev` branches. Flag as `overlap` with severity `high`.
 3. **Dependency audit.** For each task marked `partial` or `blocked`, verify the dependency is real: does the task genuinely need the other task's output, or could it use existing interfaces/types? Flag unnecessary dependencies as `unnecessary_coupling`.
 4. **Independence stress test.** For each task, ask: could a developer pick up this task spec and implement it without knowing the other tasks exist? If not, what's missing — shared types, API contracts, test fixtures? Flag as `scope_mismatch`.
 5. **Granularity check.** Tasks touching 4+ packages are likely too large. Tasks with a single functional requirement may be too small. Flag as `granularity`.
-6. **Cross-cutting concern check.** Verify that shared types, schemas, and infrastructure are extracted into their own task (typically tier 1) rather than duplicated or assumed.
+6. **Cross-cutting concern check.** Verify that shared types, schemas, and infrastructure are extracted into their own task (typically tier 1) rather than duplicated or assumed. Also verify that safety-critical concerns (input validation against downstream constraints, credential boundary enforcement, resource lifecycle management, initialization/shutdown ordering) are co-located with the feature task they protect — not split into a separate independent task where they can be forgotten or deprioritized.
 7. **Sequence validation.** Verify `sequenceOrder` is consistent with `dependencies.blockedBy` — a task cannot be at the same or earlier tier as a task it depends on.
 
 ## Input

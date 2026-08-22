@@ -271,7 +271,7 @@ describe('renderPermissionResponseLine', () => {
     expect(container.firstChild).toHaveClass('text-emerald-400');
   });
 
-  it('renders denied text with red color when granted is false', () => {
+  it('renders did-not-approve text with red color when granted is false', () => {
     const line = makeLine({
       protocolMessage: {
         messageType: 'permission_response',
@@ -279,11 +279,11 @@ describe('renderPermissionResponseLine', () => {
       },
     });
     const { container } = render(renderPermissionResponseLine(line));
-    expect(container.textContent).toContain('✗ Denied');
+    expect(container.textContent).toContain('✗ Did not approve');
     expect(container.firstChild).toHaveClass('text-red-400');
   });
 
-  it('renders denied when granted is not strictly true', () => {
+  it('renders did-not-approve when granted is not strictly true', () => {
     const line = makeLine({
       protocolMessage: {
         messageType: 'permission_response',
@@ -291,7 +291,18 @@ describe('renderPermissionResponseLine', () => {
       },
     });
     const { container } = render(renderPermissionResponseLine(line));
-    expect(container.textContent).toContain('✗ Denied');
+    expect(container.textContent).toContain('✗ Did not approve');
+  });
+
+  it('includes rejection message when present', () => {
+    const line = makeLine({
+      protocolMessage: {
+        messageType: 'permission_response',
+        payload: { granted: false, message: 'Re-read the ticket and act.' },
+      },
+    });
+    const { container } = render(renderPermissionResponseLine(line));
+    expect(container.textContent).toContain('✗ Did not approve: Re-read the ticket and act.');
   });
 
   it('falls back to renderDefaultLine when protocolMessage is missing', () => {

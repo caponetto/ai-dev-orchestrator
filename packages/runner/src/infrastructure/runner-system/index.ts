@@ -11,7 +11,7 @@ export { ParallelManager } from './parallel-manager';
 export type { DispatchFn } from './parallel-manager';
 export { isRetryableWorkerError } from './retry-manager';
 export { RunnerContextAssembler } from './runner-context-assembler';
-export { generateWorkerId, resetWorkerCounter } from './worker-spawner';
+export { generateWorkerId, resetWorkerCounter, setWorkerCounter } from './worker-spawner';
 
 export { serializeMessage, deserializeMessage } from './protocol-serializer';
 export type { ParseSuccess, ParseFailure } from './protocol-serializer';

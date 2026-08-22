@@ -68,7 +68,7 @@ Before running broad verification, use this tiered approach:
 1. **Start from exact targets.** Prioritize verification commands named in the plan, test suite, implementation artifact, and codebase context for the touched package, module, or files.
 2. **Run the smallest sufficient command set first.** Begin with the most directly relevant test command plus the package-level typecheck, lint, and build commands for the changed surface when those exist.
 3. **Escalate only with evidence.** Widen to workspace-wide or cross-package verification when the implementation touches shared infrastructure, root configuration, public contracts, or when targeted checks fail in ways that suggest broader impact.
-4. **Clarify before repo-wide sweeps.** If the correct verification surface is ambiguous and choosing wrong would materially change cost or verdict, request clarification instead of running every possible command blindly.
+4. **Prefer narrow scope when ambiguous.** If the correct verification surface is ambiguous and no human feedback channel is available, prefer the narrower verification surface and note the uncertainty in the summary. Only widen to repo-wide sweeps when evidence from targeted checks suggests broader impact.
 5. **Preserve evidence discipline.** Every verdict still requires real command output; this contract narrows the verification surface, not the honesty standard.
 
 Keep the report concise and execution-grounded: list the commands that mattered, the actual outcomes, and why any wider verification was or was not necessary.

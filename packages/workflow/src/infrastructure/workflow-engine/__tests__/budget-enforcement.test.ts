@@ -37,6 +37,7 @@ function makeRunner(tokenUsage?: {
     getWorkerStatus: vi.fn().mockReturnValue(null),
     cancelWorker: vi.fn(),
     cancelAllWorkers: vi.fn().mockResolvedValue(undefined),
+    setWorkerCounter: vi.fn(),
   };
 }
 
@@ -834,6 +835,7 @@ describe('Budget Enforcement', () => {
         getWorkerStatus: vi.fn().mockReturnValue(null),
         cancelWorker: vi.fn(),
         cancelAllWorkers: vi.fn().mockResolvedValue(undefined),
+        setWorkerCounter: vi.fn(),
       };
 
       let governanceCallCount = 0;

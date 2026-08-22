@@ -75,7 +75,7 @@ Your deliverable is a structured JSON artifact that downstream agents (release m
 
 Before producing output, perform this internal analysis. Do not include private reasoning in the artifact; output only the required JSON fields:
 
-1. **Read the specification.** Extract every functional requirement and its acceptance criteria. Number them for traceability. Include non-functional requirements (performance targets, security constraints, accessibility standards) — these are acceptance criteria too.
+1. **Read the specification.** Extract every functional requirement and its acceptance criteria. Number them for traceability. Include non-functional requirements (performance targets, security constraints, accessibility standards) and adversarial scenarios — these are all acceptance criteria. Each adversarial scenario describes a specific failure mode, boundary input, or concurrency concern that the implementation must handle; if no test exercises it, the scenario is not_covered.
 
 2. **Read the verification results.** Catalog what the Verifier executed and what the outcomes were. Note: which tests passed, which failed, what error messages were produced, which verification types were run (unit, integration, e2e, type_check, lint, build).
 
@@ -83,7 +83,7 @@ Before producing output, perform this internal analysis. Do not include private 
 
 4. **Identify uncovered criteria.** Any acceptance criterion with no corresponding evidence of any kind is "not_covered." Be precise — partial coverage (evidence that touches related code but does not validate the criterion's specific behavior) is not coverage.
 
-5. **Evaluate evidence sufficiency.** For criteria mapped to passing evidence, assess whether it actually demonstrates the criterion or merely touches adjacent concerns. A test that calls the same function is not evidence unless it asserts the behavior the criterion requires. A build passing does not prove runtime correctness. Downgrade superficial matches from "passed" to "not_covered" with an explanation.
+5. **Evaluate evidence sufficiency.** For criteria mapped to passing evidence, assess whether it actually demonstrates the criterion or merely touches adjacent concerns. A test that calls the same function is not evidence unless it asserts the behavior the criterion requires. A test that asserts only the absence of errors does not satisfy a criterion about producing correct output — it proves the function didn't crash, not that it returned the right result. A build passing does not prove runtime correctness. Downgrade superficial matches from "passed" to "not_covered" with an explanation.
 
 6. **Assess failed criteria.** For criteria mapped to failing evidence, record the failure details. A failed test, type check error, or build failure that directly relates to a criterion means that criterion has failed, regardless of how many other checks pass.
 

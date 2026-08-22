@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { existsSync, rmSync } from 'node:fs';
+import { closeSync, existsSync, openSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -32,15 +32,22 @@ function getCliEntryPath(): string {
   return process.argv[1];
 }
 
-function spawnDetachedCli(baseDir: string, args: string[]): void {
+function spawnDetachedCli(baseDir: string, args: string[], logPath?: string): void {
   const entry = getCliEntryPath();
   const cwd = existsSync(baseDir) ? baseDir : tmpdir();
+  let stderrFd: number | undefined;
+  if (logPath) {
+    stderrFd = openSync(logPath, 'a');
+  }
   const child = spawn(process.execPath, [entry, ...args], {
     cwd,
     detached: true,
-    stdio: 'ignore',
+    stdio: ['ignore', 'ignore', stderrFd ?? 'ignore'],
   });
   child.unref();
+  if (stderrFd !== undefined) {
+    closeSync(stderrFd);
+  }
 }
 
 export class DefaultDashboardActionHandler implements DashboardActionHandler {
@@ -271,7 +278,8 @@ export class DefaultDashboardActionHandler implements DashboardActionHandler {
       if (state.repoRoot) {
         args.push('--repo', state.repoRoot);
       }
-      spawnDetachedCli(state.repoRoot ?? process.cwd(), args);
+      const logFile = join(runDir, 'cli-stderr.log');
+      spawnDetachedCli(state.repoRoot ?? process.cwd(), args, logFile);
       return { success: true };
     } catch (e: unknown) {
       return { success: false, error: e instanceof Error ? e.message : String(e) };
@@ -419,12 +427,17 @@ export class DefaultDashboardActionHandler implements DashboardActionHandler {
         });
       }
 
+      const logFile = join(runDir, 'cli-stderr.log');
       if (type === 'approval') {
-        spawnDetachedCli(process.cwd(), ['approve', runId, '--message', content]);
+        spawnDetachedCli(process.cwd(), ['approve', runId, '--message', content], logFile);
       } else if (type === 'rejection') {
-        spawnDetachedCli(process.cwd(), ['approve', runId, '--reject', '--message', content]);
+        spawnDetachedCli(
+          process.cwd(),
+          ['approve', runId, '--reject', '--message', content],
+          logFile,
+        );
       } else {
-        spawnDetachedCli(process.cwd(), ['answer', runId, content]);
+        spawnDetachedCli(process.cwd(), ['answer', runId, content], logFile);
       }
 
       return { success: true };

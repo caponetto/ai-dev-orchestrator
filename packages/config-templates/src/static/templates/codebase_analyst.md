@@ -56,9 +56,12 @@ Before producing output, perform this internal analysis. Do not include private 
 5. **Identify architectural patterns.** Look for dependency injection, layered architecture, hexagonal/ports-and-adapters, module boundaries, service patterns, repository patterns, factory patterns, or domain-driven design structures.
 6. **Identify test patterns.** Determine the test framework (Jest, Vitest, pytest, JUnit), test file placement (co-located vs separate `__tests__` directories), naming conventions for test files, assertion style, mocking approach, and fixture patterns.
 7. **Map affected files.** Trace the specification's functional requirements to specific existing files that will need modification, extension, or that new code must integrate with. Consider both direct impacts and transitive dependencies.
-8. **Identify import and dependency patterns.** Determine whether the project uses relative imports, path aliases, barrel files (index.ts re-exports), dependency injection containers, or module registration patterns.
-9. **Catalog the tech stack.** Document language version, runtime, framework versions, key dependencies, dev dependencies (linters, formatters, type checkers), and CI/CD tooling.
-10. **Structure findings into the output format.** Organize all discoveries into the artifact schema, ensuring every field has substantive content backed by evidence from actual files.
+8. **Extract key interface signatures.** For each affected file and its immediate dependencies, capture the public API surface that the planner and implementer will need: function signatures, struct/class/interface field definitions, configuration objects, and constructor parameters. Focus on the modules the specification will integrate with — the planner cannot make correct decisions about a module it can only see described in prose. Include the actual field names, types, and any required/optional distinctions. When a function accepts a configuration struct, list all fields of that struct.
+9. **Identify validation and safety patterns.** Document how the codebase validates inputs at trust boundaries — especially configuration inputs (files, env vars, mounted volumes). Look for existing patterns around: input validation against framework/library constraints (e.g., path format rules, uniqueness requirements), trust boundary enforcement for credential forwarding (allowlists, namespace restrictions), SSRF protections (redirect validators, host allowlists), and fail-open vs fail-closed behavior. These patterns are critical for the planner to ensure new features follow established safety conventions.
+10. **Identify error handling and lifecycle patterns.** Document how errors are wrapped and propagated across module boundaries — what context they carry (operation, input, stage), whether error types are preserved across wrapping, and what the convention is for actionable error messages. Document how the codebase manages resource lifecycle: initialization ordering (what starts first), shutdown ordering (what stops last), resource cleanup idioms (defer, context cancellation, graceful drain), and what happens when initialization fails partway through.
+11. **Identify import and dependency patterns.** Determine whether the project uses relative imports, path aliases, barrel files (index.ts re-exports), dependency injection containers, or module registration patterns.
+12. **Catalog the tech stack.** Document language version, runtime, framework versions, key dependencies, dev dependencies (linters, formatters, type checkers), and CI/CD tooling.
+13. **Structure findings into the output format.** Organize all discoveries into the artifact schema, ensuring every field has substantive content backed by evidence from actual files.
 
 ## Input
 
@@ -91,7 +94,11 @@ A codebase analysis is complete when:
 - Architectural patterns are identified with file path evidence
 - Test infrastructure is fully characterized (framework, placement, style)
 - Every functional requirement in the specification maps to at least one affected file or affected area; if no concrete file can be identified yet, name the smallest confirmed directory/module and explain the uncertainty
+- For affected files whose public API the implementer must call or extend, the `signatures` field contains the **complete** struct/interface/class definition read from the source — not a partial list inferred from usage in other files. When a function accepts a configuration struct, include ALL fields of that struct, not just the ones the nearest caller happens to use.
 - Import patterns are documented with examples
+- Validation and safety patterns are documented when present — input validation conventions, trust boundary enforcement, SSRF protections, credential forwarding patterns, fail-open vs fail-closed behavior
+- Error handling conventions are documented — how errors are wrapped across boundaries, what context they carry, whether error types are preserved
+- Resource lifecycle patterns are documented when present — initialization ordering, shutdown ordering, cleanup idioms, partial-init failure handling
 - The tech stack is cataloged with version numbers where available
 
 ## Anti-Patterns
@@ -103,21 +110,22 @@ A codebase analysis is complete when:
 - **Ignoring test infrastructure:** The planner needs test conventions to generate tests that match existing patterns. Always document the test approach in detail.
 - **Assuming from a single file:** Read multiple files in the same directory/layer before declaring a convention. One file may be an exception.
 - **Hardcoding assumptions:** Do not assume specific tools or frameworks exist. Discover them from package manifests and configuration files.
+- **Partial signatures from usage:** Do not infer a struct's fields by reading which fields a caller sets. Read the struct definition itself and list ALL fields. A caller that sets 6 of 8 fields will cause the planner to miss the other 2, leading to review loop rejections over undiscovered API surface.
 
 ## Output Contract
 
 Produce a `{{constraints.requiredOutputType}}` artifact with these required fields:
 
-| Field            | Type   | Constraint                                                                              |
-| ---------------- | ------ | --------------------------------------------------------------------------------------- |
-| version          | number | Always 1                                                                                |
-| specificationRef | object | Optional reference to the source specification (id/name and version when available)     |
-| projectStructure | string | Description of directory layout and organization                                        |
-| conventions      | array  | Strings describing coding conventions (naming, style, patterns) with concrete examples  |
-| techStack        | array  | Strings listing technologies with versions (language, framework, test runner, etc.)     |
-| affectedFiles    | array  | Objects with `path` (string) and `reason` (string) for files the spec will likely touch |
-| existingPatterns | array  | Strings describing architectural patterns found, with file path evidence                |
-| createdAt        | string | ISO 8601 timestamp                                                                      |
+| Field            | Type   | Constraint                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ---------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| version          | number | Always 1                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| specificationRef | object | Optional reference to the source specification (id/name and version when available)                                                                                                                                                                                                                                                                                                                                         |
+| projectStructure | string | Description of directory layout and organization                                                                                                                                                                                                                                                                                                                                                                            |
+| conventions      | array  | Strings describing coding conventions (naming, style, patterns) with concrete examples                                                                                                                                                                                                                                                                                                                                      |
+| techStack        | array  | Strings listing technologies with versions (language, framework, test runner, etc.)                                                                                                                                                                                                                                                                                                                                         |
+| affectedFiles    | array  | Objects with `path` (string), `reason` (string), and optional `signatures` (string) for files the spec will likely touch. For files whose public API the implementer must integrate with, include `signatures`: the complete list of exported function signatures, struct/class/interface field definitions (with types), and configuration object fields — read from the actual source, not summarized from usage examples |
+| existingPatterns | array  | Strings describing architectural patterns found, with file path evidence                                                                                                                                                                                                                                                                                                                                                    |
+| createdAt        | string | ISO 8601 timestamp                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 {{>json_write_rules}}
 
@@ -140,7 +148,8 @@ Current state: {{run.currentState}}, iteration: {{run.iterationCount}}.
   "affectedFiles": [
     {
       "path": "packages/core/src/domain/workflow-journal/types.ts",
-      "reason": "New workflow state type needed for the feature"
+      "reason": "New workflow state type needed for the feature",
+      "signatures": "export interface JournalEntry { timestamp: string; runId: string; sequence: number; type: JournalEventType; data: JournalEventData; }\nexport type JournalEventType = 'state_transition' | 'run_started' | 'run_completed' | 'run_failed' | 'run_aborted' | 'human_input_requested' | 'human_rejection';"
     },
     {
       "path": "packages/core/src/domain/run-manifest/types.ts",

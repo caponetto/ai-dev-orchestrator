@@ -89,6 +89,7 @@ function makeRunner(results: Array<() => Promise<unknown>>): RunnerSystem {
     getWorkerStatus: vi.fn().mockReturnValue(null),
     cancelWorker: vi.fn(),
     cancelAllWorkers: vi.fn().mockResolvedValue(undefined),
+    setWorkerCounter: vi.fn(),
   };
 }
 

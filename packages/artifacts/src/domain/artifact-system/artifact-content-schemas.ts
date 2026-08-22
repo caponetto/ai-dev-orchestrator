@@ -18,7 +18,7 @@ const artifactRefSchema = z
   .object({
     type: z.string().optional(),
     name: z.string().optional(),
-    version: z.number().optional(),
+    version: z.coerce.number().optional(),
   })
   .loose();
 
@@ -407,6 +407,7 @@ export const codebaseContextContentSchema = z
       z.object({
         path: z.string(),
         reason: z.string(),
+        signatures: z.string().nullable().optional(),
       }),
     ),
     existingPatterns: z.array(z.string()).optional(),

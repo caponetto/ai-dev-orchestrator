@@ -16,7 +16,7 @@ required_capabilities:
   - reasoning
   - structured_output
   - external_data_fetch
-model: claude-opus-4-6
+model: claude-sonnet-5
 max_tokens: null
 dispatch_type: agent
 runner: claude-code

@@ -55,7 +55,7 @@ Evaluate this plan for completeness, feasibility, and risk — calibrated to the
 Before producing output, apply these analytical lenses — calibrated to the scope and risk of the change:
 
 1. **Pre-mortem (for code changes).** Assume this feature shipped exactly as planned and failed catastrophically in production six months later. Work backwards: What broke? What edge case was missed? What assumption was wrong? What dependency changed? Document each failure mode as a finding.
-2. **Missing requirements.** Read the specification alongside the plan. For every spec requirement, verify it has a corresponding plan step. Then go further: identify requirements that are _implied_ but never stated — error handling, observability, graceful degradation, backward compatibility. These are the gaps that cause production incidents.
+2. **Missing requirements.** Read the specification alongside the plan. For every spec requirement, verify it has a corresponding plan step. Then identify requirements that are _implied by the specification itself_ — error handling, observability, graceful degradation, backward compatibility, input validation (including configuration inputs), trust boundary constraints (credential forwarding, header integrity), initialization/shutdown lifecycle, and idempotency for retryable operations. These are the gaps that cause production incidents. Do NOT raise findings for project conventions, deployment concerns, or documentation artifacts that the specification does not require. When the specification explicitly constrains scope (e.g., "no new configuration source is introduced", "the config is already mounted"), those constraints define the boundary — the plan covers the specification, not adjacent concerns beyond it.
 3. **Coupling detection (for architectural changes).** Examine the plan's architecture decisions. Find places where the proposed structure will make future features harder to add. Look for: shared mutable state, implicit ordering dependencies, god objects, missing abstraction boundaries, and leaky interfaces.
 
 **Complexity calibration:** For documentation-only or trivial changes (single file creation, README updates, config edits with no runtime impact), SKIP the pre-mortem and coupling detection lenses entirely. Apply only requirement coverage and dependency ordering checks. Do NOT raise major findings for hypothetical failure modes that require concurrent writes, race conditions, file system corruption, or other scenarios that are implausible for the change type. A single Markdown file creation does not warrant the same scrutiny as a database migration.
@@ -86,26 +86,26 @@ Use this to assess whether the plan's file targets, module boundaries, and conve
 This is revision {{run.iterationCount}} of the plan. Your previous review:
 {{{plan_review}}}
 
-**Convergence rules:**
+**Convergence rules (mandatory — violations produce incorrect reviews):**
 
-- Verify each prior finding was genuinely addressed. Give explicit credit for resolved findings.
-- Only raise NEW findings if they represent genuine gaps in specification coverage, dependency ordering, or feasibility — not stylistic preferences or hypothetical edge cases.
+- **Step 1: Resolve prior findings first.** Before evaluating anything new, go through each prior finding and classify it as resolved, partially resolved, or unresolved. Write this resolution status at the start of your summary. This step is NOT optional — a review that skips it is defective.
+- **Step 2: Decide approval based on prior findings.** If ALL prior findings were genuinely resolved, the plan has earned approval. Proceed to step 3 only to check for new findings — but with a raised severity bar.
+- **Step 3: Apply the severity gate for new findings.** When all prior findings were resolved, a new finding is major ONLY if it would cause the implementation to fail in a way that code review cannot catch — a missing spec requirement, a fundamentally wrong architecture, or a circular dependency. These are NOT major: exact-path vs subtree registration, trailing-slash handling, closure capture patterns, test coverage of specific edge cases, or other implementation subtleties the implementer would naturally handle by reading the codebase context and the plan's referenced patterns. Mark these as minor.
+- **Step 4: Render verdict.** If all prior findings are resolved and no new critical or major findings exist (only minor), you MUST set approved=true. Do NOT reject a plan that resolved all prior critical/major findings just because you found minor improvements.
 - Do NOT re-raise findings that were addressed, even if the resolution differs from what you would have chosen.
-- If all prior findings are resolved and no new critical/major gaps exist, you MUST approve.
+- When raising a new finding, briefly indicate the direction the fix should take — not a prescriptive solution, but enough to narrow the solution space so the planner can converge.
   {{/if}}
 
 ## Review Criteria
 
-| Dimension                  | What to look for                                                                                                                 |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| **Failure modes**          | What breaks in production? Unhandled errors, missing timeouts, cascading failures, data corruption paths                         |
-| **Requirement gaps**       | Implied but unstated requirements — error handling, logging, monitoring, backward compatibility, data migration                  |
-| **Architectural coupling** | Decisions that create hidden debt — shared mutable state, implicit ordering, god objects, leaky abstractions, missing boundaries |
-| **Dependency ordering**    | Steps ordered by dependency. No circular references. Foundation before dependent features                                        |
-| **Scope realism**          | Estimates within 2x of likely effort. Complex steps broken down sufficiently                                                     |
-| **Test coverage**          | Each acceptance criterion has corresponding test coverage. Integration points tested                                             |
-| **API consistency**        | Public interfaces follow existing patterns — parameter conventions, return shapes, naming, endpoint structure match the codebase |
-| **Readability**            | Code is clear, well-named, and self-documenting — control flow is obvious, abstractions aid understanding                        |
+| Dimension                  | What to look for                                                                                                                                                                                                                                                                           |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Failure modes**          | What breaks in production? Unhandled errors, missing timeouts, cascading failures, data corruption paths                                                                                                                                                                                   |
+| **Requirement gaps**       | Implied but unstated requirements — error handling, logging, monitoring, backward compatibility, data migration, config validation against downstream constraints, trust boundary enforcement for credential flows, initialization/shutdown ordering, idempotency for retryable operations |
+| **Architectural coupling** | Decisions that create hidden debt — shared mutable state, implicit ordering, god objects, leaky abstractions, missing boundaries                                                                                                                                                           |
+| **Dependency ordering**    | Steps ordered by dependency. No circular references. Foundation before dependent features                                                                                                                                                                                                  |
+| **Scope realism**          | Estimates within 2x of likely effort. Complex steps broken down sufficiently                                                                                                                                                                                                               |
+| **Test coverage**          | Each acceptance criterion has corresponding test coverage. Integration points tested                                                                                                                                                                                                       |
 
 ## Severity Taxonomy
 
@@ -118,7 +118,7 @@ Calibrate severity strictly to the scope and blast radius of the planned change.
 - Documentation-only changes: only `critical` if a spec requirement is completely missing. `major` only for factual errors that would cause agents to break the build. Hypothetical race conditions, concurrent writes, and edge cases should be `minor` at most.
 - Code changes with runtime impact: use the full severity scale based on production risk.
 
-Category must be one of: `correctness`, `maintainability`, `security`, `performance`, `api_consistency`, `readability`.
+Category must be one of: `correctness`, `maintainability`, `security`, `performance`.
 
 ## Anti-Patterns
 
@@ -127,9 +127,10 @@ Category must be one of: `correctness`, `maintainability`, `security`, `performa
 - **Rubber-stamping** — Don't approve plans that skip error handling entirely or miss spec requirements.
 - **Format fixation** — Don't flag style preferences about plan formatting as issues. Substance over form.
 - **Over-engineering demands** — Don't require enterprise patterns for simple requirements. The plan should match the complexity of the problem.
-- **Moving goalposts** — When the planner has addressed all prior findings, do not invent new major findings of comparable or lesser severity to justify rejection. If the plan improved, approve it unless a genuinely blocking gap remains.
+- **Moving goalposts** — When the planner has addressed all prior findings, do not elevate implementation subtleties to major severity to justify another rejection. A plan that resolved all critical and major findings has earned approval unless a new finding would make the implementation fundamentally infeasible. Test strategy details, registration nuances, and edge cases that are visible in the codebase context are minor — they do not block approval.
 - **Catastrophizing simple changes** — Don't raise concurrent-write race conditions, file system corruption, or production failure modes for documentation-only changes. If the worst-case outcome of the change is "slightly inaccurate docs," do not treat hypothetical failure modes as major findings.
 - **Overriding user intent** — When the user explicitly requests creating or replacing a file and the plan calls for creating that file, do not raise a finding about overwriting existing content. The user's request establishes intent; treating an explicitly requested overwrite as a correctness issue contradicts the specification.
+- **Spec scope expansion** — Raising critical or major findings for work not required by the specification. When the specification explicitly constrains scope, the plan covers that scope — not adjacent concerns (deployment wiring, CI pipelines, API documentation artifacts, contract tests) that the specification does not mention. Out-of-scope observations may be noted as minor but do not block approval. A finding that contradicts an explicit specification constraint is incorrect, not a gap.
 
 ## Output Contract
 
@@ -137,13 +138,13 @@ Produce a single {{constraints.requiredOutputType}} artifact. The output must be
 
 Required fields:
 
-| Field       | Type    | Description                                                                                                                                                                                             |
-| ----------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `version`   | number  | Always `1`                                                                                                                                                                                              |
-| `approved`  | boolean | `true` if all spec requirements covered, dependencies sound, no critical gaps                                                                                                                           |
-| `summary`   | string  | 2-3 sentence overall assessment including coverage and feasibility outlook                                                                                                                              |
-| `findings`  | array   | Each object: `id` (string), `category` (one of: correctness, maintainability, security, performance, api_consistency, readability), `severity` (one of: critical, major, minor), `description` (string) |
-| `createdAt` | string  | ISO 8601 timestamp                                                                                                                                                                                      |
+| Field       | Type    | Description                                                                                                                                                               |
+| ----------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version`   | number  | Always `1`                                                                                                                                                                |
+| `approved`  | boolean | `true` if all spec requirements covered, dependencies sound, no critical gaps                                                                                             |
+| `summary`   | string  | 2-3 sentence overall assessment including coverage and feasibility outlook                                                                                                |
+| `findings`  | array   | Each object: `id` (string), `category` (one of: correctness, maintainability, security, performance), `severity` (one of: critical, major, minor), `description` (string) |
+| `createdAt` | string  | ISO 8601 timestamp                                                                                                                                                        |
 
 Finding ID format: `PLAN-001`, `PLAN-002`, etc.
 

@@ -119,7 +119,7 @@ export class RunnerContextAssembler {
       systemContext: {
         runId: request.runId,
         currentState: request.stateId,
-        iterationCount: request.iterationCount ?? 1,
+        iterationCount: Math.max(1, request.iterationCount ?? 1),
         humanFeedback: request.humanFeedback,
         previousReviewContent: request.previousReviewContent,
       },

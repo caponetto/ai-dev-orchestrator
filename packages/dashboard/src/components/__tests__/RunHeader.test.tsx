@@ -202,4 +202,23 @@ describe('RunHeader', () => {
     renderWithRouter(<RunHeader state={noRepo} />);
     expect(screen.queryByText('Context')).not.toBeInTheDocument();
   });
+
+  it('shows process not responding banner when processAlive is false and running', () => {
+    const deadProcess: RunStateView = { ...mockState, status: 'running', processAlive: false };
+    renderWithRouter(<RunHeader state={deadProcess} />);
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.getByText(/process not responding/i)).toBeInTheDocument();
+  });
+
+  it('does not show process banner when processAlive is true', () => {
+    const aliveProcess: RunStateView = { ...mockState, status: 'running', processAlive: true };
+    renderWithRouter(<RunHeader state={aliveProcess} />);
+    expect(screen.queryByText(/process not responding/i)).not.toBeInTheDocument();
+  });
+
+  it('does not show process banner for terminal states even when processAlive is false', () => {
+    const completed: RunStateView = { ...mockState, status: 'completed', processAlive: false };
+    renderWithRouter(<RunHeader state={completed} />);
+    expect(screen.queryByText(/process not responding/i)).not.toBeInTheDocument();
+  });
 });

@@ -67,6 +67,7 @@ export const runStateViewSchema = z.object({
   waitingReason: z.string().optional(),
   waitingContext: dashboardWaitingContextSchema.optional(),
   repoRoot: z.string().optional(),
+  processAlive: z.boolean().optional(),
 });
 export type RunStateView = z.infer<typeof runStateViewSchema>;
 

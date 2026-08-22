@@ -19,7 +19,7 @@ agreement_participation:
 required_capabilities:
   - reasoning
   - structured_output
-model: gpt-5.4-medium
+model: claude-sonnet-5
 max_tokens: null
 dispatch_type: agent
-runner: cursor
+runner: claude-code

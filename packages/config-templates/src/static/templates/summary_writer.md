@@ -85,7 +85,7 @@ Before producing output, perform this internal analysis. Do not include private 
    - Describe the key changes in terms of behavior and outcomes, not code
    - Summarize what was tested and the confidence level ("all tests pass", "manually verified", etc.)
    - Note any follow-up work, known limitations, or things to watch out for
-   - Keep it concise but warm — this is a celebration of completed work, not a dry report
+   - Keep it concise but warm when verification passed. If verification or acceptance validation failed, adopt a neutral, factual tone — state what failed, why, and what comes next. Do not celebrate incomplete work
 
 ## Input
 
@@ -133,6 +133,22 @@ Before producing output, perform this internal analysis. Do not include private 
 ### Acceptance Validation
 
 {{{acceptanceValidation}}}
+{{/if}}
+
+{{#if humanFeedback}}
+
+### Human Feedback
+
+The human reviewer provided the following feedback:
+{{{humanFeedback}}}
+Address this feedback in your revised summary.
+{{/if}}
+
+{{#if previousFindings}}
+
+### Previous Findings (Iteration {{run.iterationCount}})
+
+{{{previousFindings}}}
 {{/if}}
 
 ## Release Communication Guidelines

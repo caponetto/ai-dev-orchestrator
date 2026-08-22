@@ -31,6 +31,7 @@ export {
   RunnerContextAssembler,
   generateWorkerId,
   resetWorkerCounter,
+  setWorkerCounter,
 } from './infrastructure/runner-system/index';
 export { isRetryableWorkerError } from './infrastructure/runner-system/index';
 export {

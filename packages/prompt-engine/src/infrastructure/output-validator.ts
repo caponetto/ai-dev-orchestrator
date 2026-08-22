@@ -137,6 +137,71 @@ function validateMarkdownWithFrontmatter(
   return validateAgainstSchema(parsedContent, contract);
 }
 
+function getAtPath(obj: unknown, path: readonly PropertyKey[]): unknown {
+  let current = obj;
+  for (const segment of path) {
+    if (current == null || typeof current !== 'object') {
+      return undefined;
+    }
+    current = (current as Record<PropertyKey, unknown>)[segment];
+  }
+  return current;
+}
+
+function setAtPath(obj: unknown, path: readonly PropertyKey[], value: unknown): void {
+  if (path.length === 0) {
+    return;
+  }
+  let current = obj;
+  for (let i = 0; i < path.length - 1; i++) {
+    if (current == null || typeof current !== 'object') {
+      return;
+    }
+    current = (current as Record<PropertyKey, unknown>)[path[i]];
+  }
+  if (current != null && typeof current === 'object') {
+    (current as Record<PropertyKey, unknown>)[path[path.length - 1]] = value;
+  }
+}
+
+function normalizeFromIssues(
+  parsed: unknown,
+  issues: ReadonlyArray<{ code: string; expected?: string; path: PropertyKey[] }>,
+): { normalized: unknown; changed: boolean } {
+  const normalized = structuredClone(parsed);
+  let changed = false;
+
+  for (const issue of issues) {
+    if (issue.code !== 'invalid_type') {
+      continue;
+    }
+
+    const value = getAtPath(normalized, issue.path);
+
+    if (issue.expected === 'number' && typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed.length > 0) {
+        const num = Number(trimmed);
+        if (!Number.isNaN(num)) {
+          setAtPath(normalized, issue.path, num);
+          changed = true;
+        }
+      }
+    } else if (issue.expected === 'boolean' && typeof value === 'string') {
+      const lower = value.trim().toLowerCase();
+      if (lower === 'true') {
+        setAtPath(normalized, issue.path, true);
+        changed = true;
+      } else if (lower === 'false') {
+        setAtPath(normalized, issue.path, false);
+        changed = true;
+      }
+    }
+  }
+
+  return { normalized, changed };
+}
+
 function validateAgainstSchema(parsed: unknown, contract: OutputContract): OutputValidationResult {
   const parsedContent =
     typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : undefined;
@@ -153,6 +218,18 @@ function validateAgainstSchema(parsed: unknown, contract: OutputContract): Outpu
 
   if (result.success) {
     return { valid: true, errors: [], parsedContent };
+  }
+
+  const { normalized, changed } = normalizeFromIssues(parsed, result.error.issues);
+  if (changed) {
+    const retry = zodSchema.safeParse(normalized);
+    if (retry.success) {
+      const normalizedContent =
+        typeof normalized === 'object' && normalized !== null
+          ? (normalized as Record<string, unknown>)
+          : undefined;
+      return { valid: true, errors: [], parsedContent: normalizedContent };
+    }
   }
 
   const errors: ValidationError[] = result.error.issues.map((issue) => ({

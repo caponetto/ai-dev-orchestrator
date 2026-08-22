@@ -1007,20 +1007,18 @@ describe('buildAgentTaskPrompt', () => {
     expect(prompt).not.toContain('--- Role Instructions ---');
   });
 
-  it('includes human feedback when present', () => {
+  it('does not duplicate human feedback outside the role prompt', () => {
     const task = makeTask({ humanFeedback: 'Please add error handling' });
     const prompt = buildAgentTaskPrompt(task, '/tmp/task.json');
 
-    expect(prompt).toContain('IMPORTANT — Human Feedback');
-    expect(prompt).toContain('Please add error handling');
+    expect(prompt).not.toContain('IMPORTANT — Human Feedback');
   });
 
-  it('includes previous findings when present', () => {
+  it('does not duplicate previous findings outside the role prompt', () => {
     const task = makeTask({ previousFindings: 'Missing null check on line 42' });
     const prompt = buildAgentTaskPrompt(task, '/tmp/task.json');
 
-    expect(prompt).toContain('IMPORTANT — Previous Review Findings');
-    expect(prompt).toContain('Missing null check on line 42');
+    expect(prompt).not.toContain('IMPORTANT — Previous Review Findings');
   });
 
   it('includes iteration count when > 1', () => {

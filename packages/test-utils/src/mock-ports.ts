@@ -200,6 +200,7 @@ export function createMockRunnerSystem(options: MockRunnerOptions = {}): RunnerS
     getWorkerStatus: vi.fn().mockReturnValue(null),
     cancelWorker: vi.fn(),
     cancelAllWorkers: vi.fn().mockResolvedValue(undefined),
+    setWorkerCounter: vi.fn(),
   };
 }
 

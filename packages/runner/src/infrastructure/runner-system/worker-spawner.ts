@@ -9,6 +9,10 @@ class WorkerIdGenerator {
   reset(): void {
     this.counter = 0;
   }
+
+  setCounter(value: number): void {
+    this.counter = value;
+  }
 }
 
 const defaultGenerator = new WorkerIdGenerator();
@@ -19,4 +23,8 @@ export function generateWorkerId(): string {
 
 export function resetWorkerCounter(): void {
   defaultGenerator.reset();
+}
+
+export function setWorkerCounter(value: number): void {
+  defaultGenerator.setCounter(value);
 }

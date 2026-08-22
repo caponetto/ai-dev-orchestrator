@@ -225,8 +225,8 @@ describe('roles-generator', () => {
     expect(analyst?.owned_artifacts).toContain('canonical_specification');
     expect(analyst?.readable_artifacts).toContain('canonical_specification');
     expect(analyst?.readable_artifacts).toContain('intake_requirements');
-    expect(analyst?.model).toBe('gpt-5.4-high');
-    expect(analyst?.runner).toBe('cursor');
+    expect(analyst?.model).toBe('claude-opus-4-6');
+    expect(analyst?.runner).toBe('claude-code');
 
     const contextAnalyst = parsed.roles.find((r) => r.id === 'context_analyst');
     expect(contextAnalyst?.name).toBe('Context Analyst');
@@ -343,7 +343,7 @@ describe('templates-generator', () => {
         markers: [
           '## Execution Contract',
           'Start from exact targets',
-          'Clarify before repo-wide sweeps',
+          'Prefer narrow scope when ambiguous',
           'Preserve evidence discipline',
         ],
       },

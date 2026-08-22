@@ -144,4 +144,91 @@ describe('validateOutput', () => {
     expect(result.valid).toBe(false);
     expect(result.errors.length).toBeGreaterThan(0);
   });
+
+  describe('artifact content normalization', () => {
+    it('coerces string numbers to numbers', () => {
+      const input = JSON.stringify({
+        version: '1',
+        approved: true,
+        summary: 'Looks good',
+        findings: [],
+        createdAt: '2026-01-01T00:00:00Z',
+      });
+      const result = validateOutput(input, makeContract('json', 'static_review', true));
+      expect(result.valid).toBe(true);
+      expect(result.parsedContent?.['version']).toBe(1);
+    });
+
+    it('coerces string booleans to booleans', () => {
+      const input = JSON.stringify({
+        version: 1,
+        approved: 'true',
+        summary: 'Looks good',
+        findings: [],
+        createdAt: '2026-01-01T00:00:00Z',
+      });
+      const result = validateOutput(input, makeContract('json', 'static_review', true));
+      expect(result.valid).toBe(true);
+      expect(result.parsedContent?.['approved']).toBe(true);
+    });
+
+    it('coerces multiple fields at once', () => {
+      const input = JSON.stringify({
+        version: '1',
+        approved: 'false',
+        summary: 'Issues found',
+        findings: [],
+        createdAt: '2026-01-01T00:00:00Z',
+      });
+      const result = validateOutput(input, makeContract('json', 'static_review', true));
+      expect(result.valid).toBe(true);
+      expect(result.parsedContent?.['version']).toBe(1);
+      expect(result.parsedContent?.['approved']).toBe(false);
+    });
+
+    it('coerces nested number fields in plan artifacts', () => {
+      const input = JSON.stringify({
+        version: '2',
+        specificationRef: { type: 'canonical_specification', name: 'spec', version: '3' },
+        createdAt: '2026-01-01T00:00:00Z',
+        summary: 'Plan summary',
+        tasks: [{ taskId: 'T1', description: 'Task 1', files: ['a.ts'], dependencies: [] }],
+      });
+      const result = validateOutput(input, makeContract('json', 'plan', true));
+      expect(result.valid).toBe(true);
+      expect(result.parsedContent?.['version']).toBe(2);
+    });
+
+    it('still rejects genuinely invalid data after normalization attempt', () => {
+      const input = JSON.stringify({
+        version: 'not-a-number',
+        approved: true,
+        summary: 'Looks good',
+        findings: [],
+        createdAt: '2026-01-01T00:00:00Z',
+      });
+      const result = validateOutput(input, makeContract('json', 'static_review', true));
+      expect(result.valid).toBe(false);
+    });
+
+    it('normalizes markdown_with_frontmatter content', () => {
+      const frontmatter = [
+        '---',
+        'version: "1"',
+        'approved: "true"',
+        'summary: All clear',
+        'findings: []',
+        'createdAt: "2026-01-01T00:00:00Z"',
+        '---',
+        '# Body',
+      ].join('\n');
+      const result = validateOutput(
+        frontmatter,
+        makeContract('markdown_with_frontmatter', 'static_review', true),
+      );
+      expect(result.valid).toBe(true);
+      expect(result.parsedContent?.['version']).toBe(1);
+      expect(result.parsedContent?.['approved']).toBe(true);
+    });
+  });
 });
