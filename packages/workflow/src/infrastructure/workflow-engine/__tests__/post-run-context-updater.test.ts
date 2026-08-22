@@ -5,7 +5,7 @@ import { PostRunContextUpdater } from '../post-run-context-updater';
 
 function createMockStore(
   readResult: unknown = null,
-): ProjectContextStore & { write: ReturnType<typeof vi.fn> } {
+): Omit<ProjectContextStore, 'write'> & { write: ReturnType<typeof vi.fn> } {
   return {
     initialize: vi.fn(),
     read: vi.fn().mockResolvedValue(readResult),
