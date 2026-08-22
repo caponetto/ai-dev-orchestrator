@@ -37,8 +37,8 @@
     "@ai-orchestrator/ports": "workspace:*",
     "@ai-orchestrator/schemas": "workspace:*",
     "@ai-orchestrator/utils": "workspace:*",
-    "@hono/node-server": "^2.0.8",
-    "hono": "^4.12.27",
+    "@hono/node-server": "^2.1.1",
+    "hono": "^4.13.2",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"
   },
