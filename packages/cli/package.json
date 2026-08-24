@@ -50,7 +50,7 @@
     "@types/node": "^26.2.0",
     "esbuild": "^0.28.2",
     "tsx": "^4.23.12",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   },
   "scripts": {
     "clean": "rimraf dist tsconfig.build.tsbuildinfo",

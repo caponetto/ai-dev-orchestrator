@@ -41,6 +41,6 @@
     "@ai-orchestrator/build-config": "workspace:*",
     "@types/node": "^26.2.0",
     "cpy-cli": "^7.0.0",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   }
 }
