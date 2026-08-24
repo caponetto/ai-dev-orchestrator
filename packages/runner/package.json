@@ -37,7 +37,7 @@
     "@ai-orchestrator/prompt-engine": "workspace:*",
     "@ai-orchestrator/schemas": "workspace:*",
     "@ai-orchestrator/utils": "workspace:*",
-    "execa": "^9.6.1",
+    "execa": "^10.0.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
