@@ -357,6 +357,23 @@ describe('reviewContentSchema', () => {
     );
     expect(result.success).toBe(true);
   });
+
+  it('accepts attribution on findings', () => {
+    const result = reviewContentSchema.safeParse(
+      validReview({
+        findings: [
+          {
+            id: 'f-1',
+            category: 'security',
+            severity: 'major',
+            description: 'Issue',
+            attribution: 'introduced',
+          },
+        ],
+      }),
+    );
+    expect(result.success).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -386,6 +403,26 @@ describe('reviewReportContentSchema', () => {
       createdAt: '2025-01-15T10:00:00Z',
     });
     expect(result.success).toBe(false);
+  });
+
+  it('accepts attribution on synthesized findings', () => {
+    const result = reviewReportContentSchema.safeParse({
+      version: 1,
+      approved: false,
+      summary: 'Issues found',
+      findings: [
+        {
+          id: 'SYN-001',
+          category: 'security',
+          severity: 'major',
+          description: 'SQL injection',
+          attribution: 'introduced',
+        },
+      ],
+      verdict: 'request_changes',
+      createdAt: '2025-01-15T10:00:00Z',
+    });
+    expect(result.success).toBe(true);
   });
 });
 

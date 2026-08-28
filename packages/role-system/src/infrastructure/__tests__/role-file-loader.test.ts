@@ -20,7 +20,7 @@ roles:
     reviews: []
     agreement_participation: []
     required_capabilities: [reasoning]
-    model: claude-opus-4-6
+    model: claude-opus-4-8
     dispatch_type: agent
     runner: claude-code
 `;
@@ -48,7 +48,7 @@ roles:
       - agreement_type: planning_agreement
         action: reviewed
     required_capabilities: [reasoning, structured_output]
-    model: claude-opus-4-6
+    model: claude-opus-4-8
     dispatch_type: agent
     runner: cursor
     agent_config:

@@ -35,6 +35,7 @@ Review the provided implementation artifact for performance bottlenecks, algorit
 
 Before producing output, perform this internal analysis. Do not include private reasoning in the artifact; output only the required JSON fields:
 
+0. **Anchor to the diff** — Identify changed files per the Change Attribution section. All findings must trace to added or modified content.
 1. **Identify hot paths** — Determine which code runs on user-facing request paths, in loops over collections, or in background jobs processing large datasets. These are where performance matters most.
 2. **Analyze algorithmic complexity** — For each hot path, determine the time and space complexity. Flag O(n²) or worse on unbounded inputs. Note the expected size of n.
 3. **Check data access patterns** — Look for N+1 query patterns, missing pagination on large collections, full table scans, and repeated fetches of the same data.
@@ -71,6 +72,8 @@ Category must be one of: `performance`, `correctness`.
 - **Context blindness** — Startup code, test fixtures, and CLI tools have different performance envelopes than request handlers. Adjust thresholds.
 - **Cache-first thinking** — Don't recommend caching without considering invalidation complexity. A cache that's hard to invalidate correctly is a bug factory.
 - **Bounded obsession** — Don't report O(n) as a problem when n is bounded and small. "This loop iterates over config keys" is not a performance issue.
+- **Pre-existing debt** — Don't block this change for performance patterns that already exist in unchanged code. Flag only if the change introduces a new bottleneck or extends an inefficient pattern to a new hot path.
+- **Convention following** — New code that matches existing module patterns (query style, caching approach, batching) is consistency, not regression.
 
 {{>reviewer_evidence_requirement}}
 
@@ -80,13 +83,13 @@ Produce a single {{constraints.requiredOutputType}} artifact. The output must be
 
 Required fields:
 
-| Field       | Type    | Description                                                                                                                                                                                                                                                                  |
-| ----------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `version`   | number  | Always `1`                                                                                                                                                                                                                                                                   |
-| `approved`  | boolean | `true` if no critical findings and majors don't indicate systemic scalability issues                                                                                                                                                                                         |
-| `summary`   | string  | 2-3 sentence overall assessment including scalability outlook                                                                                                                                                                                                                |
-| `findings`  | array   | Each object: `id` (string), `category` (one of: performance, correctness), `severity` (one of: critical, major, minor), `description` (string), `evidence` (string, verbatim code snippet from the diff proving the issue — required for critical/major, optional for minor) |
-| `createdAt` | string  | ISO 8601 timestamp                                                                                                                                                                                                                                                           |
+| Field       | Type    | Description                                                                                                                                                                                                                                                                                                                                         |
+| ----------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version`   | number  | Always `1`                                                                                                                                                                                                                                                                                                                                          |
+| `approved`  | boolean | `true` if no critical findings and majors don't indicate systemic scalability issues                                                                                                                                                                                                                                                                |
+| `summary`   | string  | 2-3 sentence overall assessment including scalability outlook                                                                                                                                                                                                                                                                                       |
+| `findings`  | array   | Each object: `id` (string), `category` (one of: performance, correctness), `severity` (one of: critical, major, minor), `description` (string), `attribution` (one of: introduced, worsened, propagated, pre-existing), `evidence` (string, verbatim code snippet from added/modified diff lines — required for critical/major, optional for minor) |
+| `createdAt` | string  | ISO 8601 timestamp                                                                                                                                                                                                                                                                                                                                  |
 
 Finding ID format: `PERF-001`, `PERF-002`, etc.
 
@@ -107,6 +110,7 @@ Finding ID format: `PERF-001`, `PERF-002`, etc.
       "category": "performance",
       "severity": "critical",
       "description": "reconcileInventory() line 85: triple nested loop over products x warehouses x transactions. O(n^3) on unbounded input.",
+      "attribution": "introduced",
       "evidence": "for (const p of products) { for (const w of warehouses) { for (const t of transactions) {"
     },
     {

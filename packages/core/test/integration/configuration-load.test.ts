@@ -11,7 +11,7 @@ function tempDir(): string {
   return mkdtempSync(join(tmpdir(), 'config-integration-'));
 }
 
-function writeValidConfigSet(aiDir: string, plannerModel = 'claude-opus-4-6'): void {
+function writeValidConfigSet(aiDir: string, plannerModel = 'claude-opus-4-8'): void {
   writeFileSync(
     join(aiDir, 'config.yaml'),
     'log_level: info\ndefault_workflow: dev\nworkflow_version: "1.0.0"\n',
@@ -54,7 +54,7 @@ describe('Configuration Load Integration', () => {
 
     expect(config.workflow.name).toBe('dev');
     expect(config.workflow.version).toBe('1.0.0');
-    expect(config.roles.assignments['planner'].model).toBe('claude-opus-4-6');
+    expect(config.roles.assignments['planner'].model).toBe('claude-opus-4-8');
     expect(config.runtime.logLevel).toBe('info');
   });
 

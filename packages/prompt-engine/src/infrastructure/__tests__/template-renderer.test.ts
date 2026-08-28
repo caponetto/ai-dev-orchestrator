@@ -19,6 +19,22 @@ describe('renderTemplate', () => {
     expect(result).toBe('<b>bold</b>');
   });
 
+  it('does not re-parse double-brace sequences inside triple-brace content', () => {
+    const securityReview = JSON.stringify({
+      evidence: 'BASE_REF: ${{ github.event.pull_request.base.ref }}',
+    });
+    const result = renderTemplate('{{{security_review}}}', { security_review: securityReview });
+    expect(result).toBe(securityReview);
+  });
+
+  it('resolves double-brace and triple-brace variables in the same template', () => {
+    const result = renderTemplate('{{title}}: {{{body}}}', {
+      title: 'Report',
+      body: 'contains ${{ github.event.pull_request.base.ref }} syntax',
+    });
+    expect(result).toBe('Report: contains ${{ github.event.pull_request.base.ref }} syntax');
+  });
+
   it('resolves nested property access', () => {
     const result = renderTemplate('{{user.name}}', { user: { name: 'Alice' } });
     expect(result).toBe('Alice');

@@ -177,7 +177,7 @@ describe('Event System Integration', () => {
       data: {
         workerId: 'w-001',
         role: 'planner',
-        model: 'claude-opus-4-6',
+        model: 'claude-opus-4-8',
         inputArtifacts: [],
       },
     });
@@ -247,7 +247,7 @@ describe('Event System Integration', () => {
       data: {
         workerId: 'w-001',
         role: 'planner',
-        model: 'claude-opus-4-6',
+        model: 'claude-opus-4-8',
         inputArtifacts: [],
       },
     });

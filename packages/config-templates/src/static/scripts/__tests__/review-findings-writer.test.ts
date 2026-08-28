@@ -632,4 +632,42 @@ describe('review-findings-writer transform', () => {
       expect(result.findings[1]?.file).toBe('src/utils.ts:1');
     });
   });
+
+  it('excludes pre-existing and propagated findings from output', () => {
+    const report = makeReport({
+      findings: [
+        makeFinding({
+          id: 'f1',
+          attribution: 'introduced',
+          description: 'New bug',
+          file: 'src/a.ts',
+          evidence: 'const a = null;',
+        }),
+        makeFinding({
+          id: 'f2',
+          attribution: 'pre-existing',
+          description: 'Old pattern',
+          file: 'src/b.ts',
+          evidence: 'const b = null;',
+        }),
+        makeFinding({
+          id: 'f3',
+          attribution: 'propagated',
+          description: 'Copied pattern',
+          file: 'src/c.ts',
+          evidence: 'const c = null;',
+        }),
+        makeFinding({
+          id: 'f4',
+          attribution: 'worsened',
+          description: 'Made worse',
+          file: 'src/d.ts',
+          evidence: 'const d = null;',
+        }),
+      ],
+    });
+    const result = transform(report);
+    expect(result.findings).toHaveLength(2);
+    expect(result.findings.map((f) => f.description)).toEqual(['New bug', 'Made worse']);
+  });
 });

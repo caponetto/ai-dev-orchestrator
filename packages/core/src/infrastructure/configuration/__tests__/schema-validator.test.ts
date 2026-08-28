@@ -214,14 +214,14 @@ describe('validateConfiguration', () => {
   });
 
   it('reports unknown runner for agent-dispatched roles', () => {
-    const runners = [{ id: 'claude-code', name: 'Claude Code', models: ['claude-opus-4-6'] }];
+    const runners = [{ id: 'claude-code', name: 'Claude Code', models: ['claude-opus-4-8'] }];
     const config = {
       ...TEST_BUILT_IN_DEFAULTS,
       roles: {
         assignments: {
           ...TEST_BUILT_IN_DEFAULTS.roles.assignments,
           planner: {
-            model: 'claude-opus-4-6',
+            model: 'claude-opus-4-8',
             dispatchType: 'agent',
             runner: 'nonexistent-runner',
           },
@@ -234,7 +234,7 @@ describe('validateConfiguration', () => {
   });
 
   it('reports model not available for the assigned runner', () => {
-    const runners = [{ id: 'claude-code', name: 'Claude Code', models: ['claude-opus-4-6'] }];
+    const runners = [{ id: 'claude-code', name: 'Claude Code', models: ['claude-opus-4-8'] }];
     const config = {
       ...TEST_BUILT_IN_DEFAULTS,
       roles: {
@@ -278,13 +278,13 @@ describe('validateConfiguration', () => {
   });
 
   it('skips non-object role definitions during runner validation', () => {
-    const runners = [{ id: 'claude-code', name: 'Claude Code', models: ['claude-opus-4-6'] }];
+    const runners = [{ id: 'claude-code', name: 'Claude Code', models: ['claude-opus-4-8'] }];
     const config = {
       ...TEST_BUILT_IN_DEFAULTS,
       roles: {
         assignments: {
           planner: 'bad-scalar' as unknown,
-          implementer: { model: 'claude-opus-4-6', runner: 'claude-code' },
+          implementer: { model: 'claude-opus-4-8', runner: 'claude-code' },
         },
       },
     };

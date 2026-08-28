@@ -95,15 +95,23 @@ function resolveConditionals(template: string, context: RenderContext): string {
   return result;
 }
 
-function resolveVariables(template: string, context: RenderContext, role: string): string {
-  let result = template;
+const RAW_PLACEHOLDER_PREFIX = '\uE000ORCH_RAW_';
+const RAW_PLACEHOLDER_SUFFIX = '\uE001';
 
-  result = result.replace(/\{\{\{\s*([\w.@]+)\s*\}\}\}/gu, (_match, path: string) => {
+function resolveVariables(template: string, context: RenderContext, role: string): string {
+  const rawValues: string[] = [];
+
+  // Stash triple-brace substitutions behind placeholders so the double-brace pass
+  // does not re-parse artifact content that happens to contain {{...}} sequences
+  // (e.g. GitHub Actions expressions like ${{ github.event.pull_request.base.ref }}).
+  let result = template.replace(/\{\{\{\s*([\w.@]+)\s*\}\}\}/gu, (_match, path: string) => {
     const value = resolvePath(context, path);
     if (value === undefined) {
       throw new UndefinedVariableError(path, role);
     }
-    return stringifyValue(value);
+    const index = rawValues.length;
+    rawValues.push(stringifyValue(value));
+    return `${RAW_PLACEHOLDER_PREFIX}${String(index)}${RAW_PLACEHOLDER_SUFFIX}`;
   });
 
   result = result.replace(/\{\{\s*([\w.@]+)\s*\}\}/gu, (_match, path: string) => {
@@ -113,6 +121,13 @@ function resolveVariables(template: string, context: RenderContext, role: string
     }
     return escapeHtml(stringifyValue(value));
   });
+
+  for (let index = 0; index < rawValues.length; index++) {
+    result = result.replaceAll(
+      `${RAW_PLACEHOLDER_PREFIX}${String(index)}${RAW_PLACEHOLDER_SUFFIX}`,
+      rawValues[index] ?? '',
+    );
+  }
 
   return result;
 }

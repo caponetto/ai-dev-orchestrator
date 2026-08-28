@@ -11,12 +11,12 @@ const baseConfig = {
   roles: [
     {
       role: 'planner',
-      model: 'claude-opus-4-6',
+      model: 'claude-opus-4-8',
       runner: 'cursor',
     },
     {
       role: 'implementer',
-      model: 'claude-opus-4-6',
+      model: 'claude-opus-4-8',
       runner: 'claude-code',
     },
   ],
@@ -87,7 +87,7 @@ describe('ConfigPanel', () => {
           roles: [
             {
               role: 'reviewer',
-              model: 'claude-opus-4-6',
+              model: 'claude-opus-4-8',
             },
           ],
         }),

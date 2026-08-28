@@ -130,6 +130,8 @@ export const planContentSchema = z
     }
   });
 
+const reviewAttributionSchema = z.enum(['introduced', 'worsened', 'propagated', 'pre-existing']);
+
 const reviewFindingSchema = z.object({
   id: z.string(),
   category: z.string(),
@@ -139,6 +141,7 @@ const reviewFindingSchema = z.object({
   line: z.number().optional(),
   suggestion: z.string().optional(),
   evidence: z.string().optional(),
+  attribution: reviewAttributionSchema.optional(),
 });
 
 export const reviewContentSchema = z
@@ -172,6 +175,7 @@ const reviewReportFindingSchema = z.object({
   line: z.number().nullish(),
   suggestion: z.string().nullish(),
   evidence: z.string().nullish(),
+  attribution: reviewAttributionSchema.optional(),
 });
 
 export const reviewReportContentSchema = z

@@ -12,20 +12,20 @@ const TEST_BUILT_IN_DEFAULTS: MergedConfiguration = {
   workflow: { name: 'dev', version: '1.0.0' },
   roles: {
     assignments: {
-      planner: { model: 'claude-opus-4-6', dispatchType: 'agent' },
-      implementer: { model: 'claude-opus-4-6', dispatchType: 'agent' },
-      static_reviewer: { model: 'claude-opus-4-6', dispatchType: 'agent' },
-      security_reviewer: { model: 'claude-opus-4-6', dispatchType: 'agent' },
-      performance_reviewer: { model: 'claude-opus-4-6', dispatchType: 'agent' },
-      adversarial_reviewer: { model: 'claude-opus-4-6', dispatchType: 'agent' },
-      design_reviewer: { model: 'claude-opus-4-6', dispatchType: 'agent' },
-      docs_reviewer: { model: 'claude-opus-4-6', dispatchType: 'agent' },
-      ux_reviewer: { model: 'claude-opus-4-6', dispatchType: 'agent' },
-      requirements_analyst: { model: 'claude-opus-4-6', dispatchType: 'agent' },
-      plan_reviewer: { model: 'claude-opus-4-6', dispatchType: 'agent' },
-      judge: { model: 'claude-opus-4-6', dispatchType: 'agent' },
-      verifier: { model: 'claude-opus-4-6', dispatchType: 'agent' },
-      summary_writer: { model: 'claude-opus-4-6', dispatchType: 'agent' },
+      planner: { model: 'claude-opus-4-8', dispatchType: 'agent' },
+      implementer: { model: 'claude-opus-4-8', dispatchType: 'agent' },
+      static_reviewer: { model: 'claude-opus-4-8', dispatchType: 'agent' },
+      security_reviewer: { model: 'claude-opus-4-8', dispatchType: 'agent' },
+      performance_reviewer: { model: 'claude-opus-4-8', dispatchType: 'agent' },
+      adversarial_reviewer: { model: 'claude-opus-4-8', dispatchType: 'agent' },
+      design_reviewer: { model: 'claude-opus-4-8', dispatchType: 'agent' },
+      docs_reviewer: { model: 'claude-opus-4-8', dispatchType: 'agent' },
+      ux_reviewer: { model: 'claude-opus-4-8', dispatchType: 'agent' },
+      requirements_analyst: { model: 'claude-opus-4-8', dispatchType: 'agent' },
+      plan_reviewer: { model: 'claude-opus-4-8', dispatchType: 'agent' },
+      judge: { model: 'claude-opus-4-8', dispatchType: 'agent' },
+      verifier: { model: 'claude-opus-4-8', dispatchType: 'agent' },
+      summary_writer: { model: 'claude-opus-4-8', dispatchType: 'agent' },
     },
   },
   governance: {
@@ -50,14 +50,14 @@ const ROLES_YAML = {
     {
       id: 'planner',
       name: 'Planner',
-      model: 'claude-opus-4-6',
+      model: 'claude-opus-4-8',
       dispatch_type: 'agent',
       runner: 'claude-code',
     },
     {
       id: 'implementer',
       name: 'Implementer',
-      model: 'claude-opus-4-6',
+      model: 'claude-opus-4-8',
       dispatch_type: 'agent',
       runner: 'claude-code',
     },
@@ -123,7 +123,7 @@ describe('FilesystemSettingsProvider', () => {
         roles: {
           assignments: {
             planner: { model: 'gpt-5.4-medium' },
-            implementer: { model: 'claude-opus-4-6' },
+            implementer: { model: 'claude-opus-4-8' },
           },
         },
       };
@@ -141,7 +141,7 @@ describe('FilesystemSettingsProvider', () => {
         roles: {
           assignments: {
             planner: { model: 'gpt-5.4-medium', runner: 'cursor' },
-            implementer: { model: 'claude-opus-4-6', runner: 'claude-code' },
+            implementer: { model: 'claude-opus-4-8', runner: 'claude-code' },
           },
         },
       };
@@ -277,7 +277,7 @@ describe('FilesystemSettingsProvider', () => {
         roles: {
           assignments: {
             planner: { model: 'gpt-5.4-medium' },
-            implementer: { model: 'claude-opus-4-6' },
+            implementer: { model: 'claude-opus-4-8' },
           },
         },
       };
@@ -297,7 +297,7 @@ describe('FilesystemSettingsProvider', () => {
         roles: {
           assignments: {
             planner: { model: 'gpt-5.4-medium' },
-            implementer: { model: 'claude-opus-4-6' },
+            implementer: { model: 'claude-opus-4-8' },
           },
         },
       };
@@ -427,7 +427,7 @@ describe('FilesystemSettingsProvider', () => {
       const settings = provider.getProjectSettings();
       expect(settings).not.toBeNull();
       expect(settings?.roles.assignments['planner']).toBeDefined();
-      expect(settings?.roles.assignments['planner'].model).toBe('claude-opus-4-6');
+      expect(settings?.roles.assignments['planner'].model).toBe('claude-opus-4-8');
       expect(settings?.governance.iterationLimits.defaults['maxReviewIterations']).toBe(2);
     });
 

@@ -35,6 +35,7 @@ Review the provided implementation artifact for security vulnerabilities. Identi
 
 Before producing output, perform this internal analysis. Do not include private reasoning in the artifact; output only the required JSON fields:
 
+0. **Anchor to the diff** — Identify changed files per the Change Attribution section. All findings must trace to added or modified content.
 1. **Map the attack surface** — Identify all inputs (HTTP parameters, file uploads, environment variables, configuration files, mounted volumes, user-controlled data), outputs (API responses, logs, error messages), and trust boundaries (authenticated vs. unauthenticated, internal vs. external). Include operator-supplied configuration as an input that requires validation — a ConfigMap or config file is a trust boundary, not a trusted source.
 2. **Check injection and SSRF paths** — For each input that reaches a sink (database query, shell command, HTML output, file system path, outbound HTTP request), verify that it is validated, sanitized, or parameterized. Check for SQL injection, command injection, XSS, path traversal, and SSRF. For outbound requests where the target URL is derived from user input or configuration, verify that the target is constrained to an allowlist and that redirect-following cannot escape that allowlist.
 3. **Verify auth boundaries** — Confirm that sensitive operations require authentication. Check that authorization is enforced (not just checked client-side). Look for IDOR vulnerabilities and privilege escalation paths. For every place credentials (tokens, cookies, API keys) are forwarded to another service, verify that the destination is constrained to a known trust domain. If the destination is configurable (via config files, environment, database), check that allowed targets are bounded — an unbounded credential-forwarding path turns every reachable service into a credential sink.
@@ -72,6 +73,8 @@ Category must be one of: `security`, `correctness`.
 - **Context blindness** — An internal tool and a public API have different threat models. Adjust severity accordingly.
 - **Security theater** — Don't recommend complex mitigations for non-threats. If the input is an internal enum validated at the type level, don't demand a WAF rule.
 - **Tunnel vision** — Don't miss actual injection vectors while writing up theoretical XSS in a server-rendered admin page with no user-generated content.
+- **Pre-existing debt** — Don't block this change for security patterns that already exist in unchanged code. Flag only if the change introduces a new vulnerability or extends a weak pattern to a new attack surface.
+- **Convention following** — New code that matches existing module patterns (error handling style, auth checks, credential forwarding) is consistency, not regression.
 
 {{>reviewer_evidence_requirement}}
 
@@ -81,13 +84,13 @@ Produce a single {{constraints.requiredOutputType}} artifact. The output must be
 
 Required fields:
 
-| Field       | Type    | Description                                                                                                                                                                                                                                                               |
-| ----------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `version`   | number  | Always `1`                                                                                                                                                                                                                                                                |
-| `approved`  | boolean | `true` if no critical findings and majors don't create an exploitable path                                                                                                                                                                                                |
-| `summary`   | string  | 2-3 sentence overall assessment including threat model context                                                                                                                                                                                                            |
-| `findings`  | array   | Each object: `id` (string), `category` (one of: security, correctness), `severity` (one of: critical, major, minor), `description` (string), `evidence` (string, verbatim code snippet from the diff proving the issue — required for critical/major, optional for minor) |
-| `createdAt` | string  | ISO 8601 timestamp                                                                                                                                                                                                                                                        |
+| Field       | Type    | Description                                                                                                                                                                                                                                                                                                                                      |
+| ----------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `version`   | number  | Always `1`                                                                                                                                                                                                                                                                                                                                       |
+| `approved`  | boolean | `true` if no critical findings and majors don't create an exploitable path                                                                                                                                                                                                                                                                       |
+| `summary`   | string  | 2-3 sentence overall assessment including threat model context                                                                                                                                                                                                                                                                                   |
+| `findings`  | array   | Each object: `id` (string), `category` (one of: security, correctness), `severity` (one of: critical, major, minor), `description` (string), `attribution` (one of: introduced, worsened, propagated, pre-existing), `evidence` (string, verbatim code snippet from added/modified diff lines — required for critical/major, optional for minor) |
+| `createdAt` | string  | ISO 8601 timestamp                                                                                                                                                                                                                                                                                                                               |
 
 Finding ID format: `SEC-001`, `SEC-002`, etc.
 
@@ -108,6 +111,7 @@ Finding ID format: `SEC-001`, `SEC-002`, etc.
       "category": "security",
       "severity": "critical",
       "description": "searchUsers() line 28: query parameter interpolated directly into SQL string. Exploitable via GET /api/users?q='; DROP TABLE--",
+      "attribution": "introduced",
       "evidence": "const results = db.query(`SELECT * FROM users WHERE name = '${req.query.q}'`);"
     },
     {

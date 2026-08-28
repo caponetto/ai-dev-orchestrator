@@ -33,6 +33,7 @@ Review the provided implementation artifact for design quality: abstractions, de
 
 Before producing output, perform this internal analysis. Do not include private reasoning in the artifact; output only the required JSON fields:
 
+0. **Anchor to the diff** — Identify changed files per the Change Attribution section. All findings must trace to added or modified content.
 1. **Map the architecture** — Identify the abstractions introduced or modified. What are the layers? What depends on what? Draw the dependency graph mentally.
 2. **Check abstractions** — Are abstractions at the right level? Do they hide complexity or merely shuffle it? Are there leaky abstractions that force callers to know internals? Are there missing abstractions that cause duplication?
 3. **Check dependencies** — Do dependencies flow in the right direction (toward stable abstractions)? Are there circular dependencies? Is there unnecessary coupling between modules? Could a change in one module cascade to unrelated modules? For changes to serialized formats (API responses, event schemas, config shapes, wire protocols), verify backward compatibility. Adding optional fields is safe; adding required fields, renaming/removing fields, or changing types is breaking. Breaking changes require versioning, migration paths, or deprecation periods.
@@ -83,13 +84,13 @@ Produce a single {{constraints.requiredOutputType}} artifact. The output must be
 
 Required fields:
 
-| Field       | Type    | Description                                                                                                                                                                                                                                                                                                                           |
-| ----------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `version`   | number  | Always `1`                                                                                                                                                                                                                                                                                                                            |
-| `approved`  | boolean | `true` if no critical findings and majors don't form a systemic pattern                                                                                                                                                                                                                                                               |
-| `summary`   | string  | 2-3 sentence overall assessment of design quality                                                                                                                                                                                                                                                                                     |
-| `findings`  | array   | Each object: `id` (string), `category` (one of: correctness, maintainability, security, performance, api_consistency, readability), `severity` (one of: critical, major, minor), `description` (string), `evidence` (string, verbatim code snippet from the diff proving the issue — required for critical/major, optional for minor) |
-| `createdAt` | string  | ISO 8601 timestamp                                                                                                                                                                                                                                                                                                                    |
+| Field       | Type    | Description                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ----------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `version`   | number  | Always `1`                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `approved`  | boolean | `true` if no critical findings and majors don't form a systemic pattern                                                                                                                                                                                                                                                                                                                                      |
+| `summary`   | string  | 2-3 sentence overall assessment of design quality                                                                                                                                                                                                                                                                                                                                                            |
+| `findings`  | array   | Each object: `id` (string), `category` (one of: correctness, maintainability, security, performance, api_consistency, readability), `severity` (one of: critical, major, minor), `description` (string), `attribution` (one of: introduced, worsened, propagated, pre-existing), `evidence` (string, verbatim code snippet from added/modified diff lines — required for critical/major, optional for minor) |
+| `createdAt` | string  | ISO 8601 timestamp                                                                                                                                                                                                                                                                                                                                                                                           |
 
 Finding ID format: `DR-001`, `DR-002`, etc.
 
@@ -110,6 +111,7 @@ Finding ID format: `DR-001`, `DR-002`, etc.
       "category": "maintainability",
       "severity": "critical",
       "description": "OrderRepository.findByQuery() accepts raw SQL fragments. Callers depend on the database dialect.",
+      "attribution": "introduced",
       "evidence": "findByQuery(sql: string): Promise<Order[]> // raw SQL in public interface"
     },
     {

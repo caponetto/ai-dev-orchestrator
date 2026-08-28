@@ -7,7 +7,7 @@ import { DefaultRoleRegistry } from '../role-registry';
 
 const DEFAULT_MODEL_CONFIG = {
   assignments: {},
-  defaultAssignment: { model: 'claude-opus-4-6' },
+  defaultAssignment: { model: 'claude-opus-4-8' },
 };
 
 function createRegistry(
@@ -41,7 +41,7 @@ describe('DefaultRoleRegistry', () => {
       const registry = createRegistry();
       const assignment = registry.getModelAssignment('planner');
       expect(assignment.roleId).toBe('planner');
-      expect(assignment.model).toBe('claude-opus-4-6');
+      expect(assignment.model).toBe('claude-opus-4-8');
     });
 
     it('getModelAssignment returns explicit assignment when configured', () => {

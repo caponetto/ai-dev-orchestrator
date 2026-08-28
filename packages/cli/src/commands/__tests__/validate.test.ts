@@ -50,7 +50,7 @@ describe('validateCommand', () => {
     writeFileSync(join(aiDir, 'config.yaml'), 'log_level: info\n');
     writeFileSync(
       join(aiDir, 'roles.yaml'),
-      ['roles:', '  - id: planner', '    model: claude-opus-4-6', '    dispatch_type: agent'].join(
+      ['roles:', '  - id: planner', '    model: claude-opus-4-8', '    dispatch_type: agent'].join(
         '\n',
       ),
     );
@@ -99,7 +99,7 @@ describe('validateCommand', () => {
     writeFileSync(join(aiDir, 'config.yaml'), 'log_level: info\n');
     writeFileSync(
       join(aiDir, 'roles.yaml'),
-      ['roles:', '  - id: planner', '    model: claude-opus-4-6', '    dispatch_type: agent'].join(
+      ['roles:', '  - id: planner', '    model: claude-opus-4-8', '    dispatch_type: agent'].join(
         '\n',
       ),
     );

@@ -22,7 +22,7 @@ function writeMinimalAiConfig(aiDir: string): void {
   writeFileSync(join(aiDir, 'workflow.yaml'), 'name: dev\nversion: "1.0.0"\n', 'utf-8');
   writeFileSync(
     join(aiDir, 'roles.yaml'),
-    'roles:\n  - id: planner\n    model: claude-opus-4-6\n    dispatch_type: agent\n',
+    'roles:\n  - id: planner\n    model: claude-opus-4-8\n    dispatch_type: agent\n',
     'utf-8',
   );
   writeFileSync(
@@ -82,7 +82,7 @@ describe('IC-1 Checkpoint: Artifacts persist, events flow, config loads', () => 
 
     const registry = new DefaultRoleRegistry(TEST_ROLES, {
       assignments: {},
-      defaultAssignment: { model: 'claude-opus-4-6' },
+      defaultAssignment: { model: 'claude-opus-4-8' },
     });
 
     const ownershipRegistry = new DefaultOwnershipRegistry();
@@ -146,14 +146,14 @@ describe('IC-1 Checkpoint: Artifacts persist, events flow, config loads', () => 
 
     const registry = new DefaultRoleRegistry(TEST_ROLES, {
       assignments: {
-        planner: { model: 'claude-opus-4-6' },
+        planner: { model: 'claude-opus-4-8' },
       },
-      defaultAssignment: { model: 'claude-opus-4-6' },
+      defaultAssignment: { model: 'claude-opus-4-8' },
     });
 
     const assignment = registry.getModelAssignment('planner');
     expect(assignment.roleId).toBe('planner');
-    expect(assignment.model).toBe('claude-opus-4-6');
+    expect(assignment.model).toBe('claude-opus-4-8');
 
     const validation = registry.validate();
     expect(validation.valid).toBe(true);
