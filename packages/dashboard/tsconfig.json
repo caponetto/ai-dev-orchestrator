@@ -7,7 +7,6 @@
     "rootDir": "./src",
     "noEmit": true,
     "types": ["@testing-library/jest-dom"],
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }
