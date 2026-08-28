@@ -1,12 +1,11 @@
 // @vitest-environment jsdom
-import type { UsageBreakdownView } from '@ai-orchestrator/schemas';
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { renderWithRouter } from '../../test/render';
 import { BudgetPanel } from '../BudgetPanel';
 
-const baseMock: UsageBreakdownView = {
+const baseMock = {
   runId: 'run-1',
   totalInputTokens: 5000,
   totalOutputTokens: 3000,
@@ -30,12 +29,11 @@ describe('BudgetPanel', () => {
     renderWithRouter(<BudgetPanel data={baseMock} />);
     const formattedTotal = (8000).toLocaleString();
     const formattedMax = (100000).toLocaleString();
-    expect(screen.getByText(new RegExp(formattedTotal.replace(/\./g, '\\.')))).toBeInTheDocument();
-    expect(screen.getByText(new RegExp(formattedMax.replace(/\./g, '\\.')))).toBeInTheDocument();
+    expect(screen.getByText(`${formattedTotal} / ${formattedMax}`)).toBeInTheDocument();
   });
 
   it('shows exceeded badge when budget is exceeded', () => {
-    const exceeded: UsageBreakdownView = {
+    const exceeded = {
       ...baseMock,
       budgetSummary: {
         configuredMaxTokens: 100000,
@@ -49,7 +47,7 @@ describe('BudgetPanel', () => {
   });
 
   it('renders nothing when no budget is configured', () => {
-    const noBudget: UsageBreakdownView = {
+    const noBudget = {
       ...baseMock,
       budgetSummary: undefined,
     };
