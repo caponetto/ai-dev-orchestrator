@@ -40,7 +40,7 @@ The current adapter model is centered on translating input and output for an `Ag
 
 ## Capability Probing
 
-The CLI currently probes local runner capabilities before registering runtime runners. Existing examples include the Claude Code and Cursor probes in `packages/agent-adapters/src/` and the runner wiring in `packages/cli/src/composition-root.ts`.
+The CLI currently probes local runner capabilities before registering runtime runners. Existing examples include the Claude Code, Cursor, and Codex probes in `packages/agent-adapters/src/` and the runner wiring in `packages/cli/src/composition-root.ts`. Codex uses `codex exec --json` for JSONL lifecycle events and emits final token usage on its completed-turn event.
 
 If a new adapter needs multiple modes, prefer a capability probe plus explicit mode normalization instead of hardcoding assumptions.
 

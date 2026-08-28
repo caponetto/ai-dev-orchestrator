@@ -1,3 +1,4 @@
+import { BUILT_IN_CODING_RUNNER_ID } from '@ai-orchestrator/schemas';
 import { useEffect, useRef, useState } from 'react';
 
 import { api } from '../api/client';
@@ -26,8 +27,9 @@ const subsystemDisplayNames: Record<string, string> = {
   'manifest-store': 'Manifest Store',
   'artifact-store': 'Artifact Store',
   'workflow-engine': 'Workflow Engine',
-  'runner:claude-code': 'Claude Code',
-  'runner:cursor': 'Cursor',
+  [`runner:${BUILT_IN_CODING_RUNNER_ID.CLAUDE_CODE}`]: 'Claude Code',
+  [`runner:${BUILT_IN_CODING_RUNNER_ID.CURSOR}`]: 'Cursor',
+  [`runner:${BUILT_IN_CODING_RUNNER_ID.CODEX}`]: 'Codex',
   'runner:gh-cli': 'GitHub CLI',
 };
 

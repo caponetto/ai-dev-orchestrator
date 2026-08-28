@@ -1,5 +1,6 @@
 import type { ProtocolMessage } from '@ai-orchestrator/agent-protocol';
 import { createProtocolMessage } from '@ai-orchestrator/agent-protocol';
+import { BUILT_IN_CODING_RUNNER_ID } from '@ai-orchestrator/schemas';
 
 import type { AgentAdapter, AgentAdapterCapabilities } from './adapter-types';
 import type {
@@ -39,7 +40,7 @@ const TEXT_ONLY_ARGS = ['--print', '--force', '--trust', '--approve-mcps'] as co
  * so the translation logic mirrors ClaudeCodeAdapter closely.
  */
 export class CursorCliAdapter implements AgentAdapter {
-  readonly name = 'cursor';
+  readonly name = BUILT_IN_CODING_RUNNER_ID.CURSOR;
   readonly command = 'agent';
   readonly args: readonly string[];
 

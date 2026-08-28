@@ -1,4 +1,8 @@
-import type { RoleUsageView, RunConfigView } from '@ai-orchestrator/schemas';
+import {
+  BUILT_IN_CODING_RUNNER_ID,
+  type RoleUsageView,
+  type RunConfigView,
+} from '@ai-orchestrator/schemas';
 import { Info } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
@@ -10,8 +14,9 @@ import { humanize } from '../lib/humanize';
 import { cn } from '../lib/utils';
 
 const RUNNER_LABELS: Record<string, string> = {
-  'claude-code': 'Claude Code',
-  cursor: 'Cursor',
+  [BUILT_IN_CODING_RUNNER_ID.CLAUDE_CODE]: 'Claude Code',
+  [BUILT_IN_CODING_RUNNER_ID.CURSOR]: 'Cursor',
+  [BUILT_IN_CODING_RUNNER_ID.CODEX]: 'Codex',
 };
 
 function formatRunner(runner?: string): string {

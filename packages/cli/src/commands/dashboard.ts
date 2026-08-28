@@ -5,9 +5,11 @@ import { fileURLToPath } from 'node:url';
 
 import {
   normalizeCursorProbeResult,
+  normalizeCodexProbeResult,
   normalizeGhCliProbeResult,
   normalizeProbeResult,
   probeClaudeCodeCapabilities,
+  probeCodexCliCapabilities,
   probeCursorCliCapabilities,
   probeGhCliCapabilities,
 } from '@ai-orchestrator/agent-adapters';
@@ -29,6 +31,7 @@ import {
   LocalAgentSessionSupervisor,
   RemoteAgentSessionSupervisor,
 } from '@ai-orchestrator/runner';
+import { BUILT_IN_CODING_RUNNER_ID } from '@ai-orchestrator/schemas';
 
 import { buildDataSources, startJournalPoller } from '../dashboard/data-sources';
 import type { RunnerHealthEntry } from '../dashboard/data-sources';
@@ -107,7 +110,7 @@ export async function dashboardCommand(
     const { mode, summary } = normalizeProbeResult(claudeProbe);
     const available = mode !== 'unavailable';
     runnerHealthEntries.push({
-      id: 'claude-code',
+      id: BUILT_IN_CODING_RUNNER_ID.CLAUDE_CODE,
       available,
       status: available ? 'healthy' : 'degraded',
       summary,
@@ -115,10 +118,29 @@ export async function dashboardCommand(
     });
   } catch {
     runnerHealthEntries.push({
-      id: 'claude-code',
+      id: BUILT_IN_CODING_RUNNER_ID.CLAUDE_CODE,
       available: false,
       status: 'degraded',
       summary: 'Probe failed — claude-code adapter unavailable',
+    });
+  }
+  try {
+    const codexProbe = await probeCodexCliCapabilities();
+    const { mode, summary } = normalizeCodexProbeResult(codexProbe);
+    const available = mode !== 'unavailable' && mode !== 'unauthenticated';
+    runnerHealthEntries.push({
+      id: BUILT_IN_CODING_RUNNER_ID.CODEX,
+      available,
+      status: mode === 'unauthenticated' ? 'unhealthy' : available ? 'healthy' : 'degraded',
+      summary,
+      version: codexProbe.rawVersion ?? undefined,
+    });
+  } catch {
+    runnerHealthEntries.push({
+      id: BUILT_IN_CODING_RUNNER_ID.CODEX,
+      available: false,
+      status: 'degraded',
+      summary: 'Probe failed — Codex CLI adapter unavailable',
     });
   }
   try {
@@ -126,7 +148,7 @@ export async function dashboardCommand(
     const { mode, summary } = normalizeCursorProbeResult(cursorProbe);
     const available = mode !== 'unavailable' && mode !== 'unauthenticated';
     runnerHealthEntries.push({
-      id: 'cursor',
+      id: BUILT_IN_CODING_RUNNER_ID.CURSOR,
       available,
       status: mode === 'unauthenticated' ? 'unhealthy' : available ? 'healthy' : 'degraded',
       summary,
@@ -134,7 +156,7 @@ export async function dashboardCommand(
     });
   } catch {
     runnerHealthEntries.push({
-      id: 'cursor',
+      id: BUILT_IN_CODING_RUNNER_ID.CURSOR,
       available: false,
       status: 'degraded',
       summary: 'Probe failed — cursor CLI adapter unavailable',

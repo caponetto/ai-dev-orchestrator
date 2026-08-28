@@ -5,6 +5,7 @@ import type {
 } from '@ai-orchestrator/agent-protocol';
 import { PROTOCOL_VERSION, createProtocolMessage } from '@ai-orchestrator/agent-protocol';
 import type { ThreeTierSeverity } from '@ai-orchestrator/schemas';
+import { BUILT_IN_CODING_RUNNER_ID } from '@ai-orchestrator/schemas';
 
 import type { AgentAdapter, AgentAdapterCapabilities } from './adapter-types';
 import type {
@@ -41,7 +42,7 @@ const EXPERIMENTAL_ARGS = ['--print', '--verbose', '--output-format', 'stream-js
 const TEXT_ONLY_ARGS = ['--print'] as const;
 
 export class ClaudeCodeAdapter implements AgentAdapter {
-  readonly name = 'claude-code';
+  readonly name = BUILT_IN_CODING_RUNNER_ID.CLAUDE_CODE;
   readonly command = 'claude';
   readonly args: readonly string[];
   readonly promptViaStdin: boolean;

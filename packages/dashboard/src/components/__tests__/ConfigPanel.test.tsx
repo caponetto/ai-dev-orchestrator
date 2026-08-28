@@ -45,6 +45,15 @@ describe('ConfigPanel', () => {
     expect(screen.getByText('Implementer')).toBeInTheDocument();
   });
 
+  it('renders Codex runner labels', async () => {
+    setupConfigHandler({
+      ...baseConfig,
+      roles: [{ role: 'implementer', model: 'gpt-5.3-codex', runner: 'codex' }],
+    });
+    renderWithRouter(<ConfigPanel runId="run-1" roleUsage={[]} />);
+    expect(await screen.findByText('Codex')).toBeInTheDocument();
+  });
+
   it('renders timeout, max turns, and max tokens columns', async () => {
     server.use(
       http.get('/api/runs/run-1/config', () =>

@@ -26,11 +26,11 @@ The current code supports:
 - structured protocol transport for capable agents
 - file-backed live request and live response exchange
 
-The CLI composition root probes supported local environments and currently wires built-in runner entries for `claude-code` and `cursor` when available.
+The CLI composition root probes supported local environments and currently wires built-in runner entries for `claude-code`, `cursor`, and `codex` when available. The Codex runner invokes `codex exec --json --sandbox workspace-write`, forwarding the configured role model through the CLI's `--model` option. It records the completed turn's input and output token usage.
 
 ## Protocol and Sessions
 
-Protocol-capable runners can use the structured agent protocol types in `packages/agent-protocol/src/agent-protocol-types.ts`. Runner adapters (Claude Code, Cursor, gh-cli) live in `packages/agent-adapters/src/`.
+Protocol-capable runners can use the structured agent protocol types in `packages/agent-protocol/src/agent-protocol-types.ts`. Runner adapters (Claude Code, Cursor, Codex, gh-cli) live in `packages/agent-adapters/src/`.
 
 The session model currently includes:
 
