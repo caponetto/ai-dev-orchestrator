@@ -62,7 +62,7 @@
     "linkify-it": "^6.1.0",
     "msw": "^2.8.4",
     "tailwindcss": "^4.3.3",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.3",
     "vite": "^8.2.2",
     "@ai-orchestrator/build-config": "workspace:*",
     "vitest": "^4.1.11"
