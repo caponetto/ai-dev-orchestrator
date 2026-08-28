@@ -32,15 +32,14 @@ node --version  # >= 22
 pnpm --version  # >= 11
 
 pnpm install
-pnpm lint
-pnpm typecheck
-pnpm test:unit
-pnpm build:prod
+pnpm link:cli
 ```
 
 ## CLI
 
 ```bash
+ai dashboard             # Open web dashboard
+
 ai init                  # Set up ~/.ai/ configuration
 ai run <source>          # Start a workflow run
 ai status [runId]        # Current state and progress
@@ -60,7 +59,6 @@ ai permit [runId]        # Grant/deny permission requests
 ai validate              # Check config without running
 ai config show           # Display merged configuration
 ai version               # Version, commit SHA, build info
-ai dashboard             # Open web dashboard
 ```
 
 All commands accept `--json` for machine-readable output and `--verbose` for detail. `run`, `resume`, and `retry` also accept `--repo <path>`.
