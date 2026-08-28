@@ -174,7 +174,7 @@ export class CliAgentRunner implements SessionCapableRunner {
       transport: 'stdio',
     };
 
-    const host = new LocalAgentSessionHost(ref, subprocess, transport, startTime);
+    const host = new LocalAgentSessionHost(ref, subprocess.nodeChildProcess, transport, startTime);
     const supervisor = this.sessionSupervisor as
       { registerHost(host: LocalAgentSessionHost): Promise<void> } | undefined;
     if (supervisor) {
@@ -496,7 +496,7 @@ export class CliAgentRunner implements SessionCapableRunner {
         });
       });
 
-      subprocess.on('exit', (code: number | null, signal: string | null) => {
+      subprocess.nodeChildProcess.on('exit', (code: number | null, signal: string | null) => {
         clearTimeout(overallTimer);
         if ((code !== 0 || signal) && !intentionalKill) {
           onStreamEvent?.({
@@ -511,7 +511,7 @@ export class CliAgentRunner implements SessionCapableRunner {
       // before deciding whether the agent produced output. The 'exit' event
       // fires before stdio streams are closed, so a late `result` event
       // sitting in the stdout buffer would be missed.
-      subprocess.on('close', () => {
+      subprocess.nodeChildProcess.on('close', () => {
         if (!protocolResolved && !doneHandled && protocolFinish) {
           if (finalArtifact) {
             protocolFinish({
