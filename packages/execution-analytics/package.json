@@ -35,6 +35,6 @@
   },
   "devDependencies": {
     "@ai-orchestrator/build-config": "workspace:*",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   }
 }
