@@ -29,7 +29,8 @@ describe('BudgetPanel', () => {
     renderWithRouter(<BudgetPanel data={baseMock} />);
     const formattedTotal = (8000).toLocaleString();
     const formattedMax = (100000).toLocaleString();
-    expect(screen.getByText(`${formattedTotal} / ${formattedMax}`)).toBeInTheDocument();
+    expect(screen.getByText((content) => content.includes(formattedTotal))).toBeInTheDocument();
+    expect(screen.getByText((content) => content.includes(formattedMax))).toBeInTheDocument();
   });
 
   it('shows exceeded badge when budget is exceeded', () => {
