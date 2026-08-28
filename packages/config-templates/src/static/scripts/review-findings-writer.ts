@@ -29,6 +29,7 @@ interface ReviewReportFinding {
   readonly line?: number | null;
   readonly suggestion?: string | null;
   readonly evidence?: string | null;
+  readonly attribution?: 'introduced' | 'worsened' | 'propagated' | 'pre-existing';
 }
 
 interface ReviewReport {
@@ -132,10 +133,19 @@ function inferFileFromDescription(description: string): string | undefined {
   return undefined;
 }
 
+function isBlockingAttribution(
+  attribution: ReviewReportFinding['attribution'] | undefined,
+): boolean {
+  return attribution === undefined || attribution === 'introduced' || attribution === 'worsened';
+}
+
 function mapFindings(findings: readonly ReviewReportFinding[]): OutputFinding[] {
   const result: OutputFinding[] = [];
 
   for (const f of findings) {
+    if (!isBlockingAttribution(f.attribution)) {
+      continue;
+    }
     let filePath: string | undefined;
     if (isNonEmpty(f.file) && f.line != null) {
       filePath = `${f.file}:${String(f.line)}`;

@@ -27,7 +27,7 @@ function writeValidConfigSet(options?: { logLevel?: string; plannerModel?: strin
     [
       'roles:',
       '  - id: planner',
-      `    model: ${options?.plannerModel ?? 'claude-opus-4-6'}`,
+      `    model: ${options?.plannerModel ?? 'claude-opus-4-8'}`,
       '    dispatch_type: agent',
     ].join('\n'),
     'utf-8',
@@ -106,7 +106,7 @@ describe('FileSystemConfigurationLoader (file-based)', () => {
     writeValidConfigSet();
     writeFileSync(
       join(aiDir, 'roles.yaml'),
-      ['roles:', '  - not_an_object_string', '  - id: planner', '    model: claude-opus-4-6'].join(
+      ['roles:', '  - not_an_object_string', '  - id: planner', '    model: claude-opus-4-8'].join(
         '\n',
       ),
       'utf-8',
@@ -114,7 +114,7 @@ describe('FileSystemConfigurationLoader (file-based)', () => {
 
     const config = loader.load({ aiConfigDir: aiDir });
     expect(config.roles.assignments['planner']).toBeDefined();
-    expect(config.roles.assignments['planner'].model).toBe('claude-opus-4-6');
+    expect(config.roles.assignments['planner'].model).toBe('claude-opus-4-8');
   });
 
   it('skips role entries with missing or empty id', () => {
@@ -127,7 +127,7 @@ describe('FileSystemConfigurationLoader (file-based)', () => {
         '  - id: ""',
         '    model: another-model',
         '  - id: valid_role',
-        '    model: claude-opus-4-6',
+        '    model: claude-opus-4-8',
       ].join('\n'),
       'utf-8',
     );

@@ -52,7 +52,7 @@ describe('configShowCommand', () => {
     writeFileSync(join(baseDir, 'config.yaml'), 'log_level: info\n');
     writeFileSync(
       join(baseDir, 'roles.yaml'),
-      ['roles:', '  - id: planner', '    model: claude-opus-4-6', '    dispatch_type: agent'].join(
+      ['roles:', '  - id: planner', '    model: claude-opus-4-8', '    dispatch_type: agent'].join(
         '\n',
       ),
     );
@@ -93,7 +93,7 @@ describe('configShowCommand', () => {
     writeFileSync(join(baseDir, 'config.yaml'), 'log_level: info\n');
     writeFileSync(
       join(baseDir, 'roles.yaml'),
-      ['roles:', '  - id: planner', '    model: claude-opus-4-6', '    dispatch_type: agent'].join(
+      ['roles:', '  - id: planner', '    model: claude-opus-4-8', '    dispatch_type: agent'].join(
         '\n',
       ),
     );

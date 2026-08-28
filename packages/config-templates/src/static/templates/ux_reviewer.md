@@ -37,6 +37,7 @@ If the implementation artifact contains ONLY backend/infrastructure changes with
 
 Before producing output, perform this internal analysis. Do not include private reasoning in the artifact; output only the required JSON fields:
 
+0. **Anchor to the diff** — Identify changed files per the Change Attribution section. All findings must trace to added or modified content.
 1. **Map the user flows** — Identify the user-facing changes introduced or modified. What tasks can the user perform? What is the happy path? What are the error paths?
 2. **Check usability** — Is the interface intuitive? Are user flows logical and efficient? Can users complete their goals with minimal friction? Are error states handled gracefully with actionable messages?
 3. **Check accessibility** — Does the implementation meet WCAG 2.1 AA standards? Is keyboard navigation fully supported? Are screen readers properly supported with semantic HTML and ARIA attributes? Is color contrast sufficient? Is focus management correct?
@@ -75,6 +76,8 @@ Category must be one of: `ux`, `accessibility`.
 - **Accessibility maximalism** — Don't demand AAA compliance when AA is the standard. Focus on barriers that actually prevent or impede user tasks.
 - **Copy perfectionism** — UI copy that "could be more helpful," "doesn't name a specific alternative," or "could suggest a next step" is at most `minor`. Only elevate if the copy actively misleads users into destructive or irreversible actions, or leaves them with no way to understand what happened. A warning that tells users the current action cannot proceed and suggests they go back or choose a different option is adequate — even if it doesn't enumerate specific alternatives.
 - **Conflating guidance gaps with correctness defects** — If the UI correctly communicates that an action is blocked and offers a generic path forward (e.g., "cancel and choose another option"), the finding that it could additionally name a specific alternative is a `minor` content enhancement, not a `major` correctness issue. The user is not stuck; the user is not misled; they simply receive less-specific guidance.
+- **Pre-existing debt** — Don't block this change for UX or accessibility patterns that already exist in unchanged UI code. Flag only if the change introduces a new barrier or extends a weak pattern to new user flows.
+- **Convention following** — New UI that matches existing component library patterns and interaction conventions is consistency, not regression.
 
 {{>reviewer_evidence_requirement}}
 
@@ -84,13 +87,13 @@ Produce a single {{constraints.requiredOutputType}} artifact. The output must be
 
 Required fields:
 
-| Field       | Type    | Description                                                                                                                                                                                                                                                           |
-| ----------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `version`   | number  | Always `1`                                                                                                                                                                                                                                                            |
-| `approved`  | boolean | `true` if no critical findings and majors don't form a systemic pattern                                                                                                                                                                                               |
-| `summary`   | string  | 2-3 sentence overall assessment of UX quality                                                                                                                                                                                                                         |
-| `findings`  | array   | Each object: `id` (string), `category` (one of: ux, accessibility), `severity` (one of: critical, major, minor), `description` (string), `evidence` (string, verbatim code snippet from the diff proving the issue — required for critical/major, optional for minor) |
-| `createdAt` | string  | ISO 8601 timestamp                                                                                                                                                                                                                                                    |
+| Field       | Type    | Description                                                                                                                                                                                                                                                                                                                                  |
+| ----------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version`   | number  | Always `1`                                                                                                                                                                                                                                                                                                                                   |
+| `approved`  | boolean | `true` if no critical findings and majors don't form a systemic pattern                                                                                                                                                                                                                                                                      |
+| `summary`   | string  | 2-3 sentence overall assessment of UX quality                                                                                                                                                                                                                                                                                                |
+| `findings`  | array   | Each object: `id` (string), `category` (one of: ux, accessibility), `severity` (one of: critical, major, minor), `description` (string), `attribution` (one of: introduced, worsened, propagated, pre-existing), `evidence` (string, verbatim code snippet from added/modified diff lines — required for critical/major, optional for minor) |
+| `createdAt` | string  | ISO 8601 timestamp                                                                                                                                                                                                                                                                                                                           |
 
 Finding ID format: `UX-001`, `UX-002`, etc.
 
@@ -111,6 +114,7 @@ Finding ID format: `UX-001`, `UX-002`, etc.
       "category": "accessibility",
       "severity": "critical",
       "description": "Toggle controls in SettingsPanel are not reachable via keyboard. Mouse-only users are blocked.",
+      "attribution": "introduced",
       "evidence": "<div onClick={handleToggle}> // no tabIndex, no onKeyDown handler"
     },
     {

@@ -8,7 +8,7 @@ const POLICY = {
   type: 'model_constraint' as const,
   scope: {},
   config: {
-    allowedModels: ['claude-opus-4-6', 'gpt-4o'],
+    allowedModels: ['claude-opus-4-8', 'gpt-4o'],
   },
   enabled: true,
 } satisfies PolicyDefinition;
@@ -28,7 +28,7 @@ describe('ModelConstraintEvaluator', () => {
   it('passes when model is in allowed list', () => {
     const result = evaluator.evaluate(
       POLICY,
-      makeContext({ metadata: { model: 'claude-opus-4-6' } }),
+      makeContext({ metadata: { model: 'claude-opus-4-8' } }),
     );
     expect(result.outcome).toBe('pass');
     expect(result.policyId).toBe('builtin:model_constraint');

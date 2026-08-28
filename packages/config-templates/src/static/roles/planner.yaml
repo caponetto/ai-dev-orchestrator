@@ -20,7 +20,7 @@ agreement_participation:
 required_capabilities:
   - reasoning
   - structured_output
-model: claude-opus-4-6
+model: claude-opus-4-8
 max_tokens: null
 dispatch_type: agent
 runner: claude-code

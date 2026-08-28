@@ -7,11 +7,11 @@ import type { ModelAssignmentConfig, ModelTierConfig } from '../model-assigner';
 function createConfig(overrides?: Partial<ModelAssignmentConfig>): ModelAssignmentConfig {
   return {
     assignments: {
-      planner: { model: 'claude-opus-4-6' },
+      planner: { model: 'claude-opus-4-8' },
       implementer: { model: 'gpt-4o', maxTokens: 32768 },
     },
     defaultAssignment: {
-      model: 'claude-opus-4-6',
+      model: 'claude-opus-4-8',
     },
     ...overrides,
   };
@@ -23,7 +23,7 @@ describe('ModelAssigner', () => {
     const assignment = assigner.getModelAssignment('planner');
 
     expect(assignment.roleId).toBe('planner');
-    expect(assignment.model).toBe('claude-opus-4-6');
+    expect(assignment.model).toBe('claude-opus-4-8');
   });
 
   it('returns explicit assignment with maxTokens', () => {
@@ -39,7 +39,7 @@ describe('ModelAssigner', () => {
     const assignment = assigner.getModelAssignment('verifier');
 
     expect(assignment.roleId).toBe('verifier');
-    expect(assignment.model).toBe('claude-opus-4-6');
+    expect(assignment.model).toBe('claude-opus-4-8');
   });
 
   it('throws ModelAssignmentError when no assignment and no default', () => {
@@ -52,8 +52,8 @@ describe('ModelAssigner', () => {
     const explicit = assigner.getModelAssignment('planner');
     const defaulted = assigner.getModelAssignment('verifier');
 
-    expect(explicit.model).toBe('claude-opus-4-6');
-    expect(defaulted.model).toBe('claude-opus-4-6');
+    expect(explicit.model).toBe('claude-opus-4-8');
+    expect(defaulted.model).toBe('claude-opus-4-8');
   });
 });
 

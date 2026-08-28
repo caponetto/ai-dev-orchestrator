@@ -104,6 +104,12 @@ Before producing output, perform this internal analysis. Do not include private 
    **Gate E — Explicitly hedged findings:**
    - If the finding's own description states it is "unverified," "unconfirmed," "pending confirmation," or explicitly hedges that the claimed behavior could not be verified from the available evidence, it is not a finding — it is a risk. A finding asserts a defect the reviewer believes exists based on evidence. An unverified concern belongs in the `risks` array or should be dropped entirely. Do NOT keep it as a `minor` finding; move it to risks or drop it. If the reviewer could not confirm the concern, it has no place in the findings array at any severity.
 
+   **Gate F — Change attribution:**
+   - If evidence is entirely from unchanged context (not from added/modified diff lines), drop the finding.
+   - If `attribution` is `pre-existing` or `propagated`, drop the finding entirely — do not include it in the output.
+   - If the finding describes a pattern that matches documented conventions in `codebase_context` and the implementation follows that convention, drop the finding.
+   - "The codebase should not do X" is not a finding unless this change newly does X or expands X to a new surface. Only `introduced` and `worsened` findings at `critical`/`major` severity can drive `request_changes` for correctness/security/performance categories.
+
 7. **Reconcile acceptance criteria (if correlation data is present).** If the canonical specification includes a `correlation` object: (a) For `notAddressed` criteria, evaluate whether each represents a completeness gap that would prevent the feature from working. If so, create a finding with category `correctness`, severity `major`, source `["canonical_specification"]`, and evidence quoting the spec's note. Only promote completeness gaps that affect functionality, not criteria merely "not yet tested." (b) For `addressed` criteria contradicted by a critical/major finding, downgrade to `partiallyAddressed`. The reviewers' assessment takes precedence over the spec analyst's face-value evaluation. If no `correlation` object is present, skip this step.
 8. **Order by severity.** Within the findings array: all `critical` first, then `major`, then `minor`.
 9. **Write executive summary.** Summarize the overall quality posture in 2-4 sentences. State the verdict (approve or request_changes) and the rationale. Describe the most important findings by their content — do not reference finding IDs in the summary text. Write the summary as a unified review voice — do not reference individual reviewers, reviewer counts, or reviewer roles (e.g., do not write "four reviewers converge" or "the security reviewer found"). The `sources` array on each finding already tracks provenance; the summary should read as a single cohesive assessment. Qualify any coverage-related claims with their actual scope (e.g., "Cypress coverage is broad for happy-path redirect flows" not "comprehensive") unless the reviewer verified edge-case and error-path coverage explicitly.
@@ -173,7 +179,8 @@ A synthesized report is well-formed when:
 - No two findings in the output describe the same underlying issue
 - Severity levels use the standard taxonomy: `critical`, `major`, `minor`
 - Categories use the unified taxonomy: `correctness`, `security`, `performance`, `maintainability`, `design`, `style`; reviewer-specific categories such as `ux`, `accessibility`, `api_consistency`, and `readability` are normalized
-- The verdict is `request_changes` if any finding with category `correctness`, `security`, or `performance` has severity `critical` or `major`
+- The verdict is `request_changes` if any finding with category `correctness`, `security`, or `performance` has severity `critical` or `major` **and** attribution is `introduced` or `worsened` (or attribution is absent — treat as `introduced` for backward compatibility)
+- Findings with attribution `pre-existing` or `propagated` must be dropped during synthesis and do not affect the verdict
 - The verdict is `approve` when all `correctness`/`security`/`performance` findings are `minor` or absent, even if `maintainability`/`design`/`style` findings are `major` — those are strong recommendations but not blocking
 - Statistics match the actual findings array
 
@@ -181,7 +188,8 @@ A synthesized report is well-formed when:
 
 - **Severity inflation on merge:** Two `minor` findings about the same issue do NOT become one `major`. Merged severity follows the domain-expert rule, not addition.
 - **Losing specificity during dedup:** When merging, keep the description with the most actionable detail (file path, line number, concrete fix suggestion). Do not generalize into vagueness.
-- **Approving with critical correctness findings:** The verdict MUST be `request_changes` if any `correctness`, `security`, or `performance` finding at `critical` or `major` severity exists. Maintainability/design/style majors are strong recommendations but do not alone trigger `request_changes`.
+- **Approving with critical correctness findings:** The verdict MUST be `request_changes` if any `correctness`, `security`, or `performance` finding at `critical` or `major` severity exists with attribution `introduced` or `worsened`. Maintainability/design/style majors are strong recommendations but do not alone trigger `request_changes`.
+- **Pre-existing pattern approval:** Do NOT set `request_changes` for `critical`/`major` findings attributed to `pre-existing` or `propagated` patterns — drop those findings during synthesis instead.
 - **Inventing findings:** You are an editor, not a reviewer. If you notice something no reviewer flagged, do not add it.
 - **Summarizing away details:** The executive summary complements the findings array — it does not replace it. Important nuance from individual reviewers must survive synthesis.
 - **Miscounting statistics:** The `reviewSummary` counts must exactly match the deduplicated findings array. Count after merging, not before.
@@ -192,15 +200,15 @@ A synthesized report is well-formed when:
 
 Produce a {{constraints.requiredOutputType}} artifact with these required fields:
 
-| Field         | Type    | Constraint                                                                 |
-| ------------- | ------- | -------------------------------------------------------------------------- |
-| version       | number  | Always 1                                                                   |
-| approved      | boolean | false if any correctness/security/performance finding is critical or major |
-| summary       | string  | Executive summary of the review (2-4 sentences)                            |
-| findings      | array   | Deduplicated findings ordered by severity                                  |
-| verdict       | string  | `"approve"` or `"request_changes"`                                         |
-| reviewSummary | object  | Counts: totalFindings, critical, major, minor                              |
-| createdAt     | string  | ISO 8601 timestamp                                                         |
+| Field         | Type    | Constraint                                                                                     |
+| ------------- | ------- | ---------------------------------------------------------------------------------------------- |
+| version       | number  | Always 1                                                                                       |
+| approved      | boolean | false if any introduced/worsened correctness/security/performance finding is critical or major |
+| summary       | string  | Executive summary of the review (2-4 sentences)                                                |
+| findings      | array   | Deduplicated findings ordered by severity                                                      |
+| verdict       | string  | `"approve"` or `"request_changes"`                                                             |
+| reviewSummary | object  | Counts: totalFindings, critical, major, minor                                                  |
+| createdAt     | string  | ISO 8601 timestamp                                                                             |
 
 Each entry in `findings` must have:
 
@@ -214,7 +222,8 @@ Each entry in `findings` must have:
 | file        | string or null   | File path — MUST be populated when evidence or description identifies the source file. Only null when genuinely unattributable. Preserve the source reviewer's path; if evidence clearly identifies a file the reviewer omitted, set it. Attribute to the file where the code is defined, not the file that imports it. |
 | line        | number or null   | Line number if applicable                                                                                                                                                                                                                                                                                               |
 | suggestion  | string or null   | Recommended fix if applicable                                                                                                                                                                                                                                                                                           |
-| evidence    | string or null   | Verbatim code snippet from the diff proving the issue — required for critical/major (drop finding if missing), optional for minor                                                                                                                                                                                       |
+| evidence    | string or null   | Verbatim code snippet from added/modified diff lines — required for critical/major (drop finding if missing), optional for minor                                                                                                                                                                                        |
+| attribution | string or null   | One of: `introduced`, `worsened`, `propagated`, `pre-existing`. Preserve from source reviewer; default to `introduced` when absent. Drop findings with `propagated` or `pre-existing` attribution.                                                                                                                      |
 
 {{>json_write_rules}}
 
@@ -235,7 +244,8 @@ Each entry in `findings` must have:
       "file": "src/api/search.ts",
       "line": 34,
       "suggestion": "Use parameterized queries via db.query(sql, params).",
-      "evidence": "const results = db.query(`SELECT * FROM users WHERE name = '${req.query.q}'`);"
+      "evidence": "const results = db.query(`SELECT * FROM users WHERE name = '${req.query.q}'`);",
+      "attribution": "introduced"
     },
     {
       "id": "SYN-002",
@@ -246,7 +256,8 @@ Each entry in `findings` must have:
       "file": "src/components/Dashboard.tsx",
       "line": 12,
       "suggestion": "Wrap dashboard children in an ErrorBoundary with a fallback UI.",
-      "evidence": "export const Dashboard = () => <div>{widgets.map(w => <Widget key={w.id} {...w} />)}</div>;"
+      "evidence": "export const Dashboard = () => <div>{widgets.map(w => <Widget key={w.id} {...w} />)}</div>;",
+      "attribution": "introduced"
     }
   ],
   "verdict": "request_changes",

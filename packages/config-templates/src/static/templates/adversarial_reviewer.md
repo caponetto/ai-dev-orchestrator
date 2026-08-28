@@ -42,6 +42,8 @@ Break this implementation. Find the production incidents it could cause, the inp
 
 Apply these three attack vectors systematically:
 
+0. **Anchor to the diff** — Identify changed files per the Change Attribution section. All findings must trace to added or modified content.
+
 1. **Break it.** Find system-level states or sequences that cause crashes, data corruption, or undefined behavior across component boundaries. Try:
    - What happens when a nil/null/undefined propagates across a component boundary — does the downstream consumer crash, corrupt data, or fail silently?
    - What happens when boundary values (0, -1, MAX_INT) flow through the full request pipeline — do they trigger unexpected behavior in serialization, storage, or downstream processing?
@@ -107,13 +109,13 @@ Produce a single {{constraints.requiredOutputType}} artifact. The output must be
 
 Required fields:
 
-| Field       | Type    | Description                                                                                                                                                                                                                                                                            |
-| ----------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `version`   | number  | Always `1`                                                                                                                                                                                                                                                                             |
-| `approved`  | boolean | `true` if no realistic scenario causes data loss, outage, or security breach                                                                                                                                                                                                           |
-| `summary`   | string  | 2-3 sentence overall assessment of production survivability                                                                                                                                                                                                                            |
-| `findings`  | array   | Each object: `id` (string), `category` (one of: correctness, security, performance), `severity` (one of: critical, major, minor), `description` (string), `evidence` (string, verbatim code snippet from the diff proving the issue — required for critical/major, optional for minor) |
-| `createdAt` | string  | ISO 8601 timestamp                                                                                                                                                                                                                                                                     |
+| Field       | Type    | Description                                                                                                                                                                                                                                                                                                                                                   |
+| ----------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version`   | number  | Always `1`                                                                                                                                                                                                                                                                                                                                                    |
+| `approved`  | boolean | `true` if no realistic scenario causes data loss, outage, or security breach                                                                                                                                                                                                                                                                                  |
+| `summary`   | string  | 2-3 sentence overall assessment of production survivability                                                                                                                                                                                                                                                                                                   |
+| `findings`  | array   | Each object: `id` (string), `category` (one of: correctness, security, performance), `severity` (one of: critical, major, minor), `description` (string), `attribution` (one of: introduced, worsened, propagated, pre-existing), `evidence` (string, verbatim code snippet from added/modified diff lines — required for critical/major, optional for minor) |
+| `createdAt` | string  | ISO 8601 timestamp                                                                                                                                                                                                                                                                                                                                            |
 
 Finding ID format: `ADV-001`, `ADV-002`, etc.
 
@@ -134,6 +136,7 @@ Finding ID format: `ADV-001`, `ADV-002`, etc.
       "category": "correctness",
       "severity": "critical",
       "description": "createOrder() writes orders then payments without a transaction. Payment failure leaves orphaned order with no cleanup.",
+      "attribution": "introduced",
       "evidence": "await db.insert('orders', order);\nawait db.insert('payments', payment); // no transaction wrapper"
     },
     {

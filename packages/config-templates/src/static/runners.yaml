@@ -3,6 +3,7 @@ runners:
     name: Claude Code
     models:
       - claude-opus-4-6
+      - claude-opus-4-8
       - claude-sonnet-5
       - claude-haiku-4-5
   - id: cursor
@@ -15,7 +16,3 @@ runners:
       - gpt-5.4-mini-high
       - claude-sonnet-5-thinking-high
       - gemini-3.1-pro
-      - grok-4.6-low
-      - grok-4.6-medium
-      - grok-4.6-high
-      - grok-4.6-xhigh

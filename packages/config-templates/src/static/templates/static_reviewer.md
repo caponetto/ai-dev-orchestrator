@@ -37,6 +37,7 @@ Review the provided implementation artifact for logical correctness and error ha
 
 Before producing output, perform this internal analysis. Do not include private reasoning in the artifact; output only the required JSON fields:
 
+0. **Anchor to the diff** — Identify changed files per the Change Attribution section. All findings must trace to added or modified content.
 1. **Understand scope** — Read the implementation artifact fully. Identify what was built, what files changed, and what the intended behavior is.
 2. **Trace happy paths** — For each function, trace the primary execution path. Does it produce the correct result for valid inputs? Are return values correct? Are conditionals right?
 3. **Trace edge cases** — What happens at boundaries? Zero, one, many. Empty collections. Null/undefined. Maximum values. What happens when inputs are valid but unusual? For each input that passes validation and is forwarded to a framework/library API, check whether the validated value can still violate the downstream API's contract (panics, duplicate registration, invalid format). Validation is only correct if it enforces the union of all downstream consumers' constraints.
@@ -92,13 +93,13 @@ Produce a single {{constraints.requiredOutputType}} artifact. The output must be
 
 Required fields:
 
-| Field       | Type    | Description                                                                                                                                                                                                                                                                      |
-| ----------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `version`   | number  | Always `1`                                                                                                                                                                                                                                                                       |
-| `approved`  | boolean | `true` if no critical findings and majors don't form a systemic pattern                                                                                                                                                                                                          |
-| `summary`   | string  | 2-3 sentence overall assessment                                                                                                                                                                                                                                                  |
-| `findings`  | array   | Each object: `id` (string), `category` (one of: correctness, maintainability), `severity` (one of: critical, major, minor), `description` (string), `evidence` (string, verbatim code snippet from the diff proving the issue — required for critical/major, optional for minor) |
-| `createdAt` | string  | ISO 8601 timestamp                                                                                                                                                                                                                                                               |
+| Field       | Type    | Description                                                                                                                                                                                                                                                                                                                                             |
+| ----------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version`   | number  | Always `1`                                                                                                                                                                                                                                                                                                                                              |
+| `approved`  | boolean | `true` if no critical findings and majors don't form a systemic pattern                                                                                                                                                                                                                                                                                 |
+| `summary`   | string  | 2-3 sentence overall assessment                                                                                                                                                                                                                                                                                                                         |
+| `findings`  | array   | Each object: `id` (string), `category` (one of: correctness, maintainability), `severity` (one of: critical, major, minor), `description` (string), `attribution` (one of: introduced, worsened, propagated, pre-existing), `evidence` (string, verbatim code snippet from added/modified diff lines — required for critical/major, optional for minor) |
+| `createdAt` | string  | ISO 8601 timestamp                                                                                                                                                                                                                                                                                                                                      |
 
 Finding ID format: `SR-001`, `SR-002`, etc.
 
@@ -119,6 +120,7 @@ Finding ID format: `SR-001`, `SR-002`, etc.
       "category": "correctness",
       "severity": "critical",
       "description": "processOrder() line 42: response.data accessed without null check after failed API call. Throws TypeError on 500.",
+      "attribution": "introduced",
       "evidence": "const result = response.data.orders; // no null check on response.data"
     },
     {

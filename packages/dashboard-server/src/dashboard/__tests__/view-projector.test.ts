@@ -114,7 +114,7 @@ describe('projectRunConfig', () => {
       roles: {
         assignments: {
           planner: {
-            model: 'claude-opus-4-6',
+            model: 'claude-opus-4-8',
           },
         },
       },
@@ -123,7 +123,7 @@ describe('projectRunConfig', () => {
     expect(view.roles).toEqual([
       {
         role: 'planner',
-        model: 'claude-opus-4-6',
+        model: 'claude-opus-4-8',
         dispatchType: undefined,
         runner: undefined,
         maxTokens: null,

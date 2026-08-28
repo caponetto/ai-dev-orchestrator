@@ -116,7 +116,7 @@ describe('composition-root orchestrator creation', () => {
         '    reviews: []',
         '    agreement_participation: []',
         '    required_capabilities: [reasoning]',
-        '    model: claude-opus-4-6',
+        '    model: claude-opus-4-8',
         '    dispatch_type: agent',
       ].join('\n'),
       'utf8',
