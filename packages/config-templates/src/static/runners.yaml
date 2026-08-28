@@ -16,3 +16,9 @@ runners:
       - gpt-5.4-mini-high
       - claude-sonnet-5-thinking-high
       - gemini-3.1-pro
+  - id: codex
+    name: Codex
+    models:
+      - gpt-5.6-sol
+      - gpt-5.6-luna
+      - gpt-5.6-terra

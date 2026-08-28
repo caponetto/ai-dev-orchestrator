@@ -1,3 +1,5 @@
+import { BUILT_IN_CODING_RUNNER_ID } from '@ai-orchestrator/schemas';
+
 import type { AgentAdapterCapabilities, CapabilityProbeResult } from './adapter-types';
 
 export interface CursorProbeResult extends CapabilityProbeResult {
@@ -36,7 +38,7 @@ export async function probeCursorCliCapabilities(
   } catch {
     notes.push(`Command '${command}' not found or not executable`);
     return {
-      adapterName: 'cursor',
+      adapterName: BUILT_IN_CODING_RUNNER_ID.CURSOR,
       probedAt: new Date().toISOString(),
       capabilities,
       rawVersion,
@@ -81,7 +83,7 @@ export async function probeCursorCliCapabilities(
   }
 
   return {
-    adapterName: 'cursor',
+    adapterName: BUILT_IN_CODING_RUNNER_ID.CURSOR,
     probedAt: new Date().toISOString(),
     capabilities,
     rawVersion,

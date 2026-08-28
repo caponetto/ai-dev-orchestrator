@@ -23,6 +23,7 @@ const mockPaths = vi.hoisted(() => ({ aiDir: '', runsDir: '' }));
 const mockProbes = vi.hoisted(() => ({
   probeClaudeCode: vi.fn(),
   probeCursor: vi.fn(),
+  probeCodex: vi.fn(),
 }));
 
 vi.mock('../workspace-paths', async (importOriginal) => {
@@ -43,6 +44,7 @@ vi.mock('@ai-orchestrator/agent-adapters', async (importOriginal) => {
     ...(actual as object),
     probeClaudeCodeCapabilities: mockProbes.probeClaudeCode,
     probeCursorCliCapabilities: mockProbes.probeCursor,
+    probeCodexCliCapabilities: mockProbes.probeCodex,
   };
 });
 
@@ -87,6 +89,19 @@ describe('composition-root orchestrator creation', () => {
         stdinResponses: false,
       },
       rawVersion: '0.1.0',
+      authenticated: true,
+      notes: ['mock'],
+    });
+    mockProbes.probeCodex.mockResolvedValue({
+      adapterName: 'codex',
+      probedAt: '2026-01-01T00:00:00Z',
+      capabilities: {
+        structuredIO: true,
+        permissionEvents: false,
+        clarificationEvents: false,
+        stdinResponses: false,
+      },
+      rawVersion: 'codex-cli 0.146.0',
       authenticated: true,
       notes: ['mock'],
     });
@@ -199,6 +214,20 @@ describe('composition-root orchestrator creation', () => {
 
     const ctx = await createOrchestrator(baseDir);
     expect(ctx.runId).toBeTruthy();
+  });
+
+  it('registers Codex CLI for roles assigned to the codex runner', async () => {
+    writeFullAiConfig(baseDir);
+    const rolesPath = join(baseDir, AI_CONFIG_DIR_NAME, 'roles.yaml');
+    writeFileSync(
+      rolesPath,
+      readFileSync(rolesPath, 'utf8').replace('runner: claude-code', 'runner: codex'),
+      'utf8',
+    );
+
+    const ctx = await createOrchestrator(baseDir);
+    expect(ctx.runId).toBeTruthy();
+    expect(mockProbes.probeCodex).toHaveBeenCalled();
   });
 
   it('writes effective agent dispatch types into the dashboard config snapshot', async () => {

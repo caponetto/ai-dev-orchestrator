@@ -3,10 +3,13 @@ import { join } from 'node:path';
 
 import {
   createClaudeCodeAdapter,
+  createCodexCliAdapter,
   createCursorCliAdapter,
+  normalizeCodexProbeResult,
   normalizeCursorProbeResult,
   normalizeProbeResult,
   probeClaudeCodeCapabilities,
+  probeCodexCliCapabilities,
   probeCursorCliCapabilities,
 } from '@ai-orchestrator/agent-adapters';
 import {
@@ -106,7 +109,11 @@ import type {
   WorkflowDefinition,
   WorkflowRunConfig,
 } from '@ai-orchestrator/schemas';
-import { WORKFLOW_DEFINITION_FILENAME, workflowSchema } from '@ai-orchestrator/schemas';
+import {
+  BUILT_IN_CODING_RUNNER_ID,
+  WORKFLOW_DEFINITION_FILENAME,
+  workflowSchema,
+} from '@ai-orchestrator/schemas';
 import { LifecycleController } from '@ai-orchestrator/workflow';
 
 import type { ConfigSnapshot } from './config-snapshot';
@@ -239,7 +246,9 @@ async function buildRunnerRegistry(
     const { mode, summary } = normalizeProbeResult(probeResult);
 
     if (mode === 'unavailable') {
-      skippedAssignments.push(`claude-code runner skipped: ${summary}`);
+      skippedAssignments.push(
+        `${BUILT_IN_CODING_RUNNER_ID.CLAUDE_CODE} runner skipped: ${summary}`,
+      );
     } else {
       const adapter = createClaudeCodeAdapter(probeResult.capabilities);
       const claudeCodeRunner = new CliAgentRunner({
@@ -252,7 +261,7 @@ async function buildRunnerRegistry(
       if (liveRequestStore) {
         claudeCodeRunner.setLiveRequestStore(liveRequestStore);
       }
-      registry.set('claude-code', claudeCodeRunner);
+      registry.set(BUILT_IN_CODING_RUNNER_ID.CLAUDE_CODE, claudeCodeRunner);
     }
   } catch {
     skippedAssignments.push(
@@ -265,7 +274,9 @@ async function buildRunnerRegistry(
     const { mode: cursorMode, summary: cursorSummary } = normalizeCursorProbeResult(cursorProbe);
 
     if (cursorMode === 'unavailable' || cursorMode === 'unauthenticated') {
-      skippedAssignments.push(`cursor runner skipped: ${cursorSummary}`);
+      skippedAssignments.push(
+        `${BUILT_IN_CODING_RUNNER_ID.CURSOR} runner skipped: ${cursorSummary}`,
+      );
     } else {
       const cursorAdapter = createCursorCliAdapter(cursorProbe.capabilities);
       const cursorRunner = new CliAgentRunner({
@@ -278,11 +289,35 @@ async function buildRunnerRegistry(
       if (liveRequestStore) {
         cursorRunner.setLiveRequestStore(liveRequestStore);
       }
-      registry.set('cursor', cursorRunner);
+      registry.set(BUILT_IN_CODING_RUNNER_ID.CURSOR, cursorRunner);
     }
   } catch {
     skippedAssignments.push(
       'cursor runner skipped: capability probe failed — cursor CLI adapter unavailable',
+    );
+  }
+
+  try {
+    const codexProbe = await probeCodexCliCapabilities();
+    const { mode: codexMode, summary: codexSummary } = normalizeCodexProbeResult(codexProbe);
+    if (codexMode === 'unavailable' || codexMode === 'unauthenticated') {
+      skippedAssignments.push(`${BUILT_IN_CODING_RUNNER_ID.CODEX} runner skipped: ${codexSummary}`);
+    } else {
+      const codexRunner = new CliAgentRunner({
+        command: 'codex',
+        args: ['exec', '--json', '--sandbox', 'workspace-write'],
+        adapter: createCodexCliAdapter(codexProbe.capabilities),
+      });
+      codexRunner.setPermissionPolicy(policy);
+      codexRunner.setApprovalStore(approvalStore);
+      if (liveRequestStore) {
+        codexRunner.setLiveRequestStore(liveRequestStore);
+      }
+      registry.set(BUILT_IN_CODING_RUNNER_ID.CODEX, codexRunner);
+    }
+  } catch {
+    skippedAssignments.push(
+      'codex runner skipped: capability probe failed — Codex CLI adapter unavailable',
     );
   }
 

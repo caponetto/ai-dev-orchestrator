@@ -1,3 +1,5 @@
+import { BUILT_IN_CODING_RUNNER_ID } from '@ai-orchestrator/schemas';
+
 import type { AgentAdapterCapabilities, CapabilityProbeResult } from './adapter-types';
 
 interface ProbeOptions {
@@ -31,7 +33,7 @@ export async function probeClaudeCodeCapabilities(
   } catch {
     notes.push(`Command '${command}' not found or not executable`);
     return {
-      adapterName: 'claude-code',
+      adapterName: BUILT_IN_CODING_RUNNER_ID.CLAUDE_CODE,
       probedAt: new Date().toISOString(),
       capabilities,
       rawVersion,
@@ -68,7 +70,7 @@ export async function probeClaudeCodeCapabilities(
   }
 
   return {
-    adapterName: 'claude-code',
+    adapterName: BUILT_IN_CODING_RUNNER_ID.CLAUDE_CODE,
     probedAt: new Date().toISOString(),
     capabilities,
     rawVersion,

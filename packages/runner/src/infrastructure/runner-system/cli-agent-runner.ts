@@ -2,7 +2,11 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 import type { AgentAdapter, VendorTokenUsage } from '@ai-orchestrator/agent-adapters';
-import { parseClaudeCodeEvent, parseCursorEvent } from '@ai-orchestrator/agent-adapters';
+import {
+  parseClaudeCodeEvent,
+  parseCodexEvent,
+  parseCursorEvent,
+} from '@ai-orchestrator/agent-adapters';
 import type {
   AgentToOrchestratorMessage,
   ArtifactMessage,
@@ -27,6 +31,7 @@ import type {
   AgentTokenUsage,
 } from '@ai-orchestrator/schemas';
 import {
+  BUILT_IN_CODING_RUNNER_ID,
   liveClarificationResponsePayloadSchema,
   livePermissionResponsePayloadSchema,
 } from '@ai-orchestrator/schemas';
@@ -1106,14 +1111,18 @@ export class CliAgentRunner implements SessionCapableRunner {
 }
 
 /** Adapters that accept a prompt as the final arg instead of --task-file. */
-const PROMPT_BASED_ADAPTERS = new Set(['claude-code', 'cursor']);
+const PROMPT_BASED_ADAPTERS = new Set<string>([
+  BUILT_IN_CODING_RUNNER_ID.CLAUDE_CODE,
+  BUILT_IN_CODING_RUNNER_ID.CODEX,
+  BUILT_IN_CODING_RUNNER_ID.CURSOR,
+]);
 
 function buildToolPermissionArgs(): string[] {
   return ['--allowedTools=Read,Write,Edit'];
 }
 
 function buildMaxTurnsArgs(task: AgentTask, adapter?: AgentAdapter): string[] {
-  if (adapter?.name !== 'claude-code') {
+  if (adapter?.name !== BUILT_IN_CODING_RUNNER_ID.CLAUDE_CODE) {
     return [];
   }
   const maxTurns = task.agentConfig?.maxTurns;
@@ -1136,7 +1145,10 @@ function buildInvocationArgs(
     return [...baseArgs, ...modelArgs, ...maxTurnsArgs];
   }
 
-  const permArgs = adapter?.name === 'claude-code' || !adapter ? buildToolPermissionArgs() : [];
+  const permArgs =
+    adapter?.name === BUILT_IN_CODING_RUNNER_ID.CLAUDE_CODE || !adapter
+      ? buildToolPermissionArgs()
+      : [];
 
   if (adapter && PROMPT_BASED_ADAPTERS.has(adapter.name)) {
     return [
@@ -1323,6 +1335,11 @@ export function extractUsageFromRawLine(line: string): ExtractedUsage | null {
     if (cursorEvent.type === 'assistant' && cursorEvent.message?.usage) {
       return parseVendorUsage(cursorEvent.message.usage);
     }
+  }
+
+  const codexEvent = parseCodexEvent(line);
+  if (codexEvent?.type === 'turn.completed' && codexEvent.usage) {
+    return { ...parseVendorUsage(codexEvent.usage), isFinal: true };
   }
 
   return null;

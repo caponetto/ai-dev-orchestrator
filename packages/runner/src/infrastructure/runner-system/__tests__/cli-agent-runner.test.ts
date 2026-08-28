@@ -1096,6 +1096,24 @@ describe('extractUsageFromRawLine', () => {
     expect(usage).toEqual({ inputTokens: 12000, outputTokens: 3500, isFinal: true });
   });
 
+  it('extracts final Codex token usage from a completed turn', () => {
+    const line = JSON.stringify({
+      type: 'turn.completed',
+      usage: {
+        input_tokens: 12000,
+        cached_input_tokens: 11000,
+        cache_write_input_tokens: 300,
+        output_tokens: 3500,
+        reasoning_output_tokens: 1000,
+      },
+    });
+    expect(extractUsageFromRawLine(line)).toEqual({
+      inputTokens: 12000,
+      outputTokens: 3500,
+      isFinal: true,
+    });
+  });
+
   it('extracts Cursor camelCase usage from assistant event without cumulative flag', () => {
     const line = JSON.stringify({
       type: 'assistant',

@@ -32,6 +32,7 @@ describe('runner-registry', () => {
       const ids = runners.map((r) => r.id);
       expect(ids).toContain('cursor');
       expect(ids).toContain('claude-code');
+      expect(ids).toContain('codex');
     });
 
     it('cursor runner has at least one model', () => {
@@ -39,6 +40,11 @@ describe('runner-registry', () => {
       const cursor = runners.find((r) => r.id === 'cursor');
       expect(cursor).toBeDefined();
       expect(cursor?.models.length).toBeGreaterThan(0);
+    });
+
+    it('codex runner advertises Codex models', () => {
+      const codex = loadRunnerRegistry().find((runner) => runner.id === 'codex');
+      expect(codex?.models).toContain('gpt-5.6-sol');
     });
 
     it('returns same data on consecutive calls', () => {

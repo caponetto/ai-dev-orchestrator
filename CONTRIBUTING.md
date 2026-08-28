@@ -112,7 +112,7 @@ packages/
 ├── ports/              # Port interfaces (contracts between layers)
 ├── artifacts/          # Artifact system, ownership, agreements
 ├── agent-protocol/     # Agent-orchestrator protocol messages
-├── agent-adapters/     # CLI adapters for Claude Code, Cursor, gh-cli
+├── agent-adapters/     # CLI adapters for Claude Code, Cursor, Codex, gh-cli
 ├── code-intelligence/  # SCIP-powered code context for symbol-level analysis
 ├── dependency-graph/   # Artifact dependency graph, impact analysis
 ├── execution-analytics/ # Adaptive execution loop, statistical profiling

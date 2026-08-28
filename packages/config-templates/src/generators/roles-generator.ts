@@ -21,7 +21,7 @@ const ROLES_HEADER = [
   '#   model                   - LLM model identifier for this role.',
   '#   max_tokens              - Maximum output tokens override (null = model default).',
   '#   dispatch_type           - How to run (currently only "agent").',
-  '#   runner                  - Which runner to use (claude-code, cursor, verifier, etc.).',
+  '#   runner                  - Which runner to use (claude-code, cursor, codex, etc.).',
   '#   agent_config            - Optional runner-specific configuration (e.g. model override).',
   '',
 ].join('\n');
