@@ -19,7 +19,7 @@
   "packages/core": "0.1.1",
   "packages/workflow": "0.1.1",
   "packages/config-templates": "0.1.1",
-  "packages/dashboard-server": "0.1.1",
-  "packages/cli": "0.1.1",
+  "packages/dashboard-server": "0.1.2",
+  "packages/cli": "0.1.2",
   "packages/execution-analytics": "0.1.1"
 }
