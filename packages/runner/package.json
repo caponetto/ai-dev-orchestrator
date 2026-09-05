@@ -38,7 +38,7 @@
     "@ai-orchestrator/schemas": "workspace:*",
     "@ai-orchestrator/utils": "workspace:*",
     "execa": "^10.0.1",
-    "zod": "^4.4.3"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@ai-orchestrator/build-config": "workspace:*",
