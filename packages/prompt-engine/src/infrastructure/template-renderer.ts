@@ -24,7 +24,27 @@ export function renderTemplate(
 }
 
 function stripComments(template: string): string {
-  return template.replace(/\{\{![\s\S]*?\}\}/gu, '');
+  let result = '';
+  let i = 0;
+
+  while (i < template.length) {
+    const start = template.indexOf('{{!', i);
+    if (start === -1) {
+      result += template.slice(i);
+      break;
+    }
+
+    result += template.slice(i, start);
+    const end = template.indexOf('}}', start + 3);
+    if (end === -1) {
+      result += template.slice(start);
+      break;
+    }
+
+    i = end + 2;
+  }
+
+  return result;
 }
 
 function resolvePartials(template: string, partials: PartialMap): string {

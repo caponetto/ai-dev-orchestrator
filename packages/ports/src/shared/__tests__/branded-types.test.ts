@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { createRunId, createWorkerId } from '../branded-types';
 
 describe('createRunId', () => {
-  it('generates an id in YYYYMMDD-HHMMSS-random format when no value provided', () => {
+  it('generates an id with a cryptographic Base64URL suffix when no value provided', () => {
     const id = createRunId();
-    expect(String(id)).toMatch(/^\d{8}-\d{6}-[a-z0-9]{6}$/);
+    expect(String(id)).toMatch(/^\d{8}-\d{6}-[A-Za-z0-9_-]{22}$/);
   });
 
   it('generates unique ids on successive calls', () => {

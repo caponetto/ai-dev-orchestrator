@@ -53,6 +53,13 @@ describe('validateOutput', () => {
     expect(result.parsedContent).toEqual({ key: 'value' });
   });
 
+  it('accepts JSON wrapped in uppercase JSON code fences', () => {
+    const fenced = '```JSON\n{"key": "value"}\n```';
+    const result = validateOutput(fenced, makeContract('json'));
+    expect(result.valid).toBe(true);
+    expect(result.parsedContent).toEqual({ key: 'value' });
+  });
+
   it('accepts JSON wrapped in untyped code fences', () => {
     const fenced = '```\n{"key": "value"}\n```';
     const result = validateOutput(fenced, makeContract('json'));

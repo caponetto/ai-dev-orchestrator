@@ -46,11 +46,31 @@ function validateJson(output: string, contract: OutputContract): OutputValidatio
 
 function stripCodeFences(output: string): string {
   const trimmed = output.trim();
-  const fenceMatch = /^```(?:json|JSON)?\s*\n([\s\S]*?)\n\s*```\s*$/.exec(trimmed);
-  if (fenceMatch?.[1]) {
-    return fenceMatch[1].trim();
+  if (!trimmed.startsWith('```')) {
+    return trimmed;
   }
-  return trimmed;
+
+  const firstNewline = trimmed.indexOf('\n');
+  if (firstNewline === -1) {
+    return trimmed;
+  }
+
+  const header = trimmed.slice(0, firstNewline).trim();
+  if (!/^```(?:json|JSON)?$/i.test(header)) {
+    return trimmed;
+  }
+
+  const lastFenceIndex = trimmed.lastIndexOf('```');
+  if (lastFenceIndex <= firstNewline) {
+    return trimmed;
+  }
+
+  const footer = trimmed.slice(lastFenceIndex + 3).trim();
+  if (footer.length > 0) {
+    return trimmed;
+  }
+
+  return trimmed.slice(firstNewline + 1, lastFenceIndex).trim();
 }
 
 function validateYaml(output: string, contract: OutputContract): OutputValidationResult {
