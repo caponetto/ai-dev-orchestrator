@@ -67,15 +67,15 @@ All commands accept `--json` for machine-readable output and `--verbose` for det
 
 Hexagonal (ports & adapters) with strict layering enforced by Turborepo boundary tags. Lower layers cannot import from higher layers.
 
-| Layer          | Packages                                                                                                                                                                                                                              |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Foundation     | `schemas`, `utils`, `build-config`                                                                                                                                                                                                    |
-| Contracts      | `ports`, `agent-protocol`, `test-utils`                                                                                                                                                                                               |
-| Domain         | `artifacts`, `agent-adapters`, `code-intelligence`, `dependency-graph`, `execution-analytics`, `governance`, `journal`, `policy-engine`, `project-context`, `prompt-engine`, `role-system`, `run-manifest`, `runner`, `specification` |
-| Infrastructure | `core`, `recovery`                                                                                                                                                                                                                    |
-| Orchestration  | `workflow`                                                                                                                                                                                                                            |
-| Application    | `config-templates`, `dashboard-server`, `dashboard`                                                                                                                                                                                   |
-| Composition    | `cli`                                                                                                                                                                                                                                 |
+| Layer          | Packages                                                                                                                                                                                                         |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Foundation     | `schemas`, `utils`, `build-config`                                                                                                                                                                               |
+| Contracts      | `ports`, `agent-protocol`, `test-utils`                                                                                                                                                                          |
+| Domain         | `artifacts`, `agent-adapters`, `dependency-graph`, `execution-analytics`, `governance`, `journal`, `policy-engine`, `project-context`, `prompt-engine`, `role-system`, `run-manifest`, `runner`, `specification` |
+| Infrastructure | `core`, `recovery`                                                                                                                                                                                               |
+| Orchestration  | `workflow`                                                                                                                                                                                                       |
+| Application    | `config-templates`, `dashboard-server`, `dashboard`                                                                                                                                                              |
+| Composition    | `cli`                                                                                                                                                                                                            |
 
 27 packages in a pnpm/Turborepo monorepo. See [`docs/system-overview.md`](docs/system-overview.md) for the full breakdown.
 

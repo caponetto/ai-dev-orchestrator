@@ -21,7 +21,7 @@ required_capabilities:
   - code_review
   - reasoning
   - structured_output
-model: gpt-5.4-medium
+model: cursor-grok-4.6-medium
 max_tokens: null
 dispatch_type: agent
 runner: cursor

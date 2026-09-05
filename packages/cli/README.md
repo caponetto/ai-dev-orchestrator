@@ -26,7 +26,6 @@ The `ai` command-line interface. This is the composition root that wires togethe
 - `@ai-orchestrator/schemas`
 - `@ai-orchestrator/utils`
 - `@ai-orchestrator/workflow`
-- `@ai-orchestrator/code-intelligence`
 - `@ai-orchestrator/project-context`
 
 ## Structure

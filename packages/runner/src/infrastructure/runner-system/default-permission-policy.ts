@@ -382,7 +382,7 @@ const SAFE_READ_ONLY_UTILITIES = new Set([
 ]);
 
 function isReadOnlyVcsCommand(command: string): boolean {
-  const segments = command.split(/\s*(?:&&|\|\||;)\s*/);
+  const segments = command.split(/&&|\|\||;/);
   if (segments.length === 0) {
     return false;
   }
@@ -394,8 +394,8 @@ function hasFileOutputRedirection(segment: string): boolean {
 }
 
 function isReadOnlySegment(segment: string): boolean {
-  const pipeHead = segment.split(/\s*\|\s*/)[0].trim();
-  const cleaned = pipeHead.replaceAll(/\s*[12]?>&?\d*\s*/g, ' ').trim();
+  const pipeHead = segment.split('|')[0].trim();
+  const cleaned = pipeHead.replaceAll(/[12]?>&?\d*/g, ' ').trim();
   if (!cleaned) {
     return false;
   }
@@ -427,7 +427,7 @@ function isReadOnlyGhCommand(command: string): boolean {
 }
 
 function isReadOnlyGitCommand(command: string): boolean {
-  const cleaned = command.replaceAll(/\s*[12]?>&?\d*\s*/g, ' ').trim();
+  const cleaned = command.replaceAll(/[12]?>&?\d*/g, ' ').trim();
   const parts = cleaned.split(/\s+/);
   let subcommandIdx = -1;
   for (let i = 1; i < parts.length; i++) {

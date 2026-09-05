@@ -78,6 +78,8 @@ Category must be one of: `ux`, `accessibility`.
 - **Conflating guidance gaps with correctness defects** — If the UI correctly communicates that an action is blocked and offers a generic path forward (e.g., "cancel and choose another option"), the finding that it could additionally name a specific alternative is a `minor` content enhancement, not a `major` correctness issue. The user is not stuck; the user is not misled; they simply receive less-specific guidance.
 - **Pre-existing debt** — Don't block this change for UX or accessibility patterns that already exist in unchanged UI code. Flag only if the change introduces a new barrier or extends a weak pattern to new user flows.
 - **Convention following** — New UI that matches existing component library patterns and interaction conventions is consistency, not regression.
+- **Permanent-state claims without lifecycle trace** — Before claiming users are stranded indefinitely or an error is never cleared, trace reconnect/`onopen`/cleanup handlers in the hook. If recovery clears the error or restores the table, cap at `minor` (stale data during retry).
+- **Fallback imprecision** — "No fallback" must specify which is missing: build-time opt-out, runtime degradation to polling, or reconnect preserving stale data. Name the specific gap.
 
 {{>reviewer_evidence_requirement}}
 

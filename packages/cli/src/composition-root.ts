@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
   createClaudeCodeAdapter,
@@ -20,7 +21,6 @@ import {
   FilesystemArtifactStore,
   safeJsonParse,
 } from '@ai-orchestrator/artifacts';
-import { DefaultCodeIntelligence } from '@ai-orchestrator/code-intelligence';
 import {
   ALL_PARTIAL_IDS,
   ALL_ROLE_IDS,
@@ -103,6 +103,7 @@ import type {
   BudgetConfig,
   MergedConfiguration,
   PartialMap,
+  PersistedState,
   PromptTemplate,
   RoleContract,
   RunId,
@@ -305,11 +306,26 @@ async function buildRunnerRegistry(
     } else {
       const codexRunner = new CliAgentRunner({
         command: 'codex',
-        args: ['exec', '--json', '--sandbox', 'workspace-write'],
+        args: [
+          'exec',
+          '--json',
+          '--sandbox',
+          'workspace-write',
+          '-c',
+          'sandbox_workspace_write.network_access=true',
+        ],
         adapter: createCodexCliAdapter(codexProbe.capabilities),
       });
       codexRunner.setPermissionPolicy(policy);
       codexRunner.setApprovalStore(approvalStore);
+      codexRunner.setApprovalStorePath(getPermissionApprovalsPath());
+      if (policyConfig) {
+        codexRunner.setPermissionPolicyConfig(policyConfig);
+      }
+      codexRunner.setCodexPermissionBridge({
+        runsDir: getRunsDir(),
+        cliEntryPath: join(dirname(fileURLToPath(import.meta.url)), 'index.js'),
+      });
       if (liveRequestStore) {
         codexRunner.setLiveRequestStore(liveRequestStore);
       }
@@ -523,7 +539,6 @@ async function buildOrchestratorInfra(params: InfraParams): Promise<InfraResult>
     }
   }
 
-  const codeIntelligence = new DefaultCodeIntelligence();
   const logger = createLogger(config.runtime.logLevel, getLogPath(runDir));
 
   const contextStore = new FilesystemProjectContextStore(getAiDir());
@@ -542,7 +557,6 @@ async function buildOrchestratorInfra(params: InfraParams): Promise<InfraResult>
     runDir,
     sessionSupervisor,
     dependencyGraph,
-    codeIntelligence,
     projectContextStore: contextStore,
     executionAnalytics,
   });
@@ -684,8 +698,7 @@ export async function resumeOrchestrator(
     journalReader.readAll(),
   );
   if (checkpoint) {
-    const workflow =
-      readPersistedWorkflow(runDir) ?? loadWorkflowFromConfig() ?? loadDefaultWorkflow();
+    const workflow = resolveWorkflowForResume(runDir, checkpoint);
     const sources = readPersistedSources(runDir);
     infra.engine.restore(
       createRunConfig(runId, sources, workflow, {
@@ -760,6 +773,18 @@ function readPersistedWorkflow(runDir: string): WorkflowDefinition | null {
   } catch {
     return null;
   }
+}
+
+function resolveWorkflowForResume(
+  runDir: string,
+  checkpoint: Pick<PersistedState, 'workflowName'>,
+): WorkflowDefinition {
+  return (
+    readPersistedWorkflow(runDir) ??
+    loadWorkflowByName(checkpoint.workflowName) ??
+    loadWorkflowFromConfig() ??
+    loadDefaultWorkflow()
+  );
 }
 
 /** Options for building a WorkflowRunConfig from CLI inputs. */

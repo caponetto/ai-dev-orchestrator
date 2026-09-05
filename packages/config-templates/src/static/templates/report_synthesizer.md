@@ -110,11 +110,22 @@ Before producing output, perform this internal analysis. Do not include private 
    - If the finding describes a pattern that matches documented conventions in `codebase_context` and the implementation follows that convention, drop the finding.
    - "The codebase should not do X" is not a finding unless this change newly does X or expands X to a new surface. Only `introduced` and `worsened` findings at `critical`/`major` severity can drive `request_changes` for correctness/security/performance categories.
 
+   **Gate G — Client lifecycle completeness:**
+   - If a finding claims a UI/error state is **permanent**, **never cleared**, or leaves the user **stranded indefinitely**, trace the full state machine: initial connect, error handlers, reconnect handlers, `onopen`/cleanup effects, and successful recovery paths.
+   - If any recovery path clears the error state or restores data, cap at `minor` (stale-data-during-retry UX), not `major` (permanent blank screen).
+   - Describe what actually happens on reconnect, not the worst-case path only.
+
+   **Gate H — Unreachable and static failure paths:**
+   - Findings about constructor-time or startup-time errors with compile-time constant inputs (e.g. fixed content-type lists passed to a library wrapper) are not `major` unless the inputs are dynamic or the failure mode was observed. Move to `risks` or drop.
+   - Inconsistent error handling between two failure branches, when one branch is effectively unreachable for typed data, is `minor` at most.
+
 7. **Reconcile acceptance criteria (if correlation data is present).** If the canonical specification includes a `correlation` object: (a) For `notAddressed` criteria, evaluate whether each represents a completeness gap that would prevent the feature from working. If so, create a finding with category `correctness`, severity `major`, source `["canonical_specification"]`, and evidence quoting the spec's note. Only promote completeness gaps that affect functionality, not criteria merely "not yet tested." (b) For `addressed` criteria contradicted by a critical/major finding, downgrade to `partiallyAddressed`. The reviewers' assessment takes precedence over the spec analyst's face-value evaluation. If no `correlation` object is present, skip this step.
 8. **Order by severity.** Within the findings array: all `critical` first, then `major`, then `minor`.
 9. **Write executive summary.** Summarize the overall quality posture in 2-4 sentences. State the verdict (approve or request_changes) and the rationale. Describe the most important findings by their content — do not reference finding IDs in the summary text. Write the summary as a unified review voice — do not reference individual reviewers, reviewer counts, or reviewer roles (e.g., do not write "four reviewers converge" or "the security reviewer found"). The `sources` array on each finding already tracks provenance; the summary should read as a single cohesive assessment. Qualify any coverage-related claims with their actual scope (e.g., "Cypress coverage is broad for happy-path redirect flows" not "comprehensive") unless the reviewer verified edge-case and error-path coverage explicitly.
    When framing the verdict rationale, identify the **single most blocking issue** — the one that most strongly prevents the PR from being merged. Functional completeness gaps (the feature doesn't work as described, a required file is missing from the diff) take priority over edge-case correctness issues. For dev-only or tooling PRs, recalibrate accordingly: edge cases that only trigger during interrupted retries on local dev clusters are less blocking than fundamental feature gaps like missing files or unmet acceptance criteria that prevent the feature from functioning at all.
+   **PR disposition calibration:** If `prDisposition` indicates the PR is a conversation starter, RFC, WIP, or carries do-not-merge labels, frame findings as **design feedback for discussion**, not merge blockers. Do not use "must be addressed before merge" or "blocking" unless a finding is a demonstrated correctness/security defect with a concrete trigger. State explicitly that the PR is not merge-ready if the author said so.
 10. **Produce statistics.** Count total findings by severity after deduplication.
+11. **Reconcile acceptance criteria in output.** After deduplication, for every criterion still marked `addressed` in the canonical spec's `correlation`, check whether any remaining `critical`/`major` finding contradicts it (same topic — e.g. fallback, auth, reconnect — with the finding describing a gap). If so, record it as `partiallyAddressed` with a note citing the finding. Never leave a criterion as fully addressed when a major finding describes the same gap.
 
 ## Input
 
@@ -182,6 +193,7 @@ A synthesized report is well-formed when:
 - The verdict is `request_changes` if any finding with category `correctness`, `security`, or `performance` has severity `critical` or `major` **and** attribution is `introduced` or `worsened` (or attribution is absent — treat as `introduced` for backward compatibility)
 - Findings with attribution `pre-existing` or `propagated` must be dropped during synthesis and do not affect the verdict
 - The verdict is `approve` when all `correctness`/`security`/`performance` findings are `minor` or absent, even if `maintainability`/`design`/`style` findings are `major` — those are strong recommendations but not blocking
+- For WIP/RFC/conversation-starter PRs (`prDisposition`), `request_changes` is acceptable but the summary must not read as a production merge gate — frame as prioritized design feedback
 - Statistics match the actual findings array
 
 ## Anti-Patterns

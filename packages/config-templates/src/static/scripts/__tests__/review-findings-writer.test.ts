@@ -164,6 +164,56 @@ describe('review-findings-writer transform', () => {
         addressed: [{ criterion: 'AC-1' }],
       });
     });
+
+    it('downgrades addressed criterion when a major finding contradicts it', () => {
+      const spec = {
+        correlation: {
+          addressed: [
+            {
+              criterion: 'Provide graceful fallback to polling behavior',
+              evidence: 'PR title mentions polling fallback',
+            },
+          ],
+        },
+      };
+      const report = makeReport({
+        findings: [
+          makeFinding({
+            description:
+              'No runtime fallback to polling when initial SSE connection fails indefinitely',
+            severity: 'major',
+            category: 'correctness',
+          }),
+        ],
+      });
+      const result = transform(report, spec);
+      expect(result.acceptanceCriteria?.addressed).toBeUndefined();
+      expect(result.acceptanceCriteria?.partiallyAddressed).toHaveLength(1);
+      expect(result.acceptanceCriteria?.partiallyAddressed?.[0]?.criterion).toContain('fallback');
+      expect(result.acceptanceCriteria?.partiallyAddressed?.[0]?.note).toContain(
+        'Contradicted by review finding',
+      );
+    });
+
+    it('keeps addressed criterion when finding is minor only', () => {
+      const spec = {
+        correlation: {
+          addressed: [{ criterion: 'Provide graceful fallback to polling behavior' }],
+        },
+      };
+      const report = makeReport({
+        findings: [
+          makeFinding({
+            description: 'Polling interval could be tuned for faster fallback',
+            severity: 'minor',
+            category: 'performance',
+          }),
+        ],
+      });
+      const result = transform(report, spec);
+      expect(result.acceptanceCriteria?.addressed).toHaveLength(1);
+      expect(result.acceptanceCriteria?.partiallyAddressed).toBeUndefined();
+    });
   });
 
   describe('untracked changes', () => {

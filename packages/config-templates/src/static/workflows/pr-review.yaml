@@ -63,16 +63,12 @@ states:
   DIFF_COMPUTATION:
     type: action
     label: Diff Computation
-    description: Pre-compute PR diff and index codebase for symbol-level context
+    description: Pre-compute PR diff
     entry_actions:
       - type: run_script
         params:
           script: compute-pr-diff.ts
-          timeout: 30000
-      - type: run_script
-        params:
-          script: index-codebase.ts
-          timeout: 150000
+          timeout: 180000
     transitions:
       - target: REVIEW_EXECUTION
         trigger: completion

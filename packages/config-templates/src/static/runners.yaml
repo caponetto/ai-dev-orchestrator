@@ -9,11 +9,8 @@ runners:
   - id: cursor
     name: Cursor
     models:
-      - gpt-5.4-low
-      - gpt-5.4-medium
-      - gpt-5.4-high
-      - gpt-5.4-xhigh
-      - gpt-5.4-mini-high
+      - cursor-grok-4.6-medium
+      - cursor-grok-4.6-low
       - claude-sonnet-5-thinking-high
       - gemini-3.1-pro
   - id: codex

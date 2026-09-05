@@ -1,7 +1,11 @@
 import type { ProtocolMessage } from '@ai-orchestrator/agent-protocol';
 import { describe, expect, it } from 'vitest';
 
-import { CodexCliAdapter, createCodexCliAdapter } from '../codex-cli-adapter';
+import {
+  CODEX_WORKSPACE_WRITE_NETWORK_CONFIG,
+  CodexCliAdapter,
+  createCodexCliAdapter,
+} from '../codex-cli-adapter';
 
 function assertMessage(message: ProtocolMessage | null): ProtocolMessage {
   expect(message).not.toBeNull();
@@ -13,7 +17,15 @@ describe('CodexCliAdapter', () => {
     const adapter = new CodexCliAdapter();
     expect(adapter.name).toBe('codex');
     expect(adapter.command).toBe('codex');
-    expect(adapter.args).toEqual(['exec', '--json', '--sandbox', 'workspace-write']);
+    expect(adapter.args).toEqual([
+      'exec',
+      '--json',
+      '--sandbox',
+      'workspace-write',
+      '-c',
+      CODEX_WORKSPACE_WRITE_NETWORK_CONFIG,
+    ]);
+    expect(adapter.supportsProtocolHandshake).toBe(false);
   });
 
   it('maps agent messages, command execution, completion, and errors', () => {

@@ -13,6 +13,7 @@ import type { AgentStreamEvent } from '@ai-orchestrator/ports';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  appendAgentStreamEventToRunFile,
   discoverChangedFiles,
   dispatchToClients,
   FileBackedAgentStreamBus,
@@ -127,6 +128,22 @@ describe('FileBackedAgentStreamBus', () => {
 
     bus.unsubscribe(id2);
     expect(bus.getClientCount()).toBe(0);
+    bus.dispose();
+  });
+
+  it('poll picks up events appended externally between publishes', () => {
+    const bus = new FileBackedAgentStreamBus(runsDir);
+    const received: AgentStreamEvent[] = [];
+    bus.subscribe((e) => received.push(e));
+
+    bus.publish(makeEvent('run-1', 'first'));
+    expect(received).toHaveLength(1);
+
+    appendAgentStreamEventToRunFile(makeEvent('run-1', 'hook-event'), runsDir);
+
+    bus.publish(makeEvent('run-1', 'second'));
+
+    expect(received.map((e) => e.content)).toEqual(['first', 'hook-event', 'second']);
     bus.dispose();
   });
 

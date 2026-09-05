@@ -12,7 +12,6 @@
     "packages/artifacts": { "component": "artifacts" },
     "packages/agent-protocol": { "component": "agent-protocol" },
     "packages/agent-adapters": { "component": "agent-adapters" },
-    "packages/code-intelligence": { "component": "code-intelligence" },
     "packages/dependency-graph": { "component": "dependency-graph" },
     "packages/governance": { "component": "governance" },
     "packages/journal": { "component": "journal" },

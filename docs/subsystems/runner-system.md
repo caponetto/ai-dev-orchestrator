@@ -26,7 +26,9 @@ The current code supports:
 - structured protocol transport for capable agents
 - file-backed live request and live response exchange
 
-The CLI composition root probes supported local environments and currently wires built-in runner entries for `claude-code`, `cursor`, and `codex` when available. The Codex runner invokes `codex exec --json --sandbox workspace-write`, forwarding the configured role model through the CLI's `--model` option. It records the completed turn's input and output token usage.
+The CLI composition root probes supported local environments and currently wires built-in runner entries for `claude-code`, `cursor`, and `codex` when available. The Codex runner invokes `codex exec --json --sandbox workspace-write` with `-c sandbox_workspace_write.network_access=true`, forwarding the configured role model through the CLI's `--model` option. Network access is required for PR-review workflows that call `gh pr view`, `gh pr diff`, and similar GitHub API commands; without it, Codex's workspace-write sandbox blocks outbound connections to `api.github.com` even when `gh` is authenticated on the host. It records the completed turn's input and output token usage. Codex does not speak the orchestrator handshake protocol, so the CLI runner uses `stdin: ignore` (prompt is passed via argv; avoids Codex logging "Reading additional input from stdin..." to stderr) and dispatches directly instead of negotiating a resumable session first. Codex also receives `--add-dir ~/.ai` so artifact writes under the orchestrator run directory are permitted alongside the checked-out repository workspace.
+
+Codex approval prompts are bridged to the orchestrator dashboard through a Codex `PermissionRequest` hook. Before each Codex dispatch, the runner writes a per-run hook launcher under `.ai/runs/<run-id>/` and passes a `-c hooks.PermissionRequest=...` override plus `--dangerously-bypass-hook-trust`. The hook invokes `ai codex-permission-hook`, which maps Codex approval requests into the same `DefaultPermissionPolicy` and `FileBackedLiveRequestStore` flow used by Claude Code and Cursor. Writes under `~/.ai/` are auto-granted; other operations surface as dashboard permission prompts.
 
 ## Protocol and Sessions
 
@@ -49,6 +51,7 @@ See `packages/runner/src/infrastructure/runner-system/` for the full set. Core f
 - `agent-task-assembler.ts` — builds agent tasks from workflow state and role contracts
 - `runner-context-assembler.ts` — assembles runtime context for dispatch
 - `cli-agent-runner.ts` — CLI-backed runner adapter
+- `codex-permission-hook.ts` — Codex PermissionRequest hook bridge to dashboard live requests
 - `http-agent-runner.ts` — HTTP-backed runner adapter
 - `parallel-manager.ts` — parallel worker dispatch coordination
 - `worker-spawner.ts` — worker lifecycle management

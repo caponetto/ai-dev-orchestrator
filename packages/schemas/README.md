@@ -16,7 +16,6 @@ None (only external dependency: `zod`).
 src/
   shared/
   artifacts/
-  code-intelligence/
   config/
   dashboard/
   governance/

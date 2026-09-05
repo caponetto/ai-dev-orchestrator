@@ -41,3 +41,5 @@ export { RemoteAgentSessionSupervisor } from './remote-agent-session-supervisor'
 
 export { WebSocketProtocolTransport } from './websocket-protocol-transport';
 export type { WebSocketLike } from './websocket-protocol-transport';
+
+export { CODEX_HOOK_CONTEXT_ENV, handleCodexPermissionHook } from './codex-permission-hook';

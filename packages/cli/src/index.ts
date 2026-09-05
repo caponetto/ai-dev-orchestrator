@@ -8,6 +8,7 @@ import { abortCommand } from './commands/abort';
 import { answerCommand } from './commands/answer';
 import { approveCommand } from './commands/approve';
 import { artifactsCommand } from './commands/artifacts';
+import { codexPermissionHookCommand } from './commands/codex-permission-hook';
 import { configShowCommand } from './commands/config-show';
 import { dashboardCommand } from './commands/dashboard';
 import { initCommand } from './commands/init';
@@ -376,6 +377,13 @@ program
       },
       formatter,
     );
+  });
+
+program
+  .command('codex-permission-hook', { hidden: true })
+  .description('Codex PermissionRequest hook bridge invoked by codex exec')
+  .action(async function () {
+    process.exitCode = await codexPermissionHookCommand();
   });
 
 function createEarlyFormatter(): OutputFormatter {

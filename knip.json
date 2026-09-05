@@ -1,26 +1,48 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignoreBinaries": ["playwright"],
-  "ignoreDependencies": ["turbo"],
   "ignoreWorkspaces": ["packages/dashboard"],
   "workspaces": {
     "packages/*": {
+      "entry": ["src/**/*.test.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/core": {
       "entry": ["src/index.ts", "src/**/*.test.ts", "test/**/*.test.ts"],
       "project": ["src/**/*.ts", "test/**/*.ts"]
     },
-    "packages/cli": {
-      "entry": ["src/index.ts", "src/**/*.test.ts", "esbuild.config.js"],
-      "project": ["src/**/*.ts"],
-      "ignoreDependencies": ["@sourcegraph/scip-typescript", "write-file-atomic"]
+    "packages/workflow": {
+      "entry": ["src/index.ts", "src/**/*.test.ts", "test/**/*.test.ts"],
+      "project": ["src/**/*.ts", "test/**/*.ts"]
     },
-    "packages/prompt-engine": {
+    "packages/dashboard-server": {
+      "entry": ["src/index.ts", "src/**/*.test.ts", "test/**/*.test.ts"],
+      "project": ["src/**/*.ts", "test/**/*.ts"]
+    },
+    "packages/governance": {
       "entry": ["src/index.ts", "src/**/*.test.ts"],
-      "project": ["src/**/*.ts"],
-      "ignoreDependencies": ["@types/diff"]
+      "project": ["src/**/*.ts", "test/**/*.ts"]
+    },
+    "packages/policy-engine": {
+      "entry": ["src/index.ts", "src/**/*.test.ts"],
+      "project": ["src/**/*.ts", "test/**/*.ts"]
+    },
+    "packages/role-system": {
+      "entry": ["src/index.ts", "src/**/*.test.ts"],
+      "project": ["src/**/*.ts", "test/**/*.ts"]
     },
     "packages/build-config": {
-      "entry": ["src/index.ts"],
       "project": ["src/**/*.ts"]
+    },
+    "packages/cli": {
+      "entry": ["src/**/*.test.ts"],
+      "project": ["src/**/*.ts"],
+      "ignoreDependencies": ["write-file-atomic"]
+    },
+    "packages/prompt-engine": {
+      "entry": ["src/**/*.test.ts"],
+      "project": ["src/**/*.ts"],
+      "ignoreDependencies": ["@types/diff"]
     }
   }
 }

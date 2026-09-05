@@ -3,9 +3,10 @@ import type { RunCreationParams } from '@ai-orchestrator/schemas';
 /**
  * Mapping from RunCreationParams optional fields to their CLI flag equivalents.
  * Adding a field to RunCreationParams without updating this map produces a type error.
+ * `runSettings` is API-only and applied by the dashboard server before spawning the CLI.
  */
 const CLI_FLAG_MAP: {
-  readonly [K in keyof Omit<RunCreationParams, 'prompt'>]-?: string;
+  readonly [K in keyof Omit<RunCreationParams, 'prompt' | 'runSettings'>]-?: string;
 } = {
   workflow: '--workflow',
   repoRoot: '--repo',

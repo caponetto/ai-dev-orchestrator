@@ -7,6 +7,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   buildPrDiffArtifact,
   findArtifactContent,
+  findRemoteBranchRef,
+  isGhDiffTooLargeError,
   parseNumstat,
   parseUnifiedDiff,
 } from '../compute-pr-diff';
@@ -222,6 +224,45 @@ describe('findArtifactContent', () => {
 
   it('returns null when artifacts dir does not exist', () => {
     expect(findArtifactContent('/nonexistent/path', 'canonical_specification')).toBeNull();
+  });
+});
+
+describe('findRemoteBranchRef', () => {
+  it('finds an exact remote branch match', () => {
+    const remoteBranches = `  origin/HEAD -> origin/main
+  origin/main
+  origin/develop
+  fork/feat/rate-limiting`;
+
+    expect(findRemoteBranchRef(remoteBranches, 'main')).toBe('origin/main');
+    expect(findRemoteBranchRef(remoteBranches, 'feat/rate-limiting')).toBe(
+      'fork/feat/rate-limiting',
+    );
+  });
+
+  it('ignores HEAD pointer aliases', () => {
+    const remoteBranches = `  origin/HEAD -> origin/main
+  origin/main`;
+
+    expect(findRemoteBranchRef(remoteBranches, 'HEAD')).toBeNull();
+  });
+
+  it('returns null when branch is missing', () => {
+    expect(findRemoteBranchRef('  origin/main', 'develop')).toBeNull();
+  });
+});
+
+describe('isGhDiffTooLargeError', () => {
+  it('detects GitHub too_large diff errors', () => {
+    const error = new Error(
+      'could not find pull request diff: HTTP 406: Sorry, the diff exceeded the maximum number of files (300). PullRequest.diff too_large',
+    );
+
+    expect(isGhDiffTooLargeError(error)).toBe(true);
+  });
+
+  it('returns false for other errors', () => {
+    expect(isGhDiffTooLargeError(new Error('network timeout'))).toBe(false);
   });
 });
 
