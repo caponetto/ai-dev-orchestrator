@@ -1,6 +1,5 @@
 import type {
   ArtifactStore,
-  CodeIntelligence,
   DependencyGraph,
   ExecutionAnalytics,
   ProjectContextStore,
@@ -29,8 +28,6 @@ export class RunnerContextAssembler {
   private readonly roleRegistry: RoleRegistry;
   private readonly promptEngine: PromptEngine;
   private readonly dependencyGraph: DependencyGraph | undefined;
-  private readonly codeIntelligence: CodeIntelligence | undefined;
-  private readonly repoRoot: string | undefined;
   private readonly projectContextStore: ProjectContextStore | undefined;
   private readonly executionAnalytics: ExecutionAnalytics | undefined;
 
@@ -39,8 +36,6 @@ export class RunnerContextAssembler {
     roleRegistry: RoleRegistry,
     promptEngine: PromptEngine,
     dependencyGraph?: DependencyGraph,
-    codeIntelligence?: CodeIntelligence,
-    repoRoot?: string,
     projectContextStore?: ProjectContextStore,
     executionAnalytics?: ExecutionAnalytics,
   ) {
@@ -48,8 +43,6 @@ export class RunnerContextAssembler {
     this.roleRegistry = roleRegistry;
     this.promptEngine = promptEngine;
     this.dependencyGraph = dependencyGraph;
-    this.codeIntelligence = codeIntelligence;
-    this.repoRoot = repoRoot;
     this.projectContextStore = projectContextStore;
     this.executionAnalytics = executionAnalytics;
   }
@@ -101,8 +94,7 @@ export class RunnerContextAssembler {
       }
     }
 
-    const rawArtifacts = await this.resolveArtifacts(request);
-    const inputArtifacts = this.enrichWithCodeIntelligence(rawArtifacts);
+    const inputArtifacts = await this.resolveArtifacts(request);
     this.verifyAccess(role, inputArtifacts);
 
     const defaultTimeout = 600_000;
@@ -179,51 +171,6 @@ export class RunnerContextAssembler {
 
     const permittedSet = new Set<ArtifactType>(permitted);
     return [...needed].filter((t) => permittedSet.has(t));
-  }
-
-  private enrichWithCodeIntelligence(artifacts: ResolvedArtifact[]): ResolvedArtifact[] {
-    const ci = this.codeIntelligence;
-    if (!ci || !this.repoRoot) {
-      return artifacts;
-    }
-
-    if (!artifacts.some((a) => a.ref.type === 'pr_diff_context')) {
-      return artifacts;
-    }
-
-    if (!ci.isIndexed(this.repoRoot)) {
-      return artifacts;
-    }
-
-    try {
-      ci.indexProject(this.repoRoot);
-    } catch {
-      return artifacts;
-    }
-
-    return artifacts.map((artifact) => {
-      if (artifact.ref.type !== 'pr_diff_context') {
-        return artifact;
-      }
-
-      try {
-        const parsed = JSON.parse(artifact.content) as Record<string, unknown>;
-        const diff = parsed['diff'];
-        if (typeof diff !== 'string') {
-          return artifact;
-        }
-
-        const codeBundle = ci.symbolsFromRawDiff(diff);
-        if (codeBundle.symbols.length === 0 && codeBundle.relatedDefinitions.length === 0) {
-          return artifact;
-        }
-
-        const enriched = { ...parsed, codeIntelligence: codeBundle };
-        return { ref: artifact.ref, content: JSON.stringify(enriched, null, 2) };
-      } catch {
-        return artifact;
-      }
-    });
   }
 
   private async resolveArtifacts(request: DispatchRequest): Promise<ResolvedArtifact[]> {

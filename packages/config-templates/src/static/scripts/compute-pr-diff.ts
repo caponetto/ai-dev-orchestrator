@@ -172,19 +172,193 @@ export function findArtifactContent(artifactsDir: string, type: string): string 
   return files[0] ? join(typeDir, files[0]) : null;
 }
 
+const GIT_DIFF_TIMEOUT_MS = 120_000;
+
 function git(repoRoot: string, ...args: string[]): string {
   return execFileSync('git', ['-C', repoRoot, ...args], {
     encoding: 'utf-8',
-    timeout: 30_000,
+    timeout: GIT_DIFF_TIMEOUT_MS,
   }).trim();
+}
+
+function gitFetch(repoRoot: string, remote: string, ref: string): void {
+  execFileSync('git', ['-C', repoRoot, 'fetch', remote, ref], {
+    encoding: 'utf-8',
+    timeout: GIT_DIFF_TIMEOUT_MS,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
 }
 
 function ghPrDiff(prNumber: number, repoUrl: string): string {
   const repoSlug = repoUrl.replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '');
   return execFileSync('gh', ['pr', 'diff', String(prNumber), '--repo', repoSlug], {
     encoding: 'utf-8',
-    timeout: 30_000,
+    timeout: GIT_DIFF_TIMEOUT_MS,
   }).trim();
+}
+
+export function findRemoteBranchRef(
+  remoteBranchesOutput: string,
+  branchName: string,
+): string | null {
+  for (const line of remoteBranchesOutput.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.includes('->')) {
+      continue;
+    }
+
+    const slashIndex = trimmed.indexOf('/');
+    if (slashIndex === -1) {
+      continue;
+    }
+
+    const remoteBranchName = trimmed.slice(slashIndex + 1);
+    if (remoteBranchName === branchName) {
+      return trimmed;
+    }
+  }
+
+  return null;
+}
+
+export function isGhDiffTooLargeError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('too_large') || message.includes('exceeded the maximum number of files');
+}
+
+function ghPrRefOids(
+  prNumber: number,
+  repoUrl: string,
+): { baseRefOid: string; headRefOid: string } | null {
+  const repoSlug = repoUrl.replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '');
+  try {
+    const output = execFileSync(
+      'gh',
+      ['pr', 'view', String(prNumber), '--repo', repoSlug, '--json', 'baseRefOid,headRefOid'],
+      {
+        encoding: 'utf-8',
+        timeout: 30_000,
+      },
+    ).trim();
+    const parsed = JSON.parse(output) as { baseRefOid?: string; headRefOid?: string };
+    if (!parsed.baseRefOid || !parsed.headRefOid) {
+      return null;
+    }
+    return { baseRefOid: parsed.baseRefOid, headRefOid: parsed.headRefOid };
+  } catch {
+    return null;
+  }
+}
+
+function resolveLocalGitDiff(
+  repoRoot: string,
+  baseRef: string,
+  headRef: string,
+  prNumber?: number,
+  repositoryUrl?: string,
+): { diff: string; numstat: string } | null {
+  try {
+    return resolveLocalGitDiffInternal(repoRoot, baseRef, headRef, prNumber, repositoryUrl);
+  } catch {
+    return null;
+  }
+}
+
+function resolveLocalGitDiffInternal(
+  repoRoot: string,
+  baseRef: string,
+  headRef: string,
+  prNumber?: number,
+  repositoryUrl?: string,
+): { diff: string; numstat: string } | null {
+  const remoteBranches = git(repoRoot, 'branch', '-r');
+  const baseRemoteRef = findRemoteBranchRef(remoteBranches, baseRef);
+  const headRemoteRef = findRemoteBranchRef(remoteBranches, headRef);
+
+  const strategies: Array<{ base: string; head: string }> = [];
+
+  if (baseRemoteRef && headRemoteRef) {
+    strategies.push({ base: baseRemoteRef, head: headRemoteRef });
+  }
+
+  if (baseRemoteRef) {
+    strategies.push({ base: baseRemoteRef, head: 'HEAD' });
+  }
+
+  const primaryRemote = git(repoRoot, 'remote').split('\n')[0]?.trim() ?? 'origin';
+  strategies.push({ base: `${primaryRemote}/${baseRef}`, head: 'HEAD' });
+  strategies.push({ base: `${primaryRemote}/${baseRef}`, head: `${primaryRemote}/${headRef}` });
+
+  const seen = new Set<string>();
+
+  for (const strategy of strategies) {
+    const key = `${strategy.base}...${strategy.head}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+
+    try {
+      const diff = git(repoRoot, 'diff', `${strategy.base}...${strategy.head}`);
+      if (!diff) {
+        continue;
+      }
+
+      const numstat = git(repoRoot, 'diff', '--numstat', `${strategy.base}...${strategy.head}`);
+      return { diff, numstat };
+    } catch {
+      // Try the next strategy.
+    }
+  }
+
+  try {
+    gitFetch(repoRoot, primaryRemote, baseRef);
+    const fetchedBaseRef = `${primaryRemote}/${baseRef}`;
+    const diff = git(repoRoot, 'diff', `${fetchedBaseRef}...HEAD`);
+    if (diff) {
+      const numstat = git(repoRoot, 'diff', '--numstat', `${fetchedBaseRef}...HEAD`);
+      return { diff, numstat };
+    }
+  } catch {
+    // Try the next strategy.
+  }
+
+  try {
+    gitFetch(repoRoot, primaryRemote, headRef);
+    const fetchedBaseRef = `${primaryRemote}/${baseRef}`;
+    const fetchedHeadRef = `${primaryRemote}/${headRef}`;
+    const diff = git(repoRoot, 'diff', `${fetchedBaseRef}...${fetchedHeadRef}`);
+    if (diff) {
+      const numstat = git(repoRoot, 'diff', '--numstat', `${fetchedBaseRef}...${fetchedHeadRef}`);
+      return { diff, numstat };
+    }
+  } catch {
+    // Try the next strategy.
+  }
+
+  if (prNumber && repositoryUrl) {
+    const oids = ghPrRefOids(prNumber, repositoryUrl);
+    if (oids) {
+      try {
+        gitFetch(repoRoot, primaryRemote, oids.baseRefOid);
+        gitFetch(repoRoot, primaryRemote, oids.headRefOid);
+        const diff = git(repoRoot, 'diff', `${oids.baseRefOid}...${oids.headRefOid}`);
+        if (diff) {
+          const numstat = git(
+            repoRoot,
+            'diff',
+            '--numstat',
+            `${oids.baseRefOid}...${oids.headRefOid}`,
+          );
+          return { diff, numstat };
+        }
+      } catch {
+        // Fall through.
+      }
+    }
+  }
+
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -225,33 +399,43 @@ if (isMainModule) {
   let diff = '';
   let numstat = '';
 
-  try {
-    const remoteOutput = git(repoRoot, 'remote', '-v');
-    const remoteName = remoteOutput.split('\n')[0]?.split(/\s/)[0] ?? 'origin';
-    const remoteBranches = git(repoRoot, 'branch', '-r');
-
-    const hasBase = remoteBranches.includes(`${remoteName}/${baseRef}`);
-    const hasHead = remoteBranches.includes(`${remoteName}/${headRef}`);
-
-    if (hasBase && hasHead) {
-      diff = git(repoRoot, 'diff', `${remoteName}/${baseRef}...${remoteName}/${headRef}`);
-      numstat = git(
-        repoRoot,
-        'diff',
-        '--numstat',
-        `${remoteName}/${baseRef}...${remoteName}/${headRef}`,
-      );
-    }
-  } catch {
-    // Fall through to gh CLI
+  const localDiff = resolveLocalGitDiff(
+    repoRoot,
+    baseRef,
+    headRef,
+    prMeta.number,
+    prMeta.repositoryUrl,
+  );
+  if (localDiff) {
+    diff = localDiff.diff;
+    numstat = localDiff.numstat;
   }
 
   if (!diff && prMeta.number && prMeta.repositoryUrl) {
     try {
       diff = ghPrDiff(prMeta.number, prMeta.repositoryUrl);
     } catch (err) {
-      console.error(`gh pr diff failed: ${String(err)}`);
-      process.exit(1);
+      if (isGhDiffTooLargeError(err)) {
+        const fetchedLocalDiff = resolveLocalGitDiff(
+          repoRoot,
+          baseRef,
+          headRef,
+          prMeta.number,
+          prMeta.repositoryUrl,
+        );
+        if (fetchedLocalDiff) {
+          diff = fetchedLocalDiff.diff;
+          numstat = fetchedLocalDiff.numstat;
+        } else {
+          console.error(
+            `gh pr diff exceeded GitHub file limit and local git diff could not be computed`,
+          );
+          process.exit(1);
+        }
+      } else {
+        console.error(`gh pr diff failed: ${String(err)}`);
+        process.exit(1);
+      }
     }
   }
 

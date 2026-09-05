@@ -360,6 +360,48 @@ describe('composition-root orchestrator creation', () => {
     }
   });
 
+  it('resumeOrchestrator loads workflow from checkpoint when workflow-definition.json is missing', async () => {
+    process.env['AI_ORCHESTRATOR_FIXTURE'] = '1';
+    try {
+      const ctx = await createOrchestrator(baseDir);
+      const runId = ctx.runId;
+      const runDir = ctx.runDir;
+      ctx.shutdownCoordinator?.uninstall();
+
+      const statePersistence = new DefaultStatePersistence(mockPaths.runsDir);
+      const checkpoint: PersistedState = {
+        runId: runId as RunId,
+        schemaVersion: 2,
+        currentState: 'SETUP',
+        previousState: null,
+        stateEnteredAt: new Date().toISOString(),
+        transitionCount: 0,
+        stateHistory: ['SETUP'],
+        iterationCounts: {},
+        activeArtifacts: [],
+        lastProducedArtifact: null,
+        workflowName: 'pr-review',
+        workflowVersion: '1.0.0',
+        persistedAt: new Date().toISOString(),
+        persistenceVersion: 1,
+        checksum: '',
+      };
+      await statePersistence.save(checkpoint);
+      rmSync(join(runDir, 'workflow-definition.json'), { force: true });
+      writeFileSync(join(runDir, 'journal.md'), `# Journal — ${runId}\n`, 'utf8');
+
+      const resumed = await resumeOrchestrator(baseDir, runId);
+      resumed.shutdownCoordinator?.uninstall();
+
+      expect(resumed.engine.getState().currentState).toBe('SETUP');
+      await expect(resumed.engine.retry()).resolves.toMatchObject({
+        runId,
+      });
+    } finally {
+      delete process.env['AI_ORCHESTRATOR_FIXTURE'];
+    }
+  });
+
   it('createRunConfig passes alertThresholds through to WorkflowRunConfig', () => {
     const config = createRunConfig('run-test', ['source'], undefined, {
       alertThresholds: [0.5, 0.8, 0.95],

@@ -1,5 +1,5 @@
 import { mkdtemp, readFile, rm, writeFile, mkdir } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import type { AgentAdapter } from '@ai-orchestrator/agent-adapters';
@@ -11,9 +11,15 @@ import type {
   PermissionPolicy,
 } from '@ai-orchestrator/ports';
 import type { AgentTask } from '@ai-orchestrator/schemas';
+import { AI_CONFIG_DIR_NAME } from '@ai-orchestrator/schemas';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { buildAgentTaskPrompt, CliAgentRunner, extractUsageFromRawLine } from '../cli-agent-runner';
+import {
+  buildAgentTaskPrompt,
+  CliAgentRunner,
+  extractArtifactJsonFromAgentText,
+  extractUsageFromRawLine,
+} from '../cli-agent-runner';
 import type { LiveRequestStore } from '../file-backed-live-request-store';
 import type { PermissionApprovalStore } from '../permission-approval-store';
 import { serializeMessage } from '../protocol-serializer';
@@ -573,6 +579,42 @@ describe('CliAgentRunner', () => {
       expect(result.error).toContain('Failed to read agent output artifact');
     });
 
+    it('uses adapter agent-message JSON fallback when output file is missing', async () => {
+      const artifactJson = JSON.stringify({ id: 'ctx-1', version: 1, title: 'Context' });
+      const adapter: AgentAdapter = {
+        name: 'codex',
+        command: 'bash',
+        args: [
+          '-c',
+          `echo '${artifactJson.replaceAll("'", "'\\''")}'; echo '{"type":"turn.completed"}'`,
+        ],
+        supportsProtocolHandshake: false,
+        translateOutput(line: string): ProtocolMessage | null {
+          if (line.includes('turn.completed')) {
+            return createProtocolMessage('done', { summary: 'completed' });
+          }
+          if (line.startsWith('{') && line.includes('"id"')) {
+            return createProtocolMessage('progress', {
+              phase: 'generating',
+              detail: line,
+            });
+          }
+          return null;
+        },
+      };
+
+      const runner = new CliAgentRunner({
+        command: 'bash',
+        args: [],
+        adapter,
+        handshakeTimeoutMs: 300,
+      });
+
+      const result = await runner.dispatch(makeTask());
+      expect(result.status).toBe('success');
+      expect(result.artifactContent).toBe(artifactJson);
+    });
+
     it('tracks cumulative Claude Code token usage via high-water mark in legacy mode', async () => {
       const task = makeTask();
       await preWriteOutput(task, { summary: 'done' });
@@ -688,6 +730,88 @@ PY`,
       expect(args[modelIdx + 1]).toBe('claude-opus-4-20250514');
     });
 
+    it('injects codex permission hook args when bridge is configured', async () => {
+      const task = makeTask();
+      await preWriteOutput(task, { summary: 'done' });
+      const capturedArgsPath = join(tempDir, 'codex-hook-args.json');
+      const adapter: AgentAdapter = {
+        name: 'codex',
+        command: 'bash',
+        args: [
+          '-c',
+          `python3 - <<'PY' "$0" "$@"
+import json
+import sys
+
+with open(${JSON.stringify(capturedArgsPath)}, "w", encoding="utf-8") as handle:
+    json.dump(sys.argv[1:], handle)
+PY`,
+        ],
+        supportsProtocolHandshake: false,
+      };
+
+      const runner = new CliAgentRunner({
+        command: 'bash',
+        args: [],
+        adapter,
+        handshakeTimeoutMs: 300,
+      });
+      runner.setCodexPermissionBridge({
+        runsDir: join(tempDir, 'runs'),
+        cliEntryPath: join(tempDir, 'ai', 'index.js'),
+      });
+      runner.setPermissionPolicyConfig({ defaultAction: 'ask_human' });
+
+      const result = await runner.dispatch(task);
+      expect(result.status).toBe('success');
+
+      const serializedArgs = await readFile(capturedArgsPath, 'utf-8');
+      const args = JSON.parse(serializedArgs) as string[];
+      expect(args).toContain('--dangerously-bypass-hook-trust');
+      expect(args).toContain('-c');
+      expect(args.some((arg) => arg.includes('hooks.PermissionRequest'))).toBe(true);
+
+      const hookScript = join(task.runDir, 'codex-permission-hook.sh');
+      await expect(readFile(hookScript, 'utf-8')).resolves.toContain('codex-permission-hook');
+    });
+
+    it('injects --add-dir for codex so ~/.ai artifact writes are sandbox-allowed', async () => {
+      const task = makeTask();
+      await preWriteOutput(task, { summary: 'done' });
+      const capturedArgsPath = join(tempDir, 'codex-add-dir-args.json');
+      const adapter: AgentAdapter = {
+        name: 'codex',
+        command: 'bash',
+        args: [
+          '-c',
+          `python3 - <<'PY' "$0" "$@"
+import json
+import sys
+
+with open(${JSON.stringify(capturedArgsPath)}, "w", encoding="utf-8") as handle:
+    json.dump(sys.argv[1:], handle)
+PY`,
+        ],
+        supportsProtocolHandshake: false,
+      };
+
+      const runner = new CliAgentRunner({
+        command: 'bash',
+        args: [],
+        adapter,
+        handshakeTimeoutMs: 300,
+      });
+
+      const result = await runner.dispatch(task);
+      expect(result.status).toBe('success');
+
+      const serializedArgs = await readFile(capturedArgsPath, 'utf-8');
+      const args = JSON.parse(serializedArgs) as string[];
+      const addDirIdx = args.indexOf('--add-dir');
+      expect(addDirIdx).toBeGreaterThanOrEqual(0);
+      expect(args[addDirIdx + 1]).toBe(join(homedir(), AI_CONFIG_DIR_NAME));
+    });
+
     it('does not inject --model when modelHint is absent', async () => {
       const task = makeTask();
       await preWriteOutput(task, { summary: 'done' });
@@ -755,6 +879,41 @@ PY`,
       expect(parsed.type).toBe('user');
       expect(parsed.message.role).toBe('user');
       expect(parsed.message.content).toContain('Read the JSON task file');
+    });
+
+    it('uses stdin ignore for prompt-arg adapters without promptViaStdin', async () => {
+      const task = makeTask();
+      await preWriteOutput(task, { summary: 'done' });
+      const stdinBytesPath = join(tempDir, 'stdin-bytes.txt');
+
+      const adapter: AgentAdapter = {
+        name: 'codex',
+        command: 'bash',
+        args: [
+          '-c',
+          `wc -c <&0 | tr -d ' ' > ${JSON.stringify(stdinBytesPath)}; echo '{"type":"turn.completed"}'`,
+        ],
+        supportsProtocolHandshake: false,
+        translateOutput(line: string): ProtocolMessage | null {
+          if (line.includes('turn.completed')) {
+            return createProtocolMessage('done', { summary: 'ok' });
+          }
+          return null;
+        },
+      };
+
+      const runner = new CliAgentRunner({
+        command: 'bash',
+        args: [],
+        adapter,
+        handshakeTimeoutMs: 300,
+      });
+
+      const result = await runner.dispatch(task);
+      expect(result.status).toBe('success');
+
+      const stdinBytes = await readFile(stdinBytesPath, 'utf-8');
+      expect(stdinBytes.trim()).toBe('0');
     });
 
     it('skips --allowedTools and prompt arg when adapter has promptViaStdin=true', async () => {
@@ -1109,9 +1268,21 @@ describe('extractUsageFromRawLine', () => {
     });
     expect(extractUsageFromRawLine(line)).toEqual({
       inputTokens: 12000,
-      outputTokens: 3500,
+      outputTokens: 4500,
       isFinal: true,
     });
+  });
+
+  it('does not double-count Codex cached_input_tokens against input_tokens', () => {
+    const line = JSON.stringify({
+      type: 'turn.completed',
+      usage: {
+        input_tokens: 12000,
+        cached_input_tokens: 11000,
+        output_tokens: 3500,
+      },
+    });
+    expect(extractUsageFromRawLine(line)?.inputTokens).toBe(12000);
   });
 
   it('extracts Cursor camelCase usage from assistant event without cumulative flag', () => {
@@ -1175,6 +1346,18 @@ describe('extractUsageFromRawLine', () => {
     expect(usage?.outputTokens).toBe(800);
     // Cursor-style events without input_tokens/cache fields should NOT have cumulative
     expect(usage?.cumulative).toBeUndefined();
+  });
+});
+
+describe('extractArtifactJsonFromAgentText', () => {
+  it('returns JSON objects emitted as agent text', () => {
+    const json = '{"id":"ctx-1","version":1,"title":"Context"}';
+    expect(extractArtifactJsonFromAgentText(json)).toBe(json);
+  });
+
+  it('returns null for non-JSON text', () => {
+    expect(extractArtifactJsonFromAgentText('Implemented it')).toBeNull();
+    expect(extractArtifactJsonFromAgentText('[1,2,3]')).toBeNull();
   });
 });
 
@@ -2450,6 +2633,44 @@ PY`,
 
     const result = await runner.dispatchWithSession(task);
     expect(result.kind).toBe('terminal');
+  }, 15000);
+
+  it('dispatchWithSession skips handshake and single-spawns non-protocol adapters', async () => {
+    const task = makeTask();
+    await preWriteOutput(task, { summary: 'done' });
+    const launchCountPath = join(tempDir, 'launch-count.txt');
+
+    const adapter: AgentAdapter = {
+      name: 'codex',
+      command: 'bash',
+      args: [
+        '-c',
+        `count=$(cat ${JSON.stringify(launchCountPath)} 2>/dev/null || echo 0); echo $((count + 1)) > ${JSON.stringify(launchCountPath)}; echo '{"type":"turn.completed"}'`,
+      ],
+      supportsProtocolHandshake: false,
+      translateOutput(line: string): ProtocolMessage | null {
+        if (line.includes('turn.completed')) {
+          return createProtocolMessage('done', { summary: 'ok' });
+        }
+        return null;
+      },
+    };
+
+    const runner = new CliAgentRunner({
+      command: 'bash',
+      args: [],
+      adapter,
+      handshakeTimeoutMs: 5000,
+    });
+
+    const result = await runner.dispatchWithSession(task);
+    expect(result.kind).toBe('terminal');
+    if (result.kind === 'terminal') {
+      expect(result.result.status).toBe('success');
+    }
+
+    const launches = await readFile(launchCountPath, 'utf-8');
+    expect(launches.trim()).toBe('1');
   }, 15000);
 
   it('legacy mode extracts token usage from stdout lines', async () => {

@@ -122,7 +122,7 @@ describe('FilesystemSettingsProvider', () => {
       const patch: Partial<ProjectSettingsView> = {
         roles: {
           assignments: {
-            planner: { model: 'gpt-5.4-medium' },
+            planner: { model: 'cursor-grok-4.6-medium' },
             implementer: { model: 'claude-opus-4-8' },
           },
         },
@@ -140,7 +140,7 @@ describe('FilesystemSettingsProvider', () => {
       const patch: Partial<ProjectSettingsView> = {
         roles: {
           assignments: {
-            planner: { model: 'gpt-5.4-medium', runner: 'cursor' },
+            planner: { model: 'cursor-grok-4.6-medium', runner: 'cursor' },
             implementer: { model: 'claude-opus-4-8', runner: 'claude-code' },
           },
         },
@@ -150,7 +150,7 @@ describe('FilesystemSettingsProvider', () => {
       expect(result.ok).toBe(true);
 
       const rolesContent = readFileSync(join(aiConfigDir, 'roles.yaml'), 'utf-8');
-      expect(rolesContent).toContain('gpt-5.4-medium');
+      expect(rolesContent).toContain('cursor-grok-4.6-medium');
       expect(rolesContent).toContain('cursor');
     });
   });
@@ -276,7 +276,7 @@ describe('FilesystemSettingsProvider', () => {
       const patch: Partial<ProjectSettingsView> = {
         roles: {
           assignments: {
-            planner: { model: 'gpt-5.4-medium' },
+            planner: { model: 'cursor-grok-4.6-medium' },
             implementer: { model: 'claude-opus-4-8' },
           },
         },
@@ -296,7 +296,7 @@ describe('FilesystemSettingsProvider', () => {
       const patch: Partial<ProjectSettingsView> = {
         roles: {
           assignments: {
-            planner: { model: 'gpt-5.4-medium' },
+            planner: { model: 'cursor-grok-4.6-medium' },
             implementer: { model: 'claude-opus-4-8' },
           },
         },
@@ -433,10 +433,10 @@ describe('FilesystemSettingsProvider', () => {
 
     it('returns YAML role overrides rather than defaults', () => {
       writeYaml(aiConfigDir, 'roles.yaml', {
-        roles: [{ id: 'planner', model: 'gpt-5.4-medium', runner: 'cursor' }],
+        roles: [{ id: 'planner', model: 'cursor-grok-4.6-medium', runner: 'cursor' }],
       });
       const settings = provider.getProjectSettings();
-      expect(settings?.roles.assignments['planner'].model).toBe('gpt-5.4-medium');
+      expect(settings?.roles.assignments['planner'].model).toBe('cursor-grok-4.6-medium');
       expect(settings?.roles.assignments['planner'].runner).toBe('cursor');
     });
 

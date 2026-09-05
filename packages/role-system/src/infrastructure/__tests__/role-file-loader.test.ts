@@ -52,13 +52,13 @@ roles:
     dispatch_type: agent
     runner: cursor
     agent_config:
-      model: gpt-5.4-medium
+      model: cursor-grok-4.6-medium
 `;
     const roles = loadRolesFromYaml(yaml);
     expect(roles[0].agreementParticipation).toEqual([
       { agreementType: 'planning_agreement', action: 'reviewed' },
     ]);
-    expect(roles[0].agentConfig).toEqual({ model: 'gpt-5.4-medium' });
+    expect(roles[0].agentConfig).toEqual({ model: 'cursor-grok-4.6-medium' });
   });
 
   it('loads roles from a file path', () => {

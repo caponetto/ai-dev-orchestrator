@@ -45,6 +45,7 @@ Before producing output, perform this internal analysis. Do not include private 
 7. **Review dependency usage** — Check for known vulnerability patterns in how dependencies are used (e.g., unsafe deserialization, prototype pollution, XML external entities).
 8. **Check cryptographic usage** — If crypto is present, verify algorithm choices (no MD5/SHA1 for security), key management, and IV/nonce handling.
 9. **Assess context** — Consider the deployment context. An internal admin tool has different risk than a public API. Calibrate findings accordingly.
+   - **Stream authorization model:** For SSE/WebSocket/long-poll endpoints, distinguish exploitable defects (missing auth, IDOR, cross-namespace leak — `major`/`critical`) from session lifetime policy (auth checked only at connect; mid-stream re-auth is a design choice unless policy requires revocation — `minor` or risks, not automatic `request_changes`).
 10. **Render verdict** — Set approved=true only if there are zero critical findings and no combination of major findings that create an exploitable path.
 
 ## Review Criteria

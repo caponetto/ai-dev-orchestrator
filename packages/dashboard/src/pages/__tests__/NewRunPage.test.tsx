@@ -383,7 +383,7 @@ describe('NewRunPage', () => {
 
   it('submit with dirty settings that fail to save', async () => {
     server.use(
-      http.put('/api/settings', () => HttpResponse.json({ ok: false, error: 'save failed' })),
+      http.post('/api/runs', () => HttpResponse.json({ success: false, error: 'save failed' })),
     );
 
     renderWithRouter(<NewRunPage />);
@@ -412,6 +412,46 @@ describe('NewRunPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('save failed')).toBeTruthy();
+    });
+  });
+
+  it('includes runSettings in createRun request', async () => {
+    let capturedBody: Record<string, unknown> | undefined;
+    server.use(
+      http.post('/api/runs', async ({ request }) => {
+        capturedBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ success: true, runId: 'new-run-1' });
+      }),
+    );
+
+    renderWithRouter(<NewRunPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Run Configuration')).toBeTruthy();
+    });
+
+    const textarea = screen.getByPlaceholderText('Describe the task...');
+    fireEvent.change(textarea, { target: { value: 'Build a feature' } });
+
+    const startButton = screen.getByText('Start Run');
+    fireEvent.click(startButton);
+
+    await waitFor(() => {
+      expect(capturedBody).toBeDefined();
+    });
+    expect(capturedBody?.['prompt']).toBe('Build a feature');
+    expect(capturedBody?.['runSettings']).toEqual({
+      roles: { assignments: {} },
+      governance: {
+        permissionPolicy: { defaultAction: 'ask_human' },
+        iterationLimits: { defaults: {} },
+        qualityGates: {
+          specificationReadiness: { minCompletenessScore: 0 },
+          implementationReview: { maxHighSeverityFindings: 0, maxMediumSeverityFindings: 0 },
+        },
+        budget: {},
+      },
+      runtime: { logLevel: 'info' },
     });
   });
 

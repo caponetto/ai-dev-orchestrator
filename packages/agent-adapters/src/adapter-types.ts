@@ -15,6 +15,8 @@ export interface AgentAdapter {
   readonly command: string;
   readonly args: readonly string[];
   readonly promptViaStdin?: boolean;
+  /** When false, the runner skips protocol handshake and resumable session negotiation. */
+  readonly supportsProtocolHandshake?: boolean;
 
   translateOutput?(line: string): ProtocolMessage | null;
   translateInput?(message: ProtocolMessage): string | null;

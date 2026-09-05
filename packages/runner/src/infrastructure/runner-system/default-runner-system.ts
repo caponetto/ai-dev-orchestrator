@@ -5,7 +5,6 @@ import type {
   SessionCapableRunner,
   AgentSessionSupervisor,
   ArtifactStore,
-  CodeIntelligence,
   DependencyGraph,
   EventBus,
   ExecutionAnalytics,
@@ -54,7 +53,6 @@ interface RunnerSystemOptions {
   readonly runDir?: string;
   readonly sessionSupervisor?: AgentSessionSupervisor;
   readonly dependencyGraph?: DependencyGraph;
-  readonly codeIntelligence?: CodeIntelligence;
   readonly projectContextStore?: ProjectContextStore;
   readonly executionAnalytics?: ExecutionAnalytics;
 }
@@ -92,8 +90,6 @@ export class DefaultRunnerSystem implements RunnerSystem {
       roleRegistry,
       promptEngine,
       options?.dependencyGraph,
-      options?.codeIntelligence,
-      options?.repoRoot,
       options?.projectContextStore,
       options?.executionAnalytics,
     );

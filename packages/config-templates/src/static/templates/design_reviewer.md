@@ -65,6 +65,8 @@ Before producing output, perform this internal analysis. Do not include private 
 
 **Test coverage calibration:** Missing focused unit tests for new code is `minor` when broader test coverage (E2E, integration, Cypress) already exercises the behavior. Elevate to `major` only when the test gap demonstrably conceals or enables a concrete bug — i.e., you can describe a specific scenario that the existing tests miss AND that would produce wrong behavior. "This new hook lacks dedicated unit tests" alone is a test-strategy recommendation (`minor`), not a design defect.
 
+**Refactor suggestions:** Recommending extraction of debounce/timer bookkeeping or shortening a single function is `minor` maintainability, never `major`, unless the complexity caused a verified bug. DRY duplication between streaming and non-streaming handlers is `minor` unless the diff shows divergent behavior.
+
 Category must be one of: `correctness`, `maintainability`, `security`, `performance`, `api_consistency`, `readability`.
 
 ## Anti-Patterns

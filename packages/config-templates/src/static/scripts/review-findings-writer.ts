@@ -53,25 +53,24 @@ interface CanonicalSpecification {
     readonly number?: number;
     readonly repositoryUrl?: string;
   };
-  readonly correlation?: {
-    readonly addressed?: ReadonlyArray<{
-      readonly criterion: string;
-      readonly evidence?: string;
-    }>;
-    readonly partiallyAddressed?: ReadonlyArray<{
-      readonly criterion: string;
-      readonly note?: string;
-    }>;
-    readonly notAddressed?: ReadonlyArray<{
-      readonly criterion: string;
-      readonly note?: string;
-    }>;
-    readonly untrackedChanges?: ReadonlyArray<{
-      readonly file: string;
-      readonly description: string;
-    }>;
-  };
+  readonly correlation?: Correlation;
   readonly risks?: readonly string[];
+}
+
+interface CriterionEntry {
+  readonly criterion: string;
+  readonly evidence?: string;
+  readonly note?: string;
+}
+
+interface Correlation {
+  readonly addressed?: ReadonlyArray<CriterionEntry>;
+  readonly partiallyAddressed?: ReadonlyArray<CriterionEntry>;
+  readonly notAddressed?: ReadonlyArray<CriterionEntry>;
+  readonly untrackedChanges?: ReadonlyArray<{
+    readonly file: string;
+    readonly description: string;
+  }>;
 }
 
 interface OutputFinding {
@@ -254,6 +253,143 @@ function deduplicateFindings(findings: OutputFinding[]): OutputFinding[] {
 }
 
 // ---------------------------------------------------------------------------
+// Acceptance criteria reconciliation
+// ---------------------------------------------------------------------------
+
+const STOP_WORDS = new Set([
+  'about',
+  'after',
+  'also',
+  'and',
+  'are',
+  'been',
+  'before',
+  'being',
+  'both',
+  'but',
+  'can',
+  'could',
+  'does',
+  'each',
+  'from',
+  'have',
+  'into',
+  'just',
+  'more',
+  'most',
+  'must',
+  'only',
+  'other',
+  'should',
+  'such',
+  'than',
+  'that',
+  'the',
+  'their',
+  'them',
+  'then',
+  'there',
+  'these',
+  'they',
+  'this',
+  'those',
+  'through',
+  'under',
+  'very',
+  'what',
+  'when',
+  'which',
+  'while',
+  'will',
+  'with',
+  'without',
+  'would',
+]);
+
+function significantTerms(text: string): Set<string> {
+  const words = text
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .split(/\s+/)
+    .filter((word) => word.length >= 4 && !STOP_WORDS.has(word));
+  return new Set(words);
+}
+
+function termsOverlap(a: Set<string>, b: Set<string>): boolean {
+  let overlap = 0;
+  for (const term of a) {
+    if (b.has(term)) {
+      overlap++;
+    }
+  }
+  if (a.size <= 3 || b.size <= 3) {
+    return overlap >= 1;
+  }
+  return overlap >= 2;
+}
+
+function findingContradictsCriterion(criterion: string, finding: ReviewReportFinding): boolean {
+  if (!isBlockingAttribution(finding.attribution)) {
+    return false;
+  }
+  if (finding.severity !== 'critical' && finding.severity !== 'major') {
+    return false;
+  }
+  if (
+    finding.category !== 'correctness' &&
+    finding.category !== 'security' &&
+    finding.category !== 'performance'
+  ) {
+    return false;
+  }
+  return termsOverlap(significantTerms(criterion), significantTerms(finding.description));
+}
+
+function reconcileAcceptanceCriteria(
+  correlation: Correlation,
+  findings: readonly ReviewReportFinding[],
+): {
+  addressed?: CriterionEntry[];
+  partiallyAddressed?: CriterionEntry[];
+  notAddressed?: CriterionEntry[];
+} {
+  const stillAddressed: CriterionEntry[] = [];
+  const partiallyAddressed = [...(correlation.partiallyAddressed ?? [])];
+
+  for (const entry of correlation.addressed ?? []) {
+    const contradicting = findings.find((finding) =>
+      findingContradictsCriterion(entry.criterion, finding),
+    );
+    if (contradicting) {
+      partiallyAddressed.push({
+        criterion: entry.criterion,
+        note: `Contradicted by review finding: ${contradicting.description.slice(0, 200)}`,
+      });
+    } else {
+      stillAddressed.push(entry);
+    }
+  }
+
+  const result: {
+    addressed?: CriterionEntry[];
+    partiallyAddressed?: CriterionEntry[];
+    notAddressed?: CriterionEntry[];
+  } = {};
+
+  if (stillAddressed.length > 0) {
+    result.addressed = stillAddressed;
+  }
+  if (partiallyAddressed.length > 0) {
+    result.partiallyAddressed = partiallyAddressed;
+  }
+  if (correlation.notAddressed && correlation.notAddressed.length > 0) {
+    result.notAddressed = [...correlation.notAddressed];
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Core transform
 // ---------------------------------------------------------------------------
 
@@ -278,15 +414,16 @@ export function transform(report: ReviewReport, spec?: CanonicalSpecification): 
   result['summary'] = report.summary;
 
   if (spec?.correlation) {
+    const reconciled = reconcileAcceptanceCriteria(spec.correlation, report.findings);
     const ac: Record<string, unknown> = {};
-    if (spec.correlation.addressed && spec.correlation.addressed.length > 0) {
-      ac['addressed'] = spec.correlation.addressed;
+    if (reconciled.addressed && reconciled.addressed.length > 0) {
+      ac['addressed'] = reconciled.addressed;
     }
-    if (spec.correlation.partiallyAddressed && spec.correlation.partiallyAddressed.length > 0) {
-      ac['partiallyAddressed'] = spec.correlation.partiallyAddressed;
+    if (reconciled.partiallyAddressed && reconciled.partiallyAddressed.length > 0) {
+      ac['partiallyAddressed'] = reconciled.partiallyAddressed;
     }
-    if (spec.correlation.notAddressed && spec.correlation.notAddressed.length > 0) {
-      ac['notAddressed'] = spec.correlation.notAddressed;
+    if (reconciled.notAddressed && reconciled.notAddressed.length > 0) {
+      ac['notAddressed'] = reconciled.notAddressed;
     }
     if (Object.keys(ac).length > 0) {
       result['acceptanceCriteria'] = ac;

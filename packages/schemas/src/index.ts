@@ -8,4 +8,3 @@ export * from './dashboard';
 export * from './config';
 export * from './observability';
 export * from './persistence';
-export * from './code-intelligence';

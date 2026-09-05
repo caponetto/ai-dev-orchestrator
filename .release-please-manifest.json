@@ -6,7 +6,6 @@
   "packages/artifacts": "1.0.0",
   "packages/agent-protocol": "1.0.0",
   "packages/agent-adapters": "1.0.0",
-  "packages/code-intelligence": "1.0.0",
   "packages/dependency-graph": "1.0.0",
   "packages/governance": "1.0.0",
   "packages/journal": "1.0.0",

@@ -43,8 +43,10 @@ Before producing output, perform this internal analysis. Do not include private 
 5. **Check observability cardinality** — For any new log fields, metric labels, or trace attributes, verify the set of possible values is bounded. Labels derived from user input, request paths, error messages, or identifiers create unbounded cardinality — each unique value becomes a new time series or index entry, causing monitoring system OOM or log storage explosion. Use bucketized or enumerated labels instead.
 6. **Check I/O patterns** — Look for missing batching, sequential I/O that could be parallelized, missing connection pooling, and blocking I/O on event loops.
 7. **Assess caching** — Identify caching opportunities on hot paths. For existing caches, verify invalidation correctness — a stale cache is worse than no cache.
-8. **Consider context** — Startup code, migration scripts, and CLI tools have different performance requirements than request handlers. Calibrate accordingly.
-9. **Render verdict** — Set approved=true only if there are zero critical findings and major findings don't indicate systemic scalability issues.
+8. **Classify data source cost** — Before claiming "N+1 API calls" or "per-request Kubernetes load", determine whether reads come from an informer/controller-runtime cache/repository layer (in-memory CPU/allocation cost) or from direct API server/etcd/database round-trips (I/O/API cost). If you cannot determine which, say "per-snapshot lookup work (source unverified)" and cap at `minor`.
+9. **Frame fan-out cost** — Per-subscriber recomputation is a scalability concern when viewers × work per change is estimable. Without scale assumptions, use `minor` and recommend measurement/benchmarking.
+10. **Consider context** — Startup code, migration scripts, and CLI tools have different performance requirements than request handlers. Calibrate accordingly.
+11. **Render verdict** — Set approved=true only if there are zero critical findings and major findings don't indicate systemic scalability issues.
 
 ## Review Criteria
 
@@ -72,6 +74,7 @@ Category must be one of: `performance`, `correctness`.
 - **Context blindness** — Startup code, test fixtures, and CLI tools have different performance envelopes than request handlers. Adjust thresholds.
 - **Cache-first thinking** — Don't recommend caching without considering invalidation complexity. A cache that's hard to invalidate correctly is a bug factory.
 - **Bounded obsession** — Don't report O(n) as a problem when n is bounded and small. "This loop iterates over config keys" is not a performance issue.
+- **Cache vs API confusion** — Do not describe informer/cache/repository reads as "Kubernetes API calls" or "database round-trips" unless you verified the code path reaches the network. Controller-runtime cached lookups are CPU work, not API QPS.
 - **Pre-existing debt** — Don't block this change for performance patterns that already exist in unchanged code. Flag only if the change introduces a new bottleneck or extends an inefficient pattern to a new hot path.
 - **Convention following** — New code that matches existing module patterns (query style, caching approach, batching) is consistency, not regression.
 

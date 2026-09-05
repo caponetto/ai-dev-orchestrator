@@ -23,7 +23,7 @@ import type {
   WorkflowSummary,
 } from '@ai-orchestrator/schemas';
 import { err, ok } from '@ai-orchestrator/schemas';
-import { describe, expect, it, afterEach } from 'vitest';
+import { describe, expect, it, afterEach, vi } from 'vitest';
 
 import { DashboardHttpServer } from '../dashboard-http-server';
 import { SseEventStream } from '../sse-event-stream';
@@ -1944,6 +1944,16 @@ describe('DashboardHttpServer', () => {
       };
     }
 
+    function createMockSettingsProvider(
+      overrides: Partial<SettingsProvider> = {},
+    ): SettingsProvider {
+      return {
+        getProjectSettings: () => null,
+        updateProjectSettings: () => ({ ok: true }),
+        ...overrides,
+      };
+    }
+
     it('returns 404 when no action handler', async () => {
       eventStream = new SseEventStream();
       server = new DashboardHttpServer({
@@ -2006,6 +2016,75 @@ describe('DashboardHttpServer', () => {
       const data = JSON.parse(res.body) as { success: boolean; runId?: string };
       expect(data.success).toBe(true);
       expect(data.runId).toBe('new-run-1');
+    });
+
+    it('applies runSettings before creating run', async () => {
+      eventStream = new SseEventStream();
+      const updateProjectSettings = vi.fn().mockReturnValue({ ok: true });
+      const createRun = vi.fn().mockResolvedValue({ success: true, runId: 'new-run-1' });
+      const settingsProvider = createMockSettingsProvider({ updateProjectSettings });
+      const handler = createMockActionHandler({ createRun });
+      server = new DashboardHttpServer({
+        config: { port: 0 },
+        dataProvider: createMockProvider(),
+        eventStream,
+        actionHandler: handler,
+        settingsProvider,
+      });
+      await server.start();
+
+      const runSettings = {
+        roles: {
+          assignments: {
+            context_analyst: { model: 'cursor-grok-4.6-medium', runner: 'cursor' },
+          },
+        },
+      };
+      const res = await httpPost(server.getPort(), '/api/runs', {
+        prompt: 'Implement login',
+        runSettings,
+      });
+
+      expect(res.status).toBe(200);
+      expect(updateProjectSettings).toHaveBeenCalledWith(runSettings);
+      expect(createRun).toHaveBeenCalledWith({
+        prompt: 'Implement login',
+        workflow: undefined,
+        repoRoot: undefined,
+      });
+    });
+
+    it('returns 400 when runSettings fail to save', async () => {
+      eventStream = new SseEventStream();
+      const updateProjectSettings = vi.fn().mockReturnValue({ ok: false, error: 'invalid runner' });
+      const createRun = vi.fn();
+      const settingsProvider = createMockSettingsProvider({ updateProjectSettings });
+      const handler = createMockActionHandler({ createRun });
+      server = new DashboardHttpServer({
+        config: { port: 0 },
+        dataProvider: createMockProvider(),
+        eventStream,
+        actionHandler: handler,
+        settingsProvider,
+      });
+      await server.start();
+
+      const res = await httpPost(server.getPort(), '/api/runs', {
+        prompt: 'Implement login',
+        runSettings: {
+          roles: {
+            assignments: {
+              context_analyst: { model: 'cursor-grok-4.6-medium', runner: 'cursor' },
+            },
+          },
+        },
+      });
+
+      expect(res.status).toBe(400);
+      const data = JSON.parse(res.body) as { success: boolean; error?: string };
+      expect(data.success).toBe(false);
+      expect(data.error).toBe('invalid runner');
+      expect(createRun).not.toHaveBeenCalled();
     });
   });
 

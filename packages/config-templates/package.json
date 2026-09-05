@@ -25,7 +25,7 @@
     "clean": "rimraf dist tsconfig.build.tsbuildinfo",
     "build:base": "rimraf dist tsconfig.build.tsbuildinfo && tsc -p tsconfig.build.json && pnpm run copy:static",
     "build:dev": "pnpm run build:base",
-    "build:prod": "pnpm run build:base --sourceMap false --declarationMap false",
+    "build:prod": "tsc -p tsconfig.build.json --sourceMap false --declarationMap false && pnpm run copy:static",
     "lint": "eslint src/",
     "test:unit": "vitest run",
     "typecheck": "tsc -p tsconfig.build.json --noEmit"

@@ -20,7 +20,6 @@
   "dependencies": {
     "@ai-orchestrator/agent-adapters": "workspace:*",
     "@ai-orchestrator/artifacts": "workspace:*",
-    "@ai-orchestrator/code-intelligence": "workspace:*",
     "@ai-orchestrator/config-templates": "workspace:*",
     "@ai-orchestrator/core": "workspace:*",
     "@ai-orchestrator/dependency-graph": "workspace:*",
@@ -39,7 +38,6 @@
     "@ai-orchestrator/role-system": "workspace:*",
     "@ai-orchestrator/schemas": "workspace:*",
     "@ai-orchestrator/utils": "workspace:*",
-    "@sourcegraph/scip-typescript": "^0.4.0",
     "commander": "^15.0.0",
     "write-file-atomic": "^8.0.0",
     "yaml": "^2.9.0",

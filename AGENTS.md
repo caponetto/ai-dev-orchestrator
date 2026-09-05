@@ -47,35 +47,34 @@ pnpm publint          # Validate package.json exports
 
 All workspace packages live under `packages/`, scoped as `@ai-orchestrator/<name>`:
 
-| Package               | Purpose                                             |
-| --------------------- | --------------------------------------------------- |
-| `schemas`             | Shared Zod schemas and types (foundation)           |
-| `utils`               | Shared utilities (error handling, YAML, timing)     |
-| `ports`               | Port interfaces (contracts between layers)          |
-| `artifacts`           | Artifact system, ownership, agreements              |
-| `agent-protocol`      | Agent-orchestrator protocol messages                |
-| `agent-adapters`      | CLI adapters for Claude Code, Cursor, gh-cli        |
-| `code-intelligence`   | SCIP-powered code context for symbol-level analysis |
-| `dependency-graph`    | Artifact dependency graph, impact analysis          |
-| `execution-analytics` | Adaptive execution loop, statistical profiling      |
-| `governance`          | Governance engine, iteration contracts              |
-| `journal`             | Journal writer/reader, event formatting             |
-| `policy-engine`       | Policy evaluation (iteration, quality, budget)      |
-| `project-context`     | Persistent project context across runs              |
-| `prompt-engine`       | Template engine, token budget, context assembly     |
-| `recovery`            | Recovery manager, state reconstruction              |
-| `role-system`         | Role registry, model assignment                     |
-| `run-manifest`        | Manifest production, report rendering               |
-| `runner`              | Agent dispatch, sessions, transport                 |
-| `specification`       | Specification validation and merging                |
-| `core`                | Configuration, events, state, logging               |
-| `workflow`            | Lifecycle controller, workflow DSL                  |
-| `config-templates`    | Init generators and static files                    |
-| `dashboard-server`    | HTTP server, metrics, diagnostics                   |
-| `dashboard`           | React + Vite web UI (SPA)                           |
-| `cli`                 | Command-line interface (composition root)           |
-| `build-config`        | Shared vitest and build configuration               |
-| `test-utils`          | Test fixtures and mock implementations              |
+| Package               | Purpose                                         |
+| --------------------- | ----------------------------------------------- |
+| `schemas`             | Shared Zod schemas and types (foundation)       |
+| `utils`               | Shared utilities (error handling, YAML, timing) |
+| `ports`               | Port interfaces (contracts between layers)      |
+| `artifacts`           | Artifact system, ownership, agreements          |
+| `agent-protocol`      | Agent-orchestrator protocol messages            |
+| `agent-adapters`      | CLI adapters for Claude Code, Cursor, gh-cli    |
+| `dependency-graph`    | Artifact dependency graph, impact analysis      |
+| `execution-analytics` | Adaptive execution loop, statistical profiling  |
+| `governance`          | Governance engine, iteration contracts          |
+| `journal`             | Journal writer/reader, event formatting         |
+| `policy-engine`       | Policy evaluation (iteration, quality, budget)  |
+| `project-context`     | Persistent project context across runs          |
+| `prompt-engine`       | Template engine, token budget, context assembly |
+| `recovery`            | Recovery manager, state reconstruction          |
+| `role-system`         | Role registry, model assignment                 |
+| `run-manifest`        | Manifest production, report rendering           |
+| `runner`              | Agent dispatch, sessions, transport             |
+| `specification`       | Specification validation and merging            |
+| `core`                | Configuration, events, state, logging           |
+| `workflow`            | Lifecycle controller, workflow DSL              |
+| `config-templates`    | Init generators and static files                |
+| `dashboard-server`    | HTTP server, metrics, diagnostics               |
+| `dashboard`           | React + Vite web UI (SPA)                       |
+| `cli`                 | Command-line interface (composition root)       |
+| `build-config`        | Shared vitest and build configuration           |
+| `test-utils`          | Test fixtures and mock implementations          |
 
 Architecture follows hexagonal (ports & adapters) with strict layering enforced by Turborepo boundaries. Lower layers cannot depend on higher layers. See the architecture table in [README.md](README.md#architecture) for the full layer hierarchy.
 

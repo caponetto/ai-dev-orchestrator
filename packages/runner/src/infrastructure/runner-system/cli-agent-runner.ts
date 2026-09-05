@@ -1,5 +1,8 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { homedir } from 'node:os';
+import { dirname, join } from 'node:path';
+import type { Writable } from 'node:stream';
+import { PassThrough } from 'node:stream';
 
 import type { AgentAdapter, VendorTokenUsage } from '@ai-orchestrator/agent-adapters';
 import {
@@ -22,6 +25,7 @@ import type {
   AgentOutputStreamEvent,
   PermissionContext,
   PermissionPolicy,
+  PermissionPolicyConfig,
   SessionCapableRunner,
 } from '@ai-orchestrator/ports';
 import type {
@@ -31,6 +35,7 @@ import type {
   AgentTokenUsage,
 } from '@ai-orchestrator/schemas';
 import {
+  AI_CONFIG_DIR_NAME,
   BUILT_IN_CODING_RUNNER_ID,
   liveClarificationResponsePayloadSchema,
   livePermissionResponsePayloadSchema,
@@ -38,6 +43,11 @@ import {
 import { getErrorMessage } from '@ai-orchestrator/utils';
 import { execa } from 'execa';
 
+import type { CodexPermissionBridgeConfig } from './codex-permission-hook';
+import {
+  buildCodexPermissionHookArgs,
+  writeCodexPermissionHookArtifacts,
+} from './codex-permission-hook';
 import type { LiveRequestStore } from './file-backed-live-request-store';
 import { LocalAgentSessionHost } from './local-agent-session-host';
 import type { LocalAgentSessionSupervisor } from './local-agent-session-supervisor';
@@ -62,8 +72,11 @@ const KILL_GRACE_MS = 5_000;
 export class CliAgentRunner implements SessionCapableRunner {
   private readonly config: CliAgentRunnerConfig;
   private permissionPolicy?: PermissionPolicy;
+  private permissionPolicyConfig?: PermissionPolicyConfig;
   private liveRequestStore?: LiveRequestStore;
   private approvalStore?: PermissionApprovalStore;
+  private approvalStorePath?: string;
+  private codexPermissionBridge?: CodexPermissionBridgeConfig;
   private sessionSupervisor?: LocalAgentSessionSupervisor;
   private readonly activeSubprocesses = new Set<{ pid?: number; kill: () => boolean }>();
 
@@ -94,6 +107,18 @@ export class CliAgentRunner implements SessionCapableRunner {
     this.approvalStore = store;
   }
 
+  setApprovalStorePath(path: string): void {
+    this.approvalStorePath = path;
+  }
+
+  setPermissionPolicyConfig(config: PermissionPolicyConfig): void {
+    this.permissionPolicyConfig = config;
+  }
+
+  setCodexPermissionBridge(bridge: CodexPermissionBridgeConfig): void {
+    this.codexPermissionBridge = bridge;
+  }
+
   setSessionSupervisor(supervisor: LocalAgentSessionSupervisor): void {
     this.sessionSupervisor = supervisor;
   }
@@ -104,6 +129,12 @@ export class CliAgentRunner implements SessionCapableRunner {
     task: AgentTask,
     onStreamEvent?: (event: AgentOutputStreamEvent) => void,
   ): Promise<AgentDispatchResult> {
+    const adapter = this.config.adapter;
+    if (adapter?.supportsProtocolHandshake === false) {
+      const result = await this.dispatch(task, onStreamEvent);
+      return { kind: 'terminal', result };
+    }
+
     const startTime = Date.now();
     const timeoutMs =
       task.constraints.timeout || this.config.defaultTimeoutMs || DEFAULT_TIMEOUT_MS;
@@ -113,7 +144,6 @@ export class CliAgentRunner implements SessionCapableRunner {
     await writeFile(taskFilePath, JSON.stringify(task, null, 2));
     await mkdir(dirname(task.outputArtifactPath), { recursive: true });
 
-    const adapter = this.config.adapter;
     const cliConfig = task.agentConfig;
     const command = cliConfig?.command ?? (adapter ? adapter.command : this.config.command);
     const baseArgs = cliConfig?.args ?? (adapter ? adapter.args : (this.config.args ?? []));
@@ -124,19 +154,14 @@ export class CliAgentRunner implements SessionCapableRunner {
       timeout: timeoutMs,
       killSignal: 'SIGTERM',
       forceKillAfterDelay: KILL_GRACE_MS,
-      stdin: 'pipe',
+      stdin: resolveCliSubprocessStdinOption(adapter, args),
     });
 
     const procHandle = { pid: subprocess.pid, kill: () => subprocess.kill() };
     this.activeSubprocesses.add(procHandle);
 
-    if (args.includes('--print')) {
-      subprocess.stdin.end();
-    } else if (adapter?.promptViaStdin && adapter.sendPrompt) {
-      const stdinMsg = adapter.sendPrompt(buildAgentTaskPrompt(task, taskFilePath));
-      if (stdinMsg) {
-        subprocess.stdin.write(stdinMsg + '\n');
-      }
+    if (subprocess.stdin) {
+      configureCliSubprocessStdin(subprocess.stdin, args, adapter, task, taskFilePath);
     }
 
     subprocess
@@ -148,7 +173,7 @@ export class CliAgentRunner implements SessionCapableRunner {
       });
 
     const transport = new StdioProtocolTransport({
-      stdin: subprocess.stdin,
+      stdin: subprocess.stdin ?? new PassThrough(),
       stdout: subprocess.stdout,
       stderr: subprocess.stderr,
     });
@@ -220,7 +245,18 @@ export class CliAgentRunner implements SessionCapableRunner {
     const cliCfg = task.agentConfig;
     const command = cliCfg?.command ?? (adapter ? adapter.command : this.config.command);
     const baseArgs = cliCfg?.args ?? (adapter ? adapter.args : (this.config.args ?? []));
-    const args = buildInvocationArgs(task, taskFilePath, baseArgs, adapter);
+    let codexHookCommand: string | undefined;
+    if (adapter?.name === BUILT_IN_CODING_RUNNER_ID.CODEX && this.codexPermissionBridge) {
+      const hookArtifacts = await writeCodexPermissionHookArtifacts(
+        task,
+        this.codexPermissionBridge,
+        this.permissionPolicyConfig,
+        this.approvalStorePath,
+        this.config.liveRequestTimeoutMs,
+      );
+      codexHookCommand = hookArtifacts.hookCommand;
+    }
+    const args = buildInvocationArgs(task, taskFilePath, baseArgs, adapter, codexHookCommand);
 
     const cliPrompt = adapter?.promptViaStdin
       ? buildAgentTaskPrompt(task, taskFilePath)
@@ -245,19 +281,14 @@ export class CliAgentRunner implements SessionCapableRunner {
         timeout: timeoutMs,
         killSignal: 'SIGTERM',
         forceKillAfterDelay: KILL_GRACE_MS,
-        stdin: 'pipe',
+        stdin: resolveCliSubprocessStdinOption(adapter, args),
       });
 
       const procHandle = { pid: subprocess.pid, kill: () => subprocess.kill() };
       this.activeSubprocesses.add(procHandle);
 
-      if (args.includes('--print')) {
-        subprocess.stdin.end();
-      } else if (adapter?.promptViaStdin && adapter.sendPrompt) {
-        const stdinMsg = adapter.sendPrompt(buildAgentTaskPrompt(task, taskFilePath));
-        if (stdinMsg) {
-          subprocess.stdin.write(stdinMsg + '\n');
-        }
+      if (subprocess.stdin) {
+        configureCliSubprocessStdin(subprocess.stdin, args, adapter, task, taskFilePath);
       }
 
       // Prevent unhandled rejection if subprocess exits before we await it
@@ -271,7 +302,7 @@ export class CliAgentRunner implements SessionCapableRunner {
         });
 
       const transport = new StdioProtocolTransport({
-        stdin: subprocess.stdin,
+        stdin: subprocess.stdin ?? new PassThrough(),
         stdout: subprocess.stdout,
         stderr: subprocess.stderr,
       });
@@ -288,6 +319,7 @@ export class CliAgentRunner implements SessionCapableRunner {
       let deltaInputTokens = 0;
       let deltaOutputTokens = 0;
       let finalUsage: AgentTokenUsage | undefined;
+      let lastAgentArtifactJson: string | undefined;
       const getTokenUsage = (): AgentTokenUsage | undefined => {
         if (finalUsage) {
           return finalUsage;
@@ -356,9 +388,17 @@ export class CliAgentRunner implements SessionCapableRunner {
         switch (message.type) {
           case 'handshake':
             break;
-          case 'progress':
+          case 'progress': {
+            const detail = message.payload.detail;
+            if (typeof detail === 'string') {
+              const artifactJson = extractArtifactJsonFromAgentText(detail);
+              if (artifactJson) {
+                lastAgentArtifactJson = artifactJson;
+              }
+            }
             this.handleProgress(message, onStreamEvent);
             break;
+          }
           case 'log':
             this.handleLog(message, onStreamEvent);
             break;
@@ -383,7 +423,13 @@ export class CliAgentRunner implements SessionCapableRunner {
                 tokenUsage: getTokenUsage(),
               });
             } else {
-              void this.readOutput(task, startTime, getTokenUsage(), onStreamEvent).then(
+              void this.readOutput(
+                task,
+                startTime,
+                getTokenUsage(),
+                onStreamEvent,
+                lastAgentArtifactJson,
+              ).then(
                 (result) => {
                   protocolFinish?.(result);
                 },
@@ -527,7 +573,13 @@ export class CliAgentRunner implements SessionCapableRunner {
               tokenUsage: getTokenUsage(),
             });
           } else {
-            void this.readOutput(task, startTime, getTokenUsage(), onStreamEvent).then(
+            void this.readOutput(
+              task,
+              startTime,
+              getTokenUsage(),
+              onStreamEvent,
+              lastAgentArtifactJson,
+            ).then(
               (result) => {
                 if (protocolFinish) {
                   protocolFinish(result);
@@ -1058,6 +1110,7 @@ export class CliAgentRunner implements SessionCapableRunner {
     startTime: number,
     preAccumulatedUsage?: AgentTokenUsage,
     onStreamEvent?: (event: AgentOutputStreamEvent) => void,
+    fallbackContent?: string,
   ): Promise<AgentResult> {
     const durationMs = Date.now() - startTime;
     const maxAttempts = 4;
@@ -1084,29 +1137,47 @@ export class CliAgentRunner implements SessionCapableRunner {
           await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
           continue;
         }
-        const errorMsg = `Failed to read agent output artifact — the agent process exited without producing the expected output file at ${task.outputArtifactPath}`;
-        onStreamEvent?.({
-          timestamp: new Date().toISOString(),
-          type: 'stderr',
-          content: errorMsg,
-          structuredData: {
-            messageType: 'error',
-            phase: 'error',
-            code: 'missing_output_artifact',
-            sender: 'orchestrator',
-          },
-        });
-        return {
-          taskId: task.taskId,
-          status: 'failure',
-          error: errorMsg,
-          durationMs,
-          tokenUsage: preAccumulatedUsage,
-        };
       }
     }
 
-    return { taskId: task.taskId, status: 'failure', error: 'Unexpected', durationMs };
+    if (fallbackContent) {
+      try {
+        const parsed = parseJsonContent(fallbackContent);
+        const artifactUsage = extractArtifactTokenUsage(parsed['tokenUsage']);
+        const hasArtifactUsage =
+          artifactUsage && (artifactUsage.inputTokens > 0 || artifactUsage.outputTokens > 0);
+
+        return {
+          taskId: task.taskId,
+          status: 'success',
+          artifactContent: fallbackContent,
+          durationMs,
+          tokenUsage: hasArtifactUsage ? artifactUsage : preAccumulatedUsage,
+        };
+      } catch {
+        // Fall through to failure below.
+      }
+    }
+
+    const errorMsg = `Failed to read agent output artifact — the agent process exited without producing the expected output file at ${task.outputArtifactPath}`;
+    onStreamEvent?.({
+      timestamp: new Date().toISOString(),
+      type: 'stderr',
+      content: errorMsg,
+      structuredData: {
+        messageType: 'error',
+        phase: 'error',
+        code: 'missing_output_artifact',
+        sender: 'orchestrator',
+      },
+    });
+    return {
+      taskId: task.taskId,
+      status: 'failure',
+      error: errorMsg,
+      durationMs,
+      tokenUsage: preAccumulatedUsage,
+    };
   }
 }
 
@@ -1116,6 +1187,52 @@ const PROMPT_BASED_ADAPTERS = new Set<string>([
   BUILT_IN_CODING_RUNNER_ID.CODEX,
   BUILT_IN_CODING_RUNNER_ID.CURSOR,
 ]);
+
+/**
+ * Codex (and similar CLIs) accept the prompt as argv but block on stdin when the pipe
+ * stays open. Use `ignore` so Codex does not log "Reading additional input from stdin..."
+ * to stderr before we can close the pipe.
+ */
+function resolveCliSubprocessStdinOption(
+  adapter: AgentAdapter | undefined,
+  args: readonly string[],
+): 'pipe' | 'ignore' {
+  if (args.includes('--print')) {
+    return 'ignore';
+  }
+  if (adapter?.promptViaStdin && adapter.sendPrompt) {
+    return 'pipe';
+  }
+  if (adapter && PROMPT_BASED_ADAPTERS.has(adapter.name) && !adapter.promptViaStdin) {
+    return 'ignore';
+  }
+  return 'pipe';
+}
+
+function configureCliSubprocessStdin(
+  stdin: Writable,
+  args: readonly string[],
+  adapter: AgentAdapter | undefined,
+  task: AgentTask,
+  taskFilePath: string,
+): void {
+  if (args.includes('--print')) {
+    stdin.end();
+    return;
+  }
+
+  if (adapter?.promptViaStdin && adapter.sendPrompt) {
+    const stdinMsg = adapter.sendPrompt(buildAgentTaskPrompt(task, taskFilePath));
+    if (stdinMsg) {
+      stdin.write(stdinMsg + '\n');
+    }
+    return;
+  }
+
+  if (adapter && PROMPT_BASED_ADAPTERS.has(adapter.name) && !adapter.promptViaStdin) {
+    stdin.end();
+  }
+}
 
 function buildToolPermissionArgs(): string[] {
   return ['--allowedTools=Read,Write,Edit'];
@@ -1132,17 +1249,31 @@ function buildMaxTurnsArgs(task: AgentTask, adapter?: AgentAdapter): string[] {
   return ['--max-turns', String(maxTurns)];
 }
 
+/** Grant Codex write access to ~/.ai and route approval prompts through the orchestrator hook. */
+function buildCodexRunnerArgs(adapter?: AgentAdapter, hookCommand?: string): string[] {
+  if (adapter?.name !== BUILT_IN_CODING_RUNNER_ID.CODEX) {
+    return [];
+  }
+  const args = ['--add-dir', join(homedir(), AI_CONFIG_DIR_NAME)];
+  if (hookCommand) {
+    args.push(...buildCodexPermissionHookArgs(hookCommand));
+  }
+  return args;
+}
+
 function buildInvocationArgs(
   task: AgentTask,
   taskFilePath: string,
   baseArgs: readonly string[],
   adapter?: AgentAdapter,
+  codexHookCommand?: string,
 ): string[] {
   const modelArgs = buildModelArgs(task, baseArgs);
   const maxTurnsArgs = buildMaxTurnsArgs(task, adapter);
+  const codexRunnerArgs = buildCodexRunnerArgs(adapter, codexHookCommand);
 
   if (adapter?.promptViaStdin) {
-    return [...baseArgs, ...modelArgs, ...maxTurnsArgs];
+    return [...baseArgs, ...codexRunnerArgs, ...modelArgs, ...maxTurnsArgs];
   }
 
   const permArgs =
@@ -1153,13 +1284,22 @@ function buildInvocationArgs(
   if (adapter && PROMPT_BASED_ADAPTERS.has(adapter.name)) {
     return [
       ...baseArgs,
+      ...codexRunnerArgs,
       ...modelArgs,
       ...permArgs,
       ...maxTurnsArgs,
       buildAgentTaskPrompt(task, taskFilePath),
     ];
   }
-  return [...baseArgs, ...modelArgs, ...permArgs, ...maxTurnsArgs, '--task-file', taskFilePath];
+  return [
+    ...baseArgs,
+    ...codexRunnerArgs,
+    ...modelArgs,
+    ...permArgs,
+    ...maxTurnsArgs,
+    '--task-file',
+    taskFilePath,
+  ];
 }
 
 function buildModelArgs(task: AgentTask, baseArgs: readonly string[]): string[] {
@@ -1173,6 +1313,28 @@ function buildModelArgs(task: AgentTask, baseArgs: readonly string[]): string[] 
     return [];
   }
   return ['--model', task.modelHint];
+}
+
+/**
+ * When an agent emits the final JSON artifact in a message instead of the output file,
+ * use it as a last-resort fallback after file reads are exhausted.
+ */
+export function extractArtifactJsonFromAgentText(text: string): string | null {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith('{')) {
+    return null;
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return trimmed;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
 }
 
 /**
@@ -1292,6 +1454,15 @@ function parseVendorUsage(u: VendorTokenUsage): {
   outputTokens: number;
 } {
   const num = (v: number | undefined): number => v ?? 0;
+
+  if (isCodexUsageShape(u)) {
+    // Codex reports cached_input_tokens as a subset of input_tokens — do not add them.
+    return {
+      inputTokens: num(u.input_tokens),
+      outputTokens: num(u.output_tokens) + num(u.reasoning_output_tokens),
+    };
+  }
+
   const anthropicInput =
     num(u.input_tokens) + num(u.cache_creation_input_tokens) + num(u.cache_read_input_tokens);
   const anthropicOutput = num(u.output_tokens);
@@ -1301,6 +1472,10 @@ function parseVendorUsage(u: VendorTokenUsage): {
     inputTokens: Math.max(anthropicInput, cursorInput),
     outputTokens: Math.max(anthropicOutput, cursorOutput),
   };
+}
+
+function isCodexUsageShape(usage: VendorTokenUsage): boolean {
+  return 'cached_input_tokens' in usage || 'reasoning_output_tokens' in usage;
 }
 
 export interface ExtractedUsage {

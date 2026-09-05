@@ -49,6 +49,8 @@ export {
   LocalAgentSessionSupervisor,
   RemoteAgentSessionSupervisor,
   WebSocketProtocolTransport,
+  handleCodexPermissionHook,
+  CODEX_HOOK_CONTEXT_ENV,
 } from './infrastructure/runner-system/index';
 export type {
   MetricsInput,

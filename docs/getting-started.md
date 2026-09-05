@@ -49,7 +49,7 @@ Notes:
 
 - `config.yaml`, `roles.yaml`, and `governance.yaml` are the required runtime config files.
 - `runners.yaml` is generated from the built-in runner registry that ships with the repository.
-- To use the `codex` runner, install the Codex CLI and authenticate it with `codex login`. Codex executes tasks with workspace-write sandboxing and reports token usage from its JSONL completion event.
+- To use the `codex` runner, install the Codex CLI and authenticate it with `codex login`. Codex executes tasks with workspace-write sandboxing, enables outbound network access for tools like `gh`, and reports token usage from its JSONL completion event.
 - `templates/` contains per-role prompt templates that can be overridden per project.
 - `runs/` stores per-run state, artifacts, journals, manifests, reports, session snapshots, and live request files.
 

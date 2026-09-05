@@ -132,6 +132,4 @@ export type { PolicyEvaluator, PolicyRegistry, PolicyResolver } from './policy-e
 
 export type { SettingsProvider, UpdateSettingsResult } from './settings-provider.port';
 
-export type { CodeIntelligence } from './code-intelligence.port';
-
 export type { ProjectContextStore } from './project-context-store.port';

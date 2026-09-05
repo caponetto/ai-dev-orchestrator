@@ -8,6 +8,7 @@ import type {
   PermissionApprovalEntry,
   ProjectSettingsView,
   RunConfigView,
+  RunSettings,
   RunStateView,
   RunSummaryView,
   UsageBreakdownView,
@@ -170,10 +171,10 @@ export const api = {
     ),
   deleteRun: (runId: string) =>
     deleteJson<DashboardActionResult>(`/api/runs/${runId}`, dashboardActionResultSchema),
-  createRun: (prompt: string, workflow?: string, repoRoot?: string) =>
+  createRun: (prompt: string, workflow?: string, repoRoot?: string, runSettings?: RunSettings) =>
     postJson<DashboardActionResult & { runId?: string }>(
       '/api/runs',
-      { prompt, workflow, repoRoot },
+      { prompt, workflow, repoRoot, runSettings },
       dashboardActionResultSchema,
     ),
   fetchWorkflows: () => fetchJson<WorkflowSummary[]>('/api/workflows', workflowSummaryArraySchema),

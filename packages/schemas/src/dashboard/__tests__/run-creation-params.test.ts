@@ -53,4 +53,18 @@ describe('runCreationParamsSchema', () => {
       false,
     );
   });
+
+  it('validates with runSettings', () => {
+    const data = {
+      prompt: 'Review PR',
+      runSettings: {
+        roles: {
+          assignments: {
+            context_analyst: { model: 'cursor-grok-4.6-medium', runner: 'cursor' },
+          },
+        },
+      },
+    };
+    expect(runCreationParamsSchema.safeParse(data).success).toBe(true);
+  });
 });

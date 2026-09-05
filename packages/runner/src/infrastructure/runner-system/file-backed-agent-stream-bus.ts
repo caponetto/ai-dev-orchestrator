@@ -30,6 +30,31 @@ export const agentStreamEventSchema = z.object({
 const STREAM_FILENAME = 'agent-stream.jsonl';
 const POLL_INTERVAL_MS = 500;
 
+/** Resolve the JSONL path for a run's agent stream. */
+function getAgentStreamFilePath(runsDir: string, runId: string): string {
+  return join(runsDir, runId, STREAM_FILENAME);
+}
+
+/**
+ * Append a validated event to a run's stream file. Used by cross-process writers
+ * (e.g. the Codex permission hook) that cannot call {@link FileBackedAgentStreamBus.publish}.
+ * Returns the stream file path when the event was written.
+ */
+export function appendAgentStreamEventToRunFile(
+  event: AgentStreamEvent,
+  runsDir: string,
+): string | undefined {
+  const parsed = agentStreamEventSchema.safeParse(event);
+  if (!parsed.success) {
+    return undefined;
+  }
+
+  const streamFile = getAgentStreamFilePath(runsDir, parsed.data.runId);
+  mkdirSync(join(runsDir, parsed.data.runId), { recursive: true });
+  appendFileSync(streamFile, `${JSON.stringify(parsed.data)}\n`);
+  return streamFile;
+}
+
 export interface ChangedFileInfo {
   streamFile: string;
   offset: number;
@@ -127,16 +152,21 @@ export class FileBackedAgentStreamBus implements HistoryCapableStreamBus {
   }
 
   publish(event: AgentStreamEvent): void {
-    const dir = join(this.runsDir, event.runId);
-    mkdirSync(dir, { recursive: true });
-    const streamFile = join(dir, STREAM_FILENAME);
-    const serialized = JSON.stringify(event) + '\n';
-    appendFileSync(streamFile, serialized);
+    const parsed = agentStreamEventSchema.safeParse(event);
+    if (!parsed.success) {
+      return;
+    }
 
-    const currentOffset = this.fileOffsets.get(streamFile) ?? 0;
-    this.fileOffsets.set(streamFile, currentOffset + Buffer.byteLength(serialized));
+    const streamFile = getAgentStreamFilePath(this.runsDir, parsed.data.runId);
+    this.flushExternalEvents(streamFile);
 
-    dispatchToClients([event], this.clients);
+    const writtenFile = appendAgentStreamEventToRunFile(parsed.data, this.runsDir);
+    if (!writtenFile) {
+      return;
+    }
+
+    this.fileOffsets.set(writtenFile, statSync(writtenFile).size);
+    dispatchToClients([parsed.data], this.clients);
   }
 
   subscribe(callback: (event: AgentStreamEvent) => void): string {
@@ -160,7 +190,7 @@ export class FileBackedAgentStreamBus implements HistoryCapableStreamBus {
   }
 
   getRunHistory(runId: string): readonly AgentStreamEvent[] {
-    const streamFile = join(this.runsDir, runId, STREAM_FILENAME);
+    const streamFile = getAgentStreamFilePath(this.runsDir, runId);
     if (!existsSync(streamFile)) {
       return [];
     }
@@ -213,5 +243,24 @@ export class FileBackedAgentStreamBus implements HistoryCapableStreamBus {
       this.fileOffsets.set(streamFile, size);
       dispatchToClients(events, this.clients);
     }
+  }
+
+  /** Deliver events appended by another process before this bus writes again. */
+  private flushExternalEvents(streamFile: string): void {
+    const offset = this.fileOffsets.get(streamFile) ?? 0;
+    let size = 0;
+    try {
+      size = statSync(streamFile).size;
+    } catch {
+      return;
+    }
+
+    if (size <= offset) {
+      return;
+    }
+
+    const events = readNewEvents(streamFile, offset, size);
+    this.fileOffsets.set(streamFile, size);
+    dispatchToClients(events, this.clients);
   }
 }

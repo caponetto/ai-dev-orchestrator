@@ -1,5 +1,6 @@
 import type {
   ProjectSettingsView,
+  RunSettings,
   WorkflowStateView,
   WorkflowSummary,
 } from '@ai-orchestrator/schemas';
@@ -34,6 +35,14 @@ type Status =
   | { kind: 'pending' }
   | { kind: 'failed' }
   | { kind: 'error'; message: string };
+
+function toRunSettings(draft: ProjectSettingsView): RunSettings {
+  return {
+    roles: draft.roles,
+    governance: draft.governance,
+    runtime: draft.runtime,
+  };
+}
 
 export function NewRunPage() {
   const navigate = useNavigate();
@@ -171,24 +180,16 @@ export function NewRunPage() {
     }
     setStatus({ kind: 'submitting' });
     try {
-      if (settingsDraft && settings && JSON.stringify(settings) !== JSON.stringify(settingsDraft)) {
-        const saveResult = await api.updateSettings(settingsDraft);
-        if (!saveResult.ok) {
-          setStatus({
-            kind: 'error',
-            message: saveResult.error ?? 'Failed to save run configuration',
-          });
-          return;
-        }
-        setSettings(settingsDraft);
-      }
-
       const result = await api.createRun(
         trimmed,
         selectedWorkflow || undefined,
         repoRoot.trim() || undefined,
+        settingsDraft ? toRunSettings(settingsDraft) : undefined,
       );
       if (result.success) {
+        if (settingsDraft) {
+          setSettings(settingsDraft);
+        }
         if (result.runId) {
           void Promise.resolve(navigate(`/runs/${result.runId}`, { replace: true }));
         } else {

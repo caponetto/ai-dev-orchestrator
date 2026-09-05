@@ -31,7 +31,13 @@ interface CursorTokenUsage {
   readonly outputTokens?: number;
 }
 
-export type VendorTokenUsage = ClaudeTokenUsage & CursorTokenUsage;
+interface CodexTokenUsage {
+  readonly cached_input_tokens?: number;
+  readonly cache_write_input_tokens?: number;
+  readonly reasoning_output_tokens?: number;
+}
+
+export type VendorTokenUsage = ClaudeTokenUsage & CursorTokenUsage & CodexTokenUsage;
 
 // ---------------------------------------------------------------------------
 // Claude Code stream events

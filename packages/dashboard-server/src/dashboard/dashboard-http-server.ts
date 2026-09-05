@@ -13,7 +13,12 @@ import type {
   SettingsProvider,
 } from '@ai-orchestrator/ports';
 import type { LiveRequestStore, PermissionApprovalStore } from '@ai-orchestrator/runner';
-import type { ArtifactType, DashboardEvent, DashboardEventType } from '@ai-orchestrator/schemas';
+import type {
+  ArtifactType,
+  DashboardEvent,
+  DashboardEventType,
+  RunSettings,
+} from '@ai-orchestrator/schemas';
 import { ARTIFACTS_DIR_NAME, MEDIA_MIME_TYPES } from '@ai-orchestrator/schemas';
 import { getRequestListener } from '@hono/node-server';
 import { Hono } from 'hono';
@@ -650,12 +655,25 @@ export class DashboardHttpServer {
         prompt?: string;
         workflow?: string;
         repoRoot?: string;
+        runSettings?: RunSettings;
       };
       if (typeof body.prompt !== 'string' || !body.prompt.trim()) {
         return c.json(
           { success: false, error: 'Body must include "prompt" (non-empty string)' },
           400,
         );
+      }
+      if (body.runSettings) {
+        if (!this.settingsProvider) {
+          return c.json({ success: false, error: 'Settings provider not configured' }, 404);
+        }
+        const saveResult = this.settingsProvider.updateProjectSettings(body.runSettings);
+        if (!saveResult.ok) {
+          return c.json(
+            { success: false, error: saveResult.error ?? 'Failed to save run configuration' },
+            400,
+          );
+        }
       }
       const result = await this.actionHandler.createRun({
         prompt: body.prompt,

@@ -177,7 +177,7 @@ describe('PostRunContextUpdater', () => {
         { role: 'static_reviewer', model: 'claude-sonnet-5', success: true, dispatches: 1 },
         {
           role: 'docs_reviewer',
-          model: 'gpt-5.4-low',
+          model: 'claude-sonnet-5-thinking-high',
           success: false,
           error: 'model not available',
           dispatches: 1,

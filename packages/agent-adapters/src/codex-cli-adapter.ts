@@ -11,13 +11,25 @@ import type {
 } from './external-event-types';
 import { parseCodexEvent } from './external-event-types';
 
-const CODEX_EXEC_ARGS = ['exec', '--json', '--sandbox', 'workspace-write'] as const;
+/** Enable outbound network in workspace-write so tools like `gh` can reach api.github.com. */
+export const CODEX_WORKSPACE_WRITE_NETWORK_CONFIG =
+  'sandbox_workspace_write.network_access=true' as const;
+
+const CODEX_EXEC_ARGS = [
+  'exec',
+  '--json',
+  '--sandbox',
+  'workspace-write',
+  '-c',
+  CODEX_WORKSPACE_WRITE_NETWORK_CONFIG,
+] as const;
 
 /** Adapter for Codex CLI's non-interactive `codex exec --json` protocol. */
 export class CodexCliAdapter implements AgentAdapter {
   readonly name = BUILT_IN_CODING_RUNNER_ID.CODEX;
   readonly command = 'codex';
   readonly args = [...CODEX_EXEC_ARGS];
+  readonly supportsProtocolHandshake = false;
 
   translateOutput(line: string): ProtocolMessage | null {
     const event = parseCodexEvent(line);
