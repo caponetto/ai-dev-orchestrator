@@ -32,7 +32,7 @@
   "dependencies": {
     "@ai-orchestrator/ports": "workspace:*",
     "@ai-orchestrator/schemas": "workspace:*",
-    "zod": "^4.4.3"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@ai-orchestrator/build-config": "workspace:*",
