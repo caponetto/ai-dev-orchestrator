@@ -45,6 +45,7 @@
   },
   "devDependencies": {
     "@ai-dev-orchestrator/build-config": "workspace:*",
+    "@ai-dev-orchestrator/dashboard": "workspace:*",
     "@types/node": "^26.4.0",
     "esbuild": "^0.28.2",
     "tsx": "^4.23.12",
@@ -52,7 +53,7 @@
   },
   "scripts": {
     "clean": "rimraf dist tsconfig.build.tsbuildinfo",
-    "build:base": "rimraf dist && node esbuild.config.js && cp -r ../config-templates/src/static dist/static",
+    "build:base": "rimraf dist && node esbuild.config.js",
     "build:dev": "NODE_ENV=development pnpm run build:base",
     "build:prod": "pnpm run build:base",
     "dev": "tsx src/index.ts",

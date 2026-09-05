@@ -31,11 +31,31 @@ interface DashboardServerConfig {
   readonly host: string;
   readonly runsDir?: string;
   readonly scriptsDir?: string;
+  readonly uiDir?: string;
 }
 
 const DEFAULT_DASHBOARD_CONFIG: DashboardServerConfig = {
   port: 9100,
   host: '127.0.0.1',
+};
+
+const STATIC_MIME_TYPES: Readonly<Record<string, string>> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.wasm': 'application/wasm',
+  '.map': 'application/json; charset=utf-8',
 };
 
 export interface DashboardHttpServerOptions {
@@ -784,5 +804,42 @@ export class DashboardHttpServer {
       const initialized = this.config.runsDir ? existsSync(this.config.runsDir) : false;
       return c.json({ cwd: process.cwd(), initialized });
     });
+
+    if (this.config.uiDir && existsSync(this.config.uiDir)) {
+      const uiDir = resolve(this.config.uiDir);
+      this.app.get('*', (c) => {
+        const reqPath = c.req.path;
+        if (reqPath.startsWith('/api/') || reqPath.startsWith('/events')) {
+          return c.json({ error: 'Not found' }, 404);
+        }
+
+        const normalizedPath = normalize(reqPath).replace(/^(\.\.[\/\\])+/, '');
+        let targetPath = join(uiDir, normalizedPath);
+
+        if (!targetPath.startsWith(uiDir)) {
+          return c.json({ error: 'Path traversal denied' }, 403);
+        }
+
+        if (!existsSync(targetPath) || !statSync(targetPath).isFile()) {
+          targetPath = join(uiDir, 'index.html');
+        }
+
+        if (!existsSync(targetPath) || !statSync(targetPath).isFile()) {
+          return c.json({ error: 'Dashboard UI not found' }, 404);
+        }
+
+        const ext = extname(targetPath).toLowerCase();
+        const contentType = STATIC_MIME_TYPES[ext] ?? 'application/octet-stream';
+        const fileContent = readFileSync(targetPath);
+
+        return new Response(fileContent, {
+          headers: {
+            'Content-Type': contentType,
+            'Content-Length': String(fileContent.length),
+            'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=31536000, immutable',
+          },
+        });
+      });
+    }
   }
 }
