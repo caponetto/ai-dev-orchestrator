@@ -867,6 +867,22 @@ describe('DefaultPermissionPolicy', () => {
         expect(decision.reason).toContain('read-only');
       });
 
+      it('handles long whitespace runs in compound commands', () => {
+        const policy = new DefaultPermissionPolicy();
+        const whitespace = ' '.repeat(100_000);
+        const decision = policy.evaluate(
+          makeRequest({
+            action: 'shell_execute',
+            resource: `git status${whitespace}&&${whitespace}git diff`,
+            toolInput: { command: `git status${whitespace}&&${whitespace}git diff` },
+          }),
+          makeContext({ role: 'verifier' }),
+        );
+
+        expect(decision.action).toBe('grant');
+        expect(decision.reason).toContain('read-only');
+      });
+
       it.each([
         'cd /tmp/repo && git push origin main',
         'git diff --stat; git add .',
