@@ -14,7 +14,7 @@ import type {
   SystemHealthView,
   UsageBreakdownView,
   WorkflowStateView,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 /** Port providing read-only dashboard data from the running system. */
 export interface DashboardDataProvider {

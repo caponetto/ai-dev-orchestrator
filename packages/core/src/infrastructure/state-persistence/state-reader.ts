@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 
-import type { PersistedState } from '@ai-orchestrator/schemas';
-import { getErrorMessage } from '@ai-orchestrator/utils';
+import type { PersistedState } from '@ai-dev-orchestrator/schemas';
+import { getErrorMessage } from '@ai-dev-orchestrator/utils';
 import { parse } from 'yaml';
 
 import { StatePersistenceError } from '../../domain/state-persistence/errors';

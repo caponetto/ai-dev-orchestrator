@@ -1,4 +1,4 @@
-import type { RunManifest } from '@ai-orchestrator/schemas';
+import type { RunManifest } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { renderReport } from '../report-renderer';

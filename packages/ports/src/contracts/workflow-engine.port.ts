@@ -4,7 +4,7 @@ import type {
   RunResult,
   WaitingContext,
   WorkflowRunConfig,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 /** Port for the workflow engine that orchestrates the full FSM lifecycle. */
 export interface WorkflowEngine {

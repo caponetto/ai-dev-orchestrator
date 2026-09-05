@@ -7,7 +7,7 @@ import type {
   PolicyType,
   PolicyTypeInfo,
   ResolvedPolicySet,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 export interface PolicyEvaluator {
   evaluate(policy: PolicyDefinition, context: PolicyContext): PolicyResult;

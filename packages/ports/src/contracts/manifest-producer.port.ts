@@ -1,4 +1,4 @@
-import type { ManifestContext, RunManifest } from '@ai-orchestrator/schemas';
+import type { ManifestContext, RunManifest } from '@ai-dev-orchestrator/schemas';
 
 /** Port for producing a run manifest at workflow completion. */
 export interface ManifestProducer {

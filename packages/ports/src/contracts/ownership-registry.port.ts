@@ -1,4 +1,4 @@
-import type { ArtifactType } from '@ai-orchestrator/schemas';
+import type { ArtifactType } from '@ai-dev-orchestrator/schemas';
 
 /** Port for querying artifact ownership rules. */
 export interface OwnershipRegistry {

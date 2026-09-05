@@ -2,7 +2,7 @@ import type {
   CanonicalSpecification,
   CompletenessResult,
   SpecificationValidationResult,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 /** Port for validating canonical specifications (structure, semantics, and completeness). */
 export interface SpecificationValidator {

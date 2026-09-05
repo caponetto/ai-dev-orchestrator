@@ -84,7 +84,7 @@ The current assembled config uses:
 
 ## Defaults and Generated Config
 
-When a project has no `.ai/` config yet, `packages/cli/src/project-config.ts` can fall back to generated defaults from `@ai-orchestrator/config-templates` for validation and workflow loading paths.
+When a project has no `.ai/` config yet, `packages/cli/src/project-config.ts` can fall back to generated defaults from `@ai-dev-orchestrator/config-templates` for validation and workflow loading paths.
 
 ## Source of Truth
 

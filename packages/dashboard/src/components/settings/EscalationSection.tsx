@@ -2,8 +2,8 @@ import type {
   ProjectSettingsView,
   SettingsGovernance,
   SettingsPermissionPolicy,
-} from '@ai-orchestrator/schemas';
-import { logLevelSchema, permissionDecisionActionSchema } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
+import { logLevelSchema, permissionDecisionActionSchema } from '@ai-dev-orchestrator/schemas';
 
 import { NumberInput, SectionCard, Select } from './FormControls';
 

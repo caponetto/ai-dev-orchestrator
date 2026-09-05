@@ -3,7 +3,7 @@ import type {
   ArtifactType,
   PolicyContext,
   PolicyDefinition,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { OwnershipEvaluator } from '../ownership-evaluator';

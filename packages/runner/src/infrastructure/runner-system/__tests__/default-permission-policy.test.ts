@@ -1,5 +1,5 @@
-import type { PermissionRequestPayload } from '@ai-orchestrator/agent-protocol';
-import type { PermissionContext } from '@ai-orchestrator/ports';
+import type { PermissionRequestPayload } from '@ai-dev-orchestrator/agent-protocol';
+import type { PermissionContext } from '@ai-dev-orchestrator/ports';
 import { describe, expect, it } from 'vitest';
 
 import { DefaultPermissionPolicy } from '../default-permission-policy';

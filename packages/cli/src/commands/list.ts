@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 
-import { formatDuration } from '@ai-orchestrator/utils';
+import { formatDuration } from '@ai-dev-orchestrator/utils';
 
 import { ExitCode } from '../output/exit-codes';
 import type { OutputFormatter } from '../output/formatter';

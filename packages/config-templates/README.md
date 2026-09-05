@@ -1,4 +1,4 @@
-# @ai-orchestrator/config-templates
+# @ai-dev-orchestrator/config-templates
 
 Generates initial configuration files for the orchestrator: project config, governance rules, roles, workflows, prompt templates, partials, and shell scripts. Includes both YAML generators and static template files that are copied during `ai init`.
 
@@ -8,9 +8,9 @@ Generates initial configuration files for the orchestrator: project config, gove
 
 ## Workspace Dependencies
 
-- `@ai-orchestrator/schemas`
-- `@ai-orchestrator/utils`
-- `@ai-orchestrator/workflow`
+- `@ai-dev-orchestrator/schemas`
+- `@ai-dev-orchestrator/utils`
+- `@ai-dev-orchestrator/workflow`
 
 ## Structure
 

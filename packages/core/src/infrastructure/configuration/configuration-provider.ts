@@ -1,11 +1,11 @@
-import type { ConfigSource, ConfigurationProvider } from '@ai-orchestrator/ports';
+import type { ConfigSource, ConfigurationProvider } from '@ai-dev-orchestrator/ports';
 import type {
   GovernanceConfig,
   MergedConfiguration,
   RolesConfig,
   RuntimeConfig,
   WorkflowConfig,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 /** Tracks which configuration layer provided each value. */
 class SourceTracker {

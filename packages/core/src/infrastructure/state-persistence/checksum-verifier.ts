@@ -1,5 +1,5 @@
-import type { PersistedState } from '@ai-orchestrator/schemas';
-import { hashContent } from '@ai-orchestrator/utils';
+import type { PersistedState } from '@ai-dev-orchestrator/schemas';
+import { hashContent } from '@ai-dev-orchestrator/utils';
 import { stringify } from 'yaml';
 
 import { StateCorruptionError } from '../../domain/state-persistence/errors';

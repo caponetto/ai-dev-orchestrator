@@ -1,5 +1,5 @@
-import { NonRecoverableErrorBase } from '@ai-orchestrator/ports';
-import type { MergeConflict } from '@ai-orchestrator/schemas';
+import { NonRecoverableErrorBase } from '@ai-dev-orchestrator/ports';
+import type { MergeConflict } from '@ai-dev-orchestrator/schemas';
 
 /** Thrown when a specification fails structural validation. */
 export class SpecificationSchemaError extends NonRecoverableErrorBase {

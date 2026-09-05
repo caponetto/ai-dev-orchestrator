@@ -1,7 +1,7 @@
 import { appendFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { getErrorMessage } from '@ai-orchestrator/utils';
+import { getErrorMessage } from '@ai-dev-orchestrator/utils';
 import { Command } from 'commander';
 
 import { abortCommand } from './commands/abort';

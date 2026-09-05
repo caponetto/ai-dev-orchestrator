@@ -1,5 +1,5 @@
-import type { JournalWriter } from '@ai-orchestrator/ports';
-import type { JournalEvent } from '@ai-orchestrator/schemas';
+import type { JournalWriter } from '@ai-dev-orchestrator/ports';
+import type { JournalEvent } from '@ai-dev-orchestrator/schemas';
 
 import { flushToFile } from './disk-flusher';
 import { formatEvent, formatEvents, formatJournalHeader } from './journal-formatter';

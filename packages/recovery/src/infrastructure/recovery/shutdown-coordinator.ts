@@ -1,5 +1,5 @@
-import type { JournalWriter, StatePersistence } from '@ai-orchestrator/ports';
-import type { LockHandle, PersistedState, RunId } from '@ai-orchestrator/schemas';
+import type { JournalWriter, StatePersistence } from '@ai-dev-orchestrator/ports';
+import type { LockHandle, PersistedState, RunId } from '@ai-dev-orchestrator/schemas';
 
 import type { ShutdownState } from './recovery-schemas';
 

@@ -1,5 +1,5 @@
-import { NonRecoverableErrorBase } from '@ai-orchestrator/ports';
-import type { PolicyType } from '@ai-orchestrator/schemas';
+import { NonRecoverableErrorBase } from '@ai-dev-orchestrator/ports';
+import type { PolicyType } from '@ai-dev-orchestrator/schemas';
 
 /** Thrown when a policy evaluation fails unexpectedly. */
 export class PolicyEvaluationError extends NonRecoverableErrorBase {

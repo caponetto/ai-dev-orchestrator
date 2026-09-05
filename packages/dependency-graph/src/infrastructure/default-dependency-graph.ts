@@ -1,9 +1,9 @@
-import type { DependencyGraph } from '@ai-orchestrator/ports';
+import type { DependencyGraph } from '@ai-dev-orchestrator/ports';
 import type {
   ArtifactType,
   DependencyEdge,
   DependencyGraphValidation,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 import { ArtifactTypeNotInGraphError, DependencyGraphCycleError } from '../domain/errors';
 

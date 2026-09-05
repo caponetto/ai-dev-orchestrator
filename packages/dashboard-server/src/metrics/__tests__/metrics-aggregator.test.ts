@@ -1,4 +1,4 @@
-import type { MetricEntry } from '@ai-orchestrator/schemas';
+import type { MetricEntry } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { aggregateEntries, groupByLabel, percentile } from '../metrics-aggregator';

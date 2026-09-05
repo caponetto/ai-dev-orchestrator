@@ -1,4 +1,4 @@
-# @ai-orchestrator/project-context
+# @ai-dev-orchestrator/project-context
 
 Persistent project knowledge store that accumulates context across runs, enabling agents to learn from past executions.
 
@@ -8,8 +8,8 @@ Persistent project knowledge store that accumulates context across runs, enablin
 
 ## Workspace Dependencies
 
-- `@ai-orchestrator/ports`
-- `@ai-orchestrator/schemas`
+- `@ai-dev-orchestrator/ports`
+- `@ai-dev-orchestrator/schemas`
 
 ## Structure
 
@@ -36,7 +36,7 @@ Context is stored per-project at `~/.ai/projects/<hash>/` where `<hash>` is the 
 ## API
 
 ```typescript
-import { FilesystemProjectContextStore } from '@ai-orchestrator/project-context';
+import { FilesystemProjectContextStore } from '@ai-dev-orchestrator/project-context';
 
 const store = new FilesystemProjectContextStore('~/.ai');
 
@@ -62,7 +62,7 @@ const fragments = await store.query({
 
 ## File Format
 
-All context files are JSON validated against Zod schemas from `@ai-orchestrator/schemas`. Writes are atomic (write to `.tmp` then rename) to prevent corruption.
+All context files are JSON validated against Zod schemas from `@ai-dev-orchestrator/schemas`. Writes are atomic (write to `.tmp` then rename) to prevent corruption.
 
 ## Run History Compression
 

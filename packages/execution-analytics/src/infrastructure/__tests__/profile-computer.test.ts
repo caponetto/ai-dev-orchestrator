@@ -1,4 +1,4 @@
-import type { ExecutionProfile, WorkerOutcomeRecord } from '@ai-orchestrator/schemas';
+import type { ExecutionProfile, WorkerOutcomeRecord } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { ProfileComputer } from '../profile-computer';

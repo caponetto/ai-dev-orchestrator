@@ -1,4 +1,4 @@
-import type { PolicyContext, PolicyDefinition, PolicyScope } from '@ai-orchestrator/schemas';
+import type { PolicyContext, PolicyDefinition, PolicyScope } from '@ai-dev-orchestrator/schemas';
 import * as fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 

@@ -1,4 +1,4 @@
-import type { RunManifest } from '@ai-orchestrator/schemas';
+import type { RunManifest } from '@ai-dev-orchestrator/schemas';
 
 /** Port for persisting a run manifest to durable storage. */
 export interface ManifestWriter {

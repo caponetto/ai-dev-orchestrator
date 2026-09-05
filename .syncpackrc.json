@@ -4,7 +4,7 @@
     {
       "label": "Use workspace protocol for internal packages",
       "packages": ["**"],
-      "dependencies": ["@ai-orchestrator/**"],
+      "dependencies": ["@ai-dev-orchestrator/**"],
       "dependencyTypes": ["dev", "prod"],
       "range": "workspace:*"
     }
@@ -13,7 +13,7 @@
     {
       "label": "Internal packages use workspace protocol",
       "packages": ["**"],
-      "dependencies": ["@ai-orchestrator/**"],
+      "dependencies": ["@ai-dev-orchestrator/**"],
       "dependencyTypes": ["dev", "prod"],
       "pinVersion": "workspace:*"
     }

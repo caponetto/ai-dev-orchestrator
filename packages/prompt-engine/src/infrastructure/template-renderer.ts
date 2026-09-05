@@ -1,4 +1,4 @@
-import type { PartialMap } from '@ai-orchestrator/schemas';
+import type { PartialMap } from '@ai-dev-orchestrator/schemas';
 
 import { MissingPartialError, UndefinedVariableError } from '../domain/errors';
 
@@ -63,54 +63,134 @@ function resolvePartials(template: string, partials: PartialMap): string {
   return result;
 }
 
+function resolveBlock(
+  template: string,
+  startTag: string,
+  headerRegex: RegExp,
+  endTag: string,
+  processMatch: (path: string, body: string) => string,
+): string {
+  let result = '';
+  let cursor = 0;
+
+  while (cursor < template.length) {
+    const start = template.indexOf(startTag, cursor);
+    if (start === -1) {
+      result += template.slice(cursor);
+      break;
+    }
+
+    result += template.slice(cursor, start);
+
+    const headerMatch = headerRegex.exec(template.slice(start));
+    if (!headerMatch) {
+      result += startTag;
+      cursor = start + startTag.length;
+      continue;
+    }
+
+    const path = headerMatch[1];
+    const bodyStart = start + headerMatch[0].length;
+
+    let openCount = 1;
+    let searchPos = bodyStart;
+    let endPos = -1;
+
+    while (openCount > 0) {
+      const nextOpen = template.indexOf(startTag, searchPos);
+      const nextClose = template.indexOf(endTag, searchPos);
+
+      if (nextClose === -1) {
+        break;
+      }
+
+      if (nextOpen !== -1 && nextOpen < nextClose) {
+        openCount++;
+        searchPos = nextOpen + startTag.length;
+      } else {
+        openCount--;
+        if (openCount === 0) {
+          endPos = nextClose;
+        } else {
+          searchPos = nextClose + endTag.length;
+        }
+      }
+    }
+
+    if (endPos === -1) {
+      result += headerMatch[0];
+      cursor = bodyStart;
+      continue;
+    }
+
+    const body = template.slice(bodyStart, endPos);
+    result += processMatch(path, body);
+    cursor = endPos + endTag.length;
+  }
+
+  return result;
+}
+
 function resolveEachBlocks(
   template: string,
   context: RenderContext,
   partials: PartialMap,
   role: string,
 ): string {
-  const eachPattern = /\{\{#each\s+([\w.]+)\}\}([\s\S]*?)\{\{\/each\}\}/gu;
+  return resolveBlock(
+    template,
+    '{{#each',
+    /^\{\{#each\s+([\w.]+)\}\}/u,
+    '{{/each}}',
+    (path, body) => {
+      const collection = resolvePath(context, path);
+      if (!Array.isArray(collection)) {
+        return '';
+      }
 
-  return template.replace(eachPattern, (_match, path: string, body: string) => {
-    const collection = resolvePath(context, path);
-    if (!Array.isArray(collection)) {
-      return '';
-    }
-
-    return collection
-      .map((item: unknown, index: number) => {
-        const itemContext: RenderContext = {
-          ...context,
-          ...(typeof item === 'object' && item !== null
-            ? (item as Record<string, unknown>)
-            : { '.': item }),
-          '@index': index,
-          '@first': index === 0,
-          '@last': index === collection.length - 1,
-        };
-        let rendered = resolveConditionals(body, itemContext);
-        rendered = resolveVariables(rendered, itemContext, role);
-        rendered = resolvePartials(rendered, partials);
-        return rendered;
-      })
-      .join('');
-  });
+      return collection
+        .map((item: unknown, index: number) => {
+          const itemContext: RenderContext = {
+            ...context,
+            ...(typeof item === 'object' && item !== null
+              ? (item as Record<string, unknown>)
+              : { '.': item }),
+            '@index': index,
+            '@first': index === 0,
+            '@last': index === collection.length - 1,
+          };
+          let rendered = resolveConditionals(body, itemContext);
+          rendered = resolveVariables(rendered, itemContext, role);
+          rendered = resolvePartials(rendered, partials);
+          return rendered;
+        })
+        .join('');
+    },
+  );
 }
 
 function resolveConditionals(template: string, context: RenderContext): string {
-  let result = template;
+  let result = resolveBlock(
+    template,
+    '{{#if',
+    /^\{\{#if\s+([\w.@]+)\}\}/u,
+    '{{/if}}',
+    (path, body) => {
+      const value = resolvePath(context, path);
+      return isTruthy(value) ? resolveConditionals(body, context) : '';
+    },
+  );
 
-  const ifPattern = /\{\{#if\s+([\w.@]+)\}\}([\s\S]*?)\{\{\/if\}\}/gu;
-  result = result.replace(ifPattern, (_match, path: string, body: string) => {
-    const value = resolvePath(context, path);
-    return isTruthy(value) ? body : '';
-  });
-
-  const unlessPattern = /\{\{#unless\s+([\w.@]+)\}\}([\s\S]*?)\{\{\/unless\}\}/gu;
-  result = result.replace(unlessPattern, (_match, path: string, body: string) => {
-    const value = resolvePath(context, path);
-    return isTruthy(value) ? '' : body;
-  });
+  result = resolveBlock(
+    result,
+    '{{#unless',
+    /^\{\{#unless\s+([\w.@]+)\}\}/u,
+    '{{/unless}}',
+    (path, body) => {
+      const value = resolvePath(context, path);
+      return isTruthy(value) ? '' : resolveConditionals(body, context);
+    },
+  );
 
   return result;
 }
@@ -153,6 +233,10 @@ function resolveVariables(template: string, context: RenderContext, role: string
 }
 
 function resolvePath(context: RenderContext, path: string): unknown {
+  if (Object.hasOwn(context, path)) {
+    return context[path];
+  }
+
   const parts = path.split('.');
   let current: unknown = context;
 

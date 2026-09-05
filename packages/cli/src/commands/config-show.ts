@@ -1,4 +1,4 @@
-import type { MergedConfiguration } from '@ai-orchestrator/schemas';
+import type { MergedConfiguration } from '@ai-dev-orchestrator/schemas';
 
 import { ExitCode, toCLIError } from '../output/exit-codes';
 import type { OutputFormatter } from '../output/formatter';

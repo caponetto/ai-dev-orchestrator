@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 
-import type { ArtifactMetadata, ArtifactRef } from '@ai-orchestrator/schemas';
+import type { ArtifactMetadata, ArtifactRef } from '@ai-dev-orchestrator/schemas';
 import { parse } from 'yaml';
 
 import { ArtifactNotFoundError } from '../../domain/artifact-system/errors';

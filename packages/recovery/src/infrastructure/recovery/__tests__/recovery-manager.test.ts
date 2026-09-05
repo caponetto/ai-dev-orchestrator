@@ -1,7 +1,7 @@
-import { rebuildStateFromEvents } from '@ai-orchestrator/core';
-import type { JournalReader, StatePersistence } from '@ai-orchestrator/ports';
-import { createRunId } from '@ai-orchestrator/ports';
-import type { JournalEvent, PersistedState } from '@ai-orchestrator/schemas';
+import { rebuildStateFromEvents } from '@ai-dev-orchestrator/core';
+import type { JournalReader, StatePersistence } from '@ai-dev-orchestrator/ports';
+import { createRunId } from '@ai-dev-orchestrator/ports';
+import type { JournalEvent, PersistedState } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi } from 'vitest';
 
 import { RecoveryManager } from '../recovery-manager';

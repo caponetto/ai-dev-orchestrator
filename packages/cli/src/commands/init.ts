@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { generateAll, generateGlobalFiles } from '@ai-orchestrator/config-templates';
+import { generateAll, generateGlobalFiles } from '@ai-dev-orchestrator/config-templates';
 
 import { ExitCode } from '../output/exit-codes';
 import type { OutputFormatter } from '../output/formatter';

@@ -1,4 +1,4 @@
-import type { HealthCheckResult } from '@ai-orchestrator/schemas';
+import type { HealthCheckResult } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { DefaultHealthChecker } from '../default-health-checker';

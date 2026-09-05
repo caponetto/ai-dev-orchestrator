@@ -1,4 +1,4 @@
-# @ai-orchestrator/agent-adapters
+# @ai-dev-orchestrator/agent-adapters
 
 CLI adapters that bridge vendor-specific coding agents (Claude Code, Cursor, Codex, GitHub CLI) into the orchestrator's unified agent protocol. Each adapter translates vendor stream events into protocol messages and probes for available capabilities.
 
@@ -8,8 +8,8 @@ CLI adapters that bridge vendor-specific coding agents (Claude Code, Cursor, Cod
 
 ## Workspace Dependencies
 
-- `@ai-orchestrator/agent-protocol`
-- `@ai-orchestrator/schemas`
+- `@ai-dev-orchestrator/agent-protocol`
+- `@ai-dev-orchestrator/schemas`
 
 ## Structure
 

@@ -4,10 +4,10 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { DefaultStatePersistence } from '@ai-orchestrator/core';
-import { projectWorkflowPreview } from '@ai-orchestrator/dashboard-server';
-import type { AgentSessionSupervisor, AgentStreamBus } from '@ai-orchestrator/ports';
-import type { RunId } from '@ai-orchestrator/schemas';
+import { DefaultStatePersistence } from '@ai-dev-orchestrator/core';
+import { projectWorkflowPreview } from '@ai-dev-orchestrator/dashboard-server';
+import type { AgentSessionSupervisor, AgentStreamBus } from '@ai-dev-orchestrator/ports';
+import type { RunId } from '@ai-dev-orchestrator/schemas';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { loadAllWorkflows, loadWorkflowByName } from '../../composition-root';
@@ -46,7 +46,7 @@ vi.mock('../../composition-root', () => ({
   loadAllWorkflows: vi.fn(),
 }));
 
-vi.mock('@ai-orchestrator/dashboard-server', () => ({
+vi.mock('@ai-dev-orchestrator/dashboard-server', () => ({
   projectWorkflowPreview: vi.fn(),
 }));
 

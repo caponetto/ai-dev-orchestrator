@@ -1,5 +1,5 @@
-import type { DashboardEventStream } from '@ai-orchestrator/ports';
-import type { DashboardEvent } from '@ai-orchestrator/schemas';
+import type { DashboardEventStream } from '@ai-dev-orchestrator/ports';
+import type { DashboardEvent } from '@ai-dev-orchestrator/schemas';
 
 /**
  * In-process SSE event stream that manages connected clients and

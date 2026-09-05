@@ -1,5 +1,5 @@
-import type { IntermediateRequirements } from '@ai-orchestrator/schemas';
-import { hashContent } from '@ai-orchestrator/utils';
+import type { IntermediateRequirements } from '@ai-dev-orchestrator/schemas';
+import { hashContent } from '@ai-dev-orchestrator/utils';
 
 /** Recognized source reference types. */
 export type SourceType = 'github_pr' | 'github_issue' | 'plain_text';

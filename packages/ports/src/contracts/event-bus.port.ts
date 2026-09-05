@@ -5,7 +5,7 @@ import type {
   EventInput,
   Subscription,
   SubscriptionOptions,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 /**
  * In-process event bus for typed, ordered event distribution.

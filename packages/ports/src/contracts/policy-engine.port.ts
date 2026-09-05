@@ -6,7 +6,7 @@ import type {
   PolicyTypeInfo,
   PolicyValidationResult,
   ResolvedPolicySet,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 /**
  * Facade port combining policy evaluation, resolution, and validation.

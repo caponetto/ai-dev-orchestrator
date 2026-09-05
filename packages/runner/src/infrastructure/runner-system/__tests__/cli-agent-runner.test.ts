@@ -2,16 +2,16 @@ import { mkdtemp, readFile, rm, writeFile, mkdir } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { AgentAdapter } from '@ai-orchestrator/agent-adapters';
-import type { ProtocolMessage } from '@ai-orchestrator/agent-protocol';
-import { createProtocolMessage } from '@ai-orchestrator/agent-protocol';
+import type { AgentAdapter } from '@ai-dev-orchestrator/agent-adapters';
+import type { ProtocolMessage } from '@ai-dev-orchestrator/agent-protocol';
+import { createProtocolMessage } from '@ai-dev-orchestrator/agent-protocol';
 import type {
   AgentOutputStreamEvent,
   PermissionContext,
   PermissionPolicy,
-} from '@ai-orchestrator/ports';
-import type { AgentTask } from '@ai-orchestrator/schemas';
-import { AI_CONFIG_DIR_NAME } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/ports';
+import type { AgentTask } from '@ai-dev-orchestrator/schemas';
+import { AI_CONFIG_DIR_NAME } from '@ai-dev-orchestrator/schemas';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {

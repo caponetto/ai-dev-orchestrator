@@ -1,4 +1,4 @@
-import type { OutputContract } from '@ai-orchestrator/schemas';
+import type { OutputContract } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { validateOutput } from '../output-validator';

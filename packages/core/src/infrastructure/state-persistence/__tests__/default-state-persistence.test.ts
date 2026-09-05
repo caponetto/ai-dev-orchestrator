@@ -2,8 +2,8 @@ import { mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { createRunId } from '@ai-orchestrator/ports';
-import type { JournalEvent, PersistedState, RunId } from '@ai-orchestrator/schemas';
+import { createRunId } from '@ai-dev-orchestrator/ports';
+import type { JournalEvent, PersistedState, RunId } from '@ai-dev-orchestrator/schemas';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { computeStateChecksum } from '../checksum-verifier';

@@ -1,4 +1,4 @@
-# @ai-orchestrator/governance
+# @ai-dev-orchestrator/governance
 
 Governance engine that enforces ownership rules, quality gates, escalation policies, and iteration contracts. Controls how agents interact, what they are allowed to do, and when human review is required.
 
@@ -8,8 +8,8 @@ Governance engine that enforces ownership rules, quality gates, escalation polic
 
 ## Workspace Dependencies
 
-- `@ai-orchestrator/ports`
-- `@ai-orchestrator/schemas`
+- `@ai-dev-orchestrator/ports`
+- `@ai-dev-orchestrator/schemas`
 
 ## Structure
 

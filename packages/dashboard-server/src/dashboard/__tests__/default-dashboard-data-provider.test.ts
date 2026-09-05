@@ -5,7 +5,7 @@ import type {
   PersistedState,
   RunManifest,
   TransitionRecord,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import type { DashboardDataSources } from '../default-dashboard-data-provider';

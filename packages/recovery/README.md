@@ -1,4 +1,4 @@
-# @ai-orchestrator/recovery
+# @ai-dev-orchestrator/recovery
 
 Recovery manager and state reconstruction for resuming interrupted orchestration runs. Handles graceful shutdown coordination, artifact consistency checks, and rebuilding workflow state from persisted data.
 
@@ -8,8 +8,8 @@ Recovery manager and state reconstruction for resuming interrupted orchestration
 
 ## Workspace Dependencies
 
-- `@ai-orchestrator/ports`
-- `@ai-orchestrator/schemas`
+- `@ai-dev-orchestrator/ports`
+- `@ai-dev-orchestrator/schemas`
 
 ## Structure
 

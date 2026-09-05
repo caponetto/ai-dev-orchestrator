@@ -1,6 +1,6 @@
-import type { EventBus } from '@ai-orchestrator/ports';
-import { createRunId } from '@ai-orchestrator/ports';
-import type { ArtifactRef } from '@ai-orchestrator/schemas';
+import type { EventBus } from '@ai-dev-orchestrator/ports';
+import { createRunId } from '@ai-dev-orchestrator/ports';
+import type { ArtifactRef } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi } from 'vitest';
 
 import { MetricsRecorder } from '../metrics-recorder';

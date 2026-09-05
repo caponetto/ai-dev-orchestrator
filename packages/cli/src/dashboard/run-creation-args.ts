@@ -1,4 +1,4 @@
-import type { RunCreationParams } from '@ai-orchestrator/schemas';
+import type { RunCreationParams } from '@ai-dev-orchestrator/schemas';
 
 /**
  * Mapping from RunCreationParams optional fields to their CLI flag equivalents.

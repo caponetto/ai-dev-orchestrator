@@ -1,4 +1,4 @@
-import type { DashboardEvent } from '@ai-orchestrator/schemas';
+import type { DashboardEvent } from '@ai-dev-orchestrator/schemas';
 import { useEffect, useRef } from 'react';
 
 import { getNotificationPermission } from './use-permission-notifications';

@@ -2,7 +2,7 @@ import type {
   ConfigurationInspection,
   ConfigurationIssue,
   DiagnosticSeverity,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 export interface ConfigurationRule {
   readonly path: string;
   readonly check: (value: unknown) => boolean;

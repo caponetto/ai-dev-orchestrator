@@ -1,4 +1,4 @@
-import type { EventBus } from '@ai-orchestrator/ports';
+import type { EventBus } from '@ai-dev-orchestrator/ports';
 import type {
   ArtifactRef,
   RoleId,
@@ -7,7 +7,7 @@ import type {
   WorkerFailedData,
   WorkerInvocationRecord,
   WorkerMetrics,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 export interface MetricsInput {
   readonly runId: RunId;

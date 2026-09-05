@@ -60,10 +60,10 @@ describe('scripts-generator', () => {
       }
     });
 
-    it('scripts are self-contained (no @ai-orchestrator imports)', () => {
+    it('scripts are self-contained (no @ai-dev-orchestrator imports)', () => {
       for (const name of ALL_SCRIPT_FILES) {
         const content = generateScriptFile(name);
-        expect(content).not.toContain('@ai-orchestrator/');
+        expect(content).not.toContain('@ai-dev-orchestrator/');
       }
     });
 

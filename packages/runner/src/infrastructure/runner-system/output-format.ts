@@ -1,5 +1,5 @@
 /** File extension for a worker output artifact given its contract format. */
-import type { WorkerOutputFormat } from '@ai-orchestrator/schemas';
+import type { WorkerOutputFormat } from '@ai-dev-orchestrator/schemas';
 export function extensionForOutputFormat(format: WorkerOutputFormat | undefined): string {
   switch (format) {
     case 'yaml':

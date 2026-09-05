@@ -1,4 +1,4 @@
-import type { MergedConfiguration } from '@ai-orchestrator/schemas';
+import type { MergedConfiguration } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { TEST_BUILT_IN_DEFAULTS } from '../../../../test/fixtures/test-defaults';

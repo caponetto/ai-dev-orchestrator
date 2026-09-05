@@ -1,4 +1,4 @@
-import type { ProjectSettingsView } from '@ai-orchestrator/schemas';
+import type { ProjectSettingsView } from '@ai-dev-orchestrator/schemas';
 
 export interface UpdateSettingsResult {
   readonly ok: boolean;

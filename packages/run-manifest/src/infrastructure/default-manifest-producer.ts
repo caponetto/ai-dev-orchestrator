@@ -1,5 +1,5 @@
-import type { ManifestProducer } from '@ai-orchestrator/ports';
-import type { ManifestContext, RunManifest } from '@ai-orchestrator/schemas';
+import type { ManifestProducer } from '@ai-dev-orchestrator/ports';
+import type { ManifestContext, RunManifest } from '@ai-dev-orchestrator/schemas';
 
 import { assembleManifest } from './manifest-assembler';
 

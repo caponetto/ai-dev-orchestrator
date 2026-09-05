@@ -1,7 +1,7 @@
 import { hostname as osHostname } from 'node:os';
 
-import type { JournalReader, StatePersistence } from '@ai-orchestrator/ports';
-import type { JournalEvent, PersistedState, RunId } from '@ai-orchestrator/schemas';
+import type { JournalReader, StatePersistence } from '@ai-dev-orchestrator/ports';
+import type { JournalEvent, PersistedState, RunId } from '@ai-dev-orchestrator/schemas';
 
 import type { RecoveryResult, RecoveryScenario } from './recovery-schemas';
 import type { StateRebuilder } from './state-reconstructor';

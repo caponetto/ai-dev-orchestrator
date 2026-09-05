@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { ArtifactSummary } from '@ai-orchestrator/schemas';
+import type { ArtifactSummary } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 

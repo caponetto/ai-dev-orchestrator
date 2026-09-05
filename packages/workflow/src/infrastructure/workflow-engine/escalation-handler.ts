@@ -1,5 +1,5 @@
-import type { JournalWriter } from '@ai-orchestrator/ports';
-import type { EscalationContext, EscalationReason } from '@ai-orchestrator/schemas';
+import type { JournalWriter } from '@ai-dev-orchestrator/ports';
+import type { EscalationContext, EscalationReason } from '@ai-dev-orchestrator/schemas';
 
 /** Escalation state handler for workflow engine. */
 export class EscalationHandler {

@@ -4,7 +4,7 @@ import type {
   RoleId,
   RoleInteraction,
   VisibilityCheck,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 /** Port for querying role interactions, artifact flows, and visibility rules. */
 export interface CollaborationModel {

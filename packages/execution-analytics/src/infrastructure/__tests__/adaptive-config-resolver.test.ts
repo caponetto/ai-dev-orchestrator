@@ -1,4 +1,4 @@
-import type { ExecutionProfile, StaticConfigBaseline } from '@ai-orchestrator/schemas';
+import type { ExecutionProfile, StaticConfigBaseline } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { AdaptiveConfigResolver } from '../adaptive-config-resolver';

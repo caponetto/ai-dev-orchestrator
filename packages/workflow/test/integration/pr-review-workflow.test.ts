@@ -2,19 +2,19 @@ import { mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { DefaultIterationContractRegistry } from '@ai-orchestrator/governance';
-import { DefaultJournalReader, DefaultJournalWriter } from '@ai-orchestrator/journal';
-import type { GovernanceEngine, RunnerSystem } from '@ai-orchestrator/ports';
+import { DefaultIterationContractRegistry } from '@ai-dev-orchestrator/governance';
+import { DefaultJournalReader, DefaultJournalWriter } from '@ai-dev-orchestrator/journal';
+import type { GovernanceEngine, RunnerSystem } from '@ai-dev-orchestrator/ports';
 import type {
   ArtifactType,
   DispatchResult,
   RoleId,
   TransitionDecision,
   WorkflowDefinition,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { LifecycleController } from '@ai-orchestrator/workflow';
+import { LifecycleController } from '@ai-dev-orchestrator/workflow';
 
 import {
   createMockArtifactStore,

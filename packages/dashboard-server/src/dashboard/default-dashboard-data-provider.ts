@@ -1,5 +1,8 @@
-import { VERDICT_ARTIFACT_TYPES, safeJsonParse } from '@ai-orchestrator/artifacts';
-import type { EventCapableDataProvider, SessionCapableDataProvider } from '@ai-orchestrator/ports';
+import { VERDICT_ARTIFACT_TYPES, safeJsonParse } from '@ai-dev-orchestrator/artifacts';
+import type {
+  EventCapableDataProvider,
+  SessionCapableDataProvider,
+} from '@ai-dev-orchestrator/ports';
 import type {
   AgentSessionSnapshot,
   ApprovalStatus,
@@ -25,8 +28,8 @@ import type {
   UsageBreakdownView,
   WorkflowStateView,
   Result,
-} from '@ai-orchestrator/schemas';
-import { err, ok } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
+import { err, ok } from '@ai-dev-orchestrator/schemas';
 import { z } from 'zod';
 
 import { DashboardDataError } from '../domain/dashboard-errors';

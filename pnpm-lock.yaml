@@ -69,14 +69,14 @@ importers:
 
   packages/agent-adapters:
     dependencies:
-      '@ai-orchestrator/agent-protocol':
+      '@ai-dev-orchestrator/agent-protocol':
         specifier: workspace:*
         version: link:../agent-protocol
-      '@ai-orchestrator/schemas':
+      '@ai-dev-orchestrator/schemas':
         specifier: workspace:*
         version: link:../schemas
     devDependencies:
-      '@ai-orchestrator/build-config':
+      '@ai-dev-orchestrator/build-config':
         specifier: workspace:*
         version: link:../build-config
       '@types/node':
@@ -88,11 +88,11 @@ importers:
 
   packages/agent-protocol:
     dependencies:
-      '@ai-orchestrator/schemas':
+      '@ai-dev-orchestrator/schemas':
         specifier: workspace:*
         version: link:../schemas
     devDependencies:
-      '@ai-orchestrator/build-config':
+      '@ai-dev-orchestrator/build-config':
         specifier: workspace:*
         version: link:../build-config
       vitest:
@@ -101,13 +101,13 @@ importers:
 
   packages/artifacts:
     dependencies:
-      '@ai-orchestrator/ports':
+      '@ai-dev-orchestrator/ports':
         specifier: workspace:*
         version: link:../ports
-      '@ai-orchestrator/schemas':
+      '@ai-dev-orchestrator/schemas':
         specifier: workspace:*
         version: link:../schemas
-      '@ai-orchestrator/utils':
+      '@ai-dev-orchestrator/utils':
         specifier: workspace:*
         version: link:../utils
       write-file-atomic:
@@ -120,7 +120,7 @@ importers:
         specifier: ^4.5.4
         version: 4.5.4
     devDependencies:
-      '@ai-orchestrator/build-config':
+      '@ai-dev-orchestrator/build-config':
         specifier: workspace:*
         version: link:../build-config
       '@types/node':
@@ -148,64 +148,64 @@ importers:
 
   packages/cli:
     dependencies:
-      '@ai-orchestrator/agent-adapters':
+      '@ai-dev-orchestrator/agent-adapters':
         specifier: workspace:*
         version: link:../agent-adapters
-      '@ai-orchestrator/artifacts':
+      '@ai-dev-orchestrator/artifacts':
         specifier: workspace:*
         version: link:../artifacts
-      '@ai-orchestrator/config-templates':
+      '@ai-dev-orchestrator/config-templates':
         specifier: workspace:*
         version: link:../config-templates
-      '@ai-orchestrator/core':
+      '@ai-dev-orchestrator/core':
         specifier: workspace:*
         version: link:../core
-      '@ai-orchestrator/dashboard-server':
+      '@ai-dev-orchestrator/dashboard-server':
         specifier: workspace:*
         version: link:../dashboard-server
-      '@ai-orchestrator/dependency-graph':
+      '@ai-dev-orchestrator/dependency-graph':
         specifier: workspace:*
         version: link:../dependency-graph
-      '@ai-orchestrator/execution-analytics':
+      '@ai-dev-orchestrator/execution-analytics':
         specifier: workspace:*
         version: link:../execution-analytics
-      '@ai-orchestrator/governance':
+      '@ai-dev-orchestrator/governance':
         specifier: workspace:*
         version: link:../governance
-      '@ai-orchestrator/journal':
+      '@ai-dev-orchestrator/journal':
         specifier: workspace:*
         version: link:../journal
-      '@ai-orchestrator/policy-engine':
+      '@ai-dev-orchestrator/policy-engine':
         specifier: workspace:*
         version: link:../policy-engine
-      '@ai-orchestrator/ports':
+      '@ai-dev-orchestrator/ports':
         specifier: workspace:*
         version: link:../ports
-      '@ai-orchestrator/project-context':
+      '@ai-dev-orchestrator/project-context':
         specifier: workspace:*
         version: link:../project-context
-      '@ai-orchestrator/prompt-engine':
+      '@ai-dev-orchestrator/prompt-engine':
         specifier: workspace:*
         version: link:../prompt-engine
-      '@ai-orchestrator/recovery':
+      '@ai-dev-orchestrator/recovery':
         specifier: workspace:*
         version: link:../recovery
-      '@ai-orchestrator/role-system':
+      '@ai-dev-orchestrator/role-system':
         specifier: workspace:*
         version: link:../role-system
-      '@ai-orchestrator/run-manifest':
+      '@ai-dev-orchestrator/run-manifest':
         specifier: workspace:*
         version: link:../run-manifest
-      '@ai-orchestrator/runner':
+      '@ai-dev-orchestrator/runner':
         specifier: workspace:*
         version: link:../runner
-      '@ai-orchestrator/schemas':
+      '@ai-dev-orchestrator/schemas':
         specifier: workspace:*
         version: link:../schemas
-      '@ai-orchestrator/utils':
+      '@ai-dev-orchestrator/utils':
         specifier: workspace:*
         version: link:../utils
-      '@ai-orchestrator/workflow':
+      '@ai-dev-orchestrator/workflow':
         specifier: workspace:*
         version: link:../workflow
       commander:
@@ -221,7 +221,7 @@ importers:
         specifier: ^4.5.4
         version: 4.5.4
     devDependencies:
-      '@ai-orchestrator/build-config':
+      '@ai-dev-orchestrator/build-config':
         specifier: workspace:*
         version: link:../build-config
       '@types/node':
@@ -239,13 +239,13 @@ importers:
 
   packages/config-templates:
     dependencies:
-      '@ai-orchestrator/schemas':
+      '@ai-dev-orchestrator/schemas':
         specifier: workspace:*
         version: link:../schemas
-      '@ai-orchestrator/utils':
+      '@ai-dev-orchestrator/utils':
         specifier: workspace:*
         version: link:../utils
-      '@ai-orchestrator/workflow':
+      '@ai-dev-orchestrator/workflow':
         specifier: workspace:*
         version: link:../workflow
       yaml:
@@ -255,7 +255,7 @@ importers:
         specifier: ^4.5.4
         version: 4.5.4
     devDependencies:
-      '@ai-orchestrator/build-config':
+      '@ai-dev-orchestrator/build-config':
         specifier: workspace:*
         version: link:../build-config
       '@types/node':
@@ -270,13 +270,13 @@ importers:
 
   packages/core:
     dependencies:
-      '@ai-orchestrator/ports':
+      '@ai-dev-orchestrator/ports':
         specifier: workspace:*
         version: link:../ports
-      '@ai-orchestrator/schemas':
+      '@ai-dev-orchestrator/schemas':
         specifier: workspace:*
         version: link:../schemas
-      '@ai-orchestrator/utils':
+      '@ai-dev-orchestrator/utils':
         specifier: workspace:*
         version: link:../utils
       ulidx:
@@ -292,16 +292,16 @@ importers:
         specifier: ^4.5.4
         version: 4.5.4
     devDependencies:
-      '@ai-orchestrator/artifacts':
+      '@ai-dev-orchestrator/artifacts':
         specifier: workspace:*
         version: link:../artifacts
-      '@ai-orchestrator/build-config':
+      '@ai-dev-orchestrator/build-config':
         specifier: workspace:*
         version: link:../build-config
-      '@ai-orchestrator/role-system':
+      '@ai-dev-orchestrator/role-system':
         specifier: workspace:*
         version: link:../role-system
-      '@ai-orchestrator/test-utils':
+      '@ai-dev-orchestrator/test-utils':
         specifier: workspace:*
         version: link:../test-utils
       '@types/node':
@@ -319,10 +319,10 @@ importers:
 
   packages/dashboard:
     dependencies:
-      '@ai-orchestrator/schemas':
+      '@ai-dev-orchestrator/schemas':
         specifier: workspace:*
         version: link:../schemas
-      '@ai-orchestrator/utils':
+      '@ai-dev-orchestrator/utils':
         specifier: workspace:*
         version: link:../utils
       '@tailwindcss/typography':
@@ -377,7 +377,7 @@ importers:
         specifier: ^4.0.2
         version: 4.0.2
     devDependencies:
-      '@ai-orchestrator/build-config':
+      '@ai-dev-orchestrator/build-config':
         specifier: workspace:*
         version: link:../build-config
       '@playwright/test':
@@ -431,22 +431,22 @@ importers:
 
   packages/dashboard-server:
     dependencies:
-      '@ai-orchestrator/artifacts':
+      '@ai-dev-orchestrator/artifacts':
         specifier: workspace:*
         version: link:../artifacts
-      '@ai-orchestrator/core':
+      '@ai-dev-orchestrator/core':
         specifier: workspace:*
         version: link:../core
-      '@ai-orchestrator/ports':
+      '@ai-dev-orchestrator/ports':
         specifier: workspace:*
         version: link:../ports
-      '@ai-orchestrator/runner':
+      '@ai-dev-orchestrator/runner':
         specifier: workspace:*
         version: link:../runner
-      '@ai-orchestrator/schemas':
+      '@ai-dev-orchestrator/schemas':
         specifier: workspace:*
         version: link:../schemas
-      '@ai-orchestrator/utils':
+      '@ai-dev-orchestrator/utils':
         specifier: workspace:*
         version: link:../utils
       '@hono/node-server':
@@ -462,7 +462,7 @@ importers:
         specifier: ^4.5.4
         version: 4.5.4
     devDependencies:
-      '@ai-orchestrator/build-config':
+      '@ai-dev-orchestrator/build-config':
         specifier: workspace:*
         version: link:../build-config
       '@types/node':
@@ -477,14 +477,14 @@ importers:
 
   packages/dependency-graph:
     dependencies:
-      '@ai-orchestrator/ports':
+      '@ai-dev-orchestrator/ports':
         specifier: workspace:*
         version: link:../ports
-      '@ai-orchestrator/schemas':
+      '@ai-dev-orchestrator/schemas':
         specifier: workspace:*
         version: link:../schemas
     devDependencies:
-      '@ai-orchestrator/build-config':
+      '@ai-dev-orchestrator/build-config':
         specifier: workspace:*
         version: link:../build-config
       fast-check:
@@ -496,14 +496,14 @@ importers:
 
   packages/execution-analytics:
     dependencies:
-      '@ai-orchestrator/ports':
+      '@ai-dev-orchestrator/ports':
         specifier: workspace:*
         version: link:../ports
-      '@ai-orchestrator/schemas':
+      '@ai-dev-orchestrator/schemas':
         specifier: workspace:*
         version: link:../schemas
     devDependencies:
-      '@ai-orchestrator/build-config':
+      '@ai-dev-orchestrator/build-config':
         specifier: workspace:*
         version: link:../build-config
       vitest:
@@ -512,23 +512,23 @@ importers:
 
   packages/governance:
     dependencies:
-      '@ai-orchestrator/ports':
+      '@ai-dev-orchestrator/ports':
         specifier: workspace:*
         version: link:../ports
-      '@ai-orchestrator/schemas':
+      '@ai-dev-orchestrator/schemas':
         specifier: workspace:*
         version: link:../schemas
     devDependencies:
-      '@ai-orchestrator/artifacts':
+      '@ai-dev-orchestrator/artifacts':
         specifier: workspace:*
         version: link:../artifacts
-      '@ai-orchestrator/build-config':
+      '@ai-dev-orchestrator/build-config':
         specifier: workspace:*
         version: link:../build-config
-      '@ai-orchestrator/role-system':
+      '@ai-dev-orchestrator/role-system':
         specifier: workspace:*
         version: link:../role-system
-      '@ai-orchestrator/test-utils':
+      '@ai-dev-orchestrator/test-utils':
         specifier: workspace:*
         version: link:../test-utils
       '@types/node':
@@ -540,20 +540,20 @@ importers:
 
   packages/journal:
     dependencies:
-      '@ai-orchestrator/ports':
+      '@ai-dev-orchestrator/ports':
         specifier: workspace:*
         version: link:../ports
-      '@ai-orchestrator/schemas':
+      '@ai-dev-orchestrator/schemas':
         specifier: workspace:*
         version: link:../schemas
-      '@ai-orchestrator/utils':
+      '@ai-dev-orchestrator/utils':
         specifier: workspace:*
         version: link:../utils
       yaml:
         specifier: ^2.9.0
         version: 2.9.0
     devDependencies:
-      '@ai-orchestrator/build-config':
+      '@ai-dev-orchestrator/build-config':
         specifier: workspace:*
         version: link:../build-config
       '@types/node':
@@ -565,23 +565,23 @@ importers:
 
   packages/policy-engine:
     dependencies:
-      '@ai-orchestrator/ports':
+      '@ai-dev-orchestrator/ports':
         specifier: workspace:*
         version: link:../ports
-      '@ai-orchestrator/schemas':
+      '@ai-dev-orchestrator/schemas':
         specifier: workspace:*
         version: link:../schemas
-      '@ai-orchestrator/utils':
+      '@ai-dev-orchestrator/utils':
         specifier: workspace:*
         version: link:../utils
       yaml:
         specifier: ^2.9.0
         version: 2.9.0
     devDependencies:
-      '@ai-orchestrator/build-config':
+      '@ai-dev-orchestrator/build-config':
         specifier: workspace:*
         version: link:../build-config
-      '@ai-orchestrator/test-utils':
+      '@ai-dev-orchestrator/test-utils':
         specifier: workspace:*
         version: link:../test-utils
       '@types/node':
@@ -596,11 +596,11 @@ importers:
 
   packages/ports:
     dependencies:
-      '@ai-orchestrator/schemas':
+      '@ai-dev-orchestrator/schemas':
         specifier: workspace:*
         version: link:../schemas
     devDependencies:
-      '@ai-orchestrator/build-config':
+      '@ai-dev-orchestrator/build-config':
         specifier: workspace:*
         version: link:../build-config
       '@types/node':
@@ -612,14 +612,14 @@ importers:
 
   packages/project-context:
     dependencies:
-      '@ai-orchestrator/ports':
+      '@ai-dev-orchestrator/ports':
         specifier: workspace:*
         version: link:../ports
-      '@ai-orchestrator/schemas':
+      '@ai-dev-orchestrator/schemas':
         specifier: workspace:*
         version: link:../schemas
     devDependencies:
-      '@ai-orchestrator/build-config':
+      '@ai-dev-orchestrator/build-config':
         specifier: workspace:*
         version: link:../build-config
       '@types/node':
@@ -631,16 +631,16 @@ importers:
 
   packages/prompt-engine:
     dependencies:
-      '@ai-orchestrator/artifacts':
+      '@ai-dev-orchestrator/artifacts':
         specifier: workspace:*
         version: link:../artifacts
-      '@ai-orchestrator/ports':
+      '@ai-dev-orchestrator/ports':
         specifier: workspace:*
         version: link:../ports
-      '@ai-orchestrator/schemas':
+      '@ai-dev-orchestrator/schemas':
         specifier: workspace:*
         version: link:../schemas
-      '@ai-orchestrator/utils':
+      '@ai-dev-orchestrator/utils':
         specifier: workspace:*
         version: link:../utils
       diff:
@@ -653,7 +653,7 @@ importers:
         specifier: ^4.5.4
         version: 4.5.4
     devDependencies:
-      '@ai-orchestrator/build-config':
+      '@ai-dev-orchestrator/build-config':
         specifier: workspace:*
         version: link:../build-config
       '@types/diff':
@@ -668,20 +668,20 @@ importers:
 
   packages/recovery:
     dependencies:
-      '@ai-orchestrator/ports':
+      '@ai-dev-orchestrator/ports':
         specifier: workspace:*
         version: link:../ports
-      '@ai-orchestrator/schemas':
+      '@ai-dev-orchestrator/schemas':
         specifier: workspace:*
         version: link:../schemas
       zod:
         specifier: ^4.5.4
         version: 4.5.4
     devDependencies:
-      '@ai-orchestrator/build-config':
+      '@ai-dev-orchestrator/build-config':
         specifier: workspace:*
         version: link:../build-config
-      '@ai-orchestrator/core':
+      '@ai-dev-orchestrator/core':
         specifier: workspace:*
         version: link:../core
       '@types/node':
@@ -693,23 +693,23 @@ importers:
 
   packages/role-system:
     dependencies:
-      '@ai-orchestrator/ports':
+      '@ai-dev-orchestrator/ports':
         specifier: workspace:*
         version: link:../ports
-      '@ai-orchestrator/schemas':
+      '@ai-dev-orchestrator/schemas':
         specifier: workspace:*
         version: link:../schemas
-      '@ai-orchestrator/utils':
+      '@ai-dev-orchestrator/utils':
         specifier: workspace:*
         version: link:../utils
       yaml:
         specifier: ^2.9.0
         version: 2.9.0
     devDependencies:
-      '@ai-orchestrator/build-config':
+      '@ai-dev-orchestrator/build-config':
         specifier: workspace:*
         version: link:../build-config
-      '@ai-orchestrator/test-utils':
+      '@ai-dev-orchestrator/test-utils':
         specifier: workspace:*
         version: link:../test-utils
       '@types/node':
@@ -721,20 +721,20 @@ importers:
 
   packages/run-manifest:
     dependencies:
-      '@ai-orchestrator/ports':
+      '@ai-dev-orchestrator/ports':
         specifier: workspace:*
         version: link:../ports
-      '@ai-orchestrator/schemas':
+      '@ai-dev-orchestrator/schemas':
         specifier: workspace:*
         version: link:../schemas
-      '@ai-orchestrator/utils':
+      '@ai-dev-orchestrator/utils':
         specifier: workspace:*
         version: link:../utils
       yaml:
         specifier: ^2.9.0
         version: 2.9.0
     devDependencies:
-      '@ai-orchestrator/build-config':
+      '@ai-dev-orchestrator/build-config':
         specifier: workspace:*
         version: link:../build-config
       '@types/node':
@@ -746,25 +746,25 @@ importers:
 
   packages/runner:
     dependencies:
-      '@ai-orchestrator/agent-adapters':
+      '@ai-dev-orchestrator/agent-adapters':
         specifier: workspace:*
         version: link:../agent-adapters
-      '@ai-orchestrator/agent-protocol':
+      '@ai-dev-orchestrator/agent-protocol':
         specifier: workspace:*
         version: link:../agent-protocol
-      '@ai-orchestrator/artifacts':
+      '@ai-dev-orchestrator/artifacts':
         specifier: workspace:*
         version: link:../artifacts
-      '@ai-orchestrator/ports':
+      '@ai-dev-orchestrator/ports':
         specifier: workspace:*
         version: link:../ports
-      '@ai-orchestrator/prompt-engine':
+      '@ai-dev-orchestrator/prompt-engine':
         specifier: workspace:*
         version: link:../prompt-engine
-      '@ai-orchestrator/schemas':
+      '@ai-dev-orchestrator/schemas':
         specifier: workspace:*
         version: link:../schemas
-      '@ai-orchestrator/utils':
+      '@ai-dev-orchestrator/utils':
         specifier: workspace:*
         version: link:../utils
       execa:
@@ -774,7 +774,7 @@ importers:
         specifier: ^4.5.4
         version: 4.5.4
     devDependencies:
-      '@ai-orchestrator/build-config':
+      '@ai-dev-orchestrator/build-config':
         specifier: workspace:*
         version: link:../build-config
       '@types/node':
@@ -793,7 +793,7 @@ importers:
         specifier: ^4.5.4
         version: 4.5.4
     devDependencies:
-      '@ai-orchestrator/build-config':
+      '@ai-dev-orchestrator/build-config':
         specifier: workspace:*
         version: link:../build-config
       vitest:
@@ -802,10 +802,10 @@ importers:
 
   packages/specification:
     dependencies:
-      '@ai-orchestrator/ports':
+      '@ai-dev-orchestrator/ports':
         specifier: workspace:*
         version: link:../ports
-      '@ai-orchestrator/schemas':
+      '@ai-dev-orchestrator/schemas':
         specifier: workspace:*
         version: link:../schemas
       yaml:
@@ -815,7 +815,7 @@ importers:
         specifier: ^4.5.4
         version: 4.5.4
     devDependencies:
-      '@ai-orchestrator/build-config':
+      '@ai-dev-orchestrator/build-config':
         specifier: workspace:*
         version: link:../build-config
       '@types/node':
@@ -827,14 +827,14 @@ importers:
 
   packages/test-utils:
     dependencies:
-      '@ai-orchestrator/ports':
+      '@ai-dev-orchestrator/ports':
         specifier: workspace:*
         version: link:../ports
-      '@ai-orchestrator/schemas':
+      '@ai-dev-orchestrator/schemas':
         specifier: workspace:*
         version: link:../schemas
     devDependencies:
-      '@ai-orchestrator/build-config':
+      '@ai-dev-orchestrator/build-config':
         specifier: workspace:*
         version: link:../build-config
       '@types/node':
@@ -850,7 +850,7 @@ importers:
         specifier: ^2.9.0
         version: 2.9.0
     devDependencies:
-      '@ai-orchestrator/build-config':
+      '@ai-dev-orchestrator/build-config':
         specifier: workspace:*
         version: link:../build-config
       '@types/node':
@@ -862,22 +862,22 @@ importers:
 
   packages/workflow:
     dependencies:
-      '@ai-orchestrator/artifacts':
+      '@ai-dev-orchestrator/artifacts':
         specifier: workspace:*
         version: link:../artifacts
-      '@ai-orchestrator/core':
+      '@ai-dev-orchestrator/core':
         specifier: workspace:*
         version: link:../core
-      '@ai-orchestrator/ports':
+      '@ai-dev-orchestrator/ports':
         specifier: workspace:*
         version: link:../ports
-      '@ai-orchestrator/run-manifest':
+      '@ai-dev-orchestrator/run-manifest':
         specifier: workspace:*
         version: link:../run-manifest
-      '@ai-orchestrator/schemas':
+      '@ai-dev-orchestrator/schemas':
         specifier: workspace:*
         version: link:../schemas
-      '@ai-orchestrator/utils':
+      '@ai-dev-orchestrator/utils':
         specifier: workspace:*
         version: link:../utils
       yaml:
@@ -887,34 +887,34 @@ importers:
         specifier: ^4.5.4
         version: 4.5.4
     devDependencies:
-      '@ai-orchestrator/build-config':
+      '@ai-dev-orchestrator/build-config':
         specifier: workspace:*
         version: link:../build-config
-      '@ai-orchestrator/dependency-graph':
+      '@ai-dev-orchestrator/dependency-graph':
         specifier: workspace:*
         version: link:../dependency-graph
-      '@ai-orchestrator/governance':
+      '@ai-dev-orchestrator/governance':
         specifier: workspace:*
         version: link:../governance
-      '@ai-orchestrator/journal':
+      '@ai-dev-orchestrator/journal':
         specifier: workspace:*
         version: link:../journal
-      '@ai-orchestrator/policy-engine':
+      '@ai-dev-orchestrator/policy-engine':
         specifier: workspace:*
         version: link:../policy-engine
-      '@ai-orchestrator/prompt-engine':
+      '@ai-dev-orchestrator/prompt-engine':
         specifier: workspace:*
         version: link:../prompt-engine
-      '@ai-orchestrator/recovery':
+      '@ai-dev-orchestrator/recovery':
         specifier: workspace:*
         version: link:../recovery
-      '@ai-orchestrator/role-system':
+      '@ai-dev-orchestrator/role-system':
         specifier: workspace:*
         version: link:../role-system
-      '@ai-orchestrator/runner':
+      '@ai-dev-orchestrator/runner':
         specifier: workspace:*
         version: link:../runner
-      '@ai-orchestrator/test-utils':
+      '@ai-dev-orchestrator/test-utils':
         specifier: workspace:*
         version: link:../test-utils
       '@types/node':

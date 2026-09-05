@@ -4,7 +4,7 @@ import type {
   ArtifactStore,
   ArtifactTypeValidator,
   OwnershipRegistry,
-} from '@ai-orchestrator/ports';
+} from '@ai-dev-orchestrator/ports';
 import type {
   Artifact,
   ArtifactInput,
@@ -15,7 +15,7 @@ import type {
   ArtifactSummary,
   ArtifactType,
   IntegrityResult,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 import {
   ImmutabilityViolationError,

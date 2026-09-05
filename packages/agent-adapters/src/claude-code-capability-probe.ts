@@ -1,4 +1,4 @@
-import { BUILT_IN_CODING_RUNNER_ID } from '@ai-orchestrator/schemas';
+import { BUILT_IN_CODING_RUNNER_ID } from '@ai-dev-orchestrator/schemas';
 
 import type { AgentAdapterCapabilities, CapabilityProbeResult } from './adapter-types';
 

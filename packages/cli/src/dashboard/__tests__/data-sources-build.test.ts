@@ -7,7 +7,7 @@ import type {
   PersistedState,
   RunManifest,
   WorkflowDefinition,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ---------------------------------------------------------------------------
@@ -22,7 +22,7 @@ vi.mock('node:fs', () => ({
 }));
 
 const mockLoad = vi.fn().mockReturnValue(null);
-vi.mock('@ai-orchestrator/core', () => ({
+vi.mock('@ai-dev-orchestrator/core', () => ({
   DefaultStatePersistence: vi.fn().mockImplementation(function (this: {
     load: ReturnType<typeof vi.fn>;
   }) {
@@ -32,7 +32,7 @@ vi.mock('@ai-orchestrator/core', () => ({
 
 const mockManifestGet = vi.fn().mockReturnValue(null);
 const mockManifestList = vi.fn().mockReturnValue([]);
-vi.mock('@ai-orchestrator/run-manifest', () => ({
+vi.mock('@ai-dev-orchestrator/run-manifest', () => ({
   DefaultManifestQuery: vi.fn().mockImplementation(function (this: {
     get: ReturnType<typeof vi.fn>;
     list: ReturnType<typeof vi.fn>;
@@ -43,7 +43,7 @@ vi.mock('@ai-orchestrator/run-manifest', () => ({
 }));
 
 const mockReadAll = vi.fn().mockReturnValue([]);
-vi.mock('@ai-orchestrator/journal', () => ({
+vi.mock('@ai-dev-orchestrator/journal', () => ({
   DefaultJournalReader: vi.fn().mockImplementation(function (this: {
     readAll: ReturnType<typeof vi.fn>;
   }) {
@@ -115,7 +115,7 @@ const mockBuildContracts = vi.fn().mockReturnValue([
   { id: 'review-loop', maxIterations: 3 },
   { id: 'judge-loop', maxIterations: 2 },
 ]);
-vi.mock('@ai-orchestrator/governance', () => ({
+vi.mock('@ai-dev-orchestrator/governance', () => ({
   buildContracts: (limits: unknown) => mockBuildContracts(limits) as unknown,
 }));
 

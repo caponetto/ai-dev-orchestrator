@@ -1,5 +1,5 @@
-import { RecoverableErrorBase } from '@ai-orchestrator/ports';
-import type { ValidationError } from '@ai-orchestrator/schemas';
+import { RecoverableErrorBase } from '@ai-dev-orchestrator/ports';
+import type { ValidationError } from '@ai-dev-orchestrator/schemas';
 
 /** Thrown when context assembly fails (missing artifact, access denied). */
 export class ContextAssemblyError extends RecoverableErrorBase {

@@ -1,4 +1,4 @@
-import { NonRecoverableErrorBase } from '@ai-orchestrator/ports';
+import { NonRecoverableErrorBase } from '@ai-dev-orchestrator/ports';
 
 /** Thrown when governance evaluation fails unexpectedly. */
 export class GovernanceError extends NonRecoverableErrorBase {

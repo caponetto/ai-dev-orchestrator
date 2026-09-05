@@ -1,4 +1,4 @@
-import type { IterationContract, IterationState } from '@ai-orchestrator/schemas';
+import type { IterationContract, IterationState } from '@ai-dev-orchestrator/schemas';
 
 /** Port for managing iteration contracts and deriving iteration state. */
 export interface IterationContractRegistry {

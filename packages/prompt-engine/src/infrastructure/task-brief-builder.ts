@@ -1,5 +1,5 @@
-import type { SuccessCriterion, TaskBrief } from '@ai-orchestrator/schemas';
-import { taskBriefSchema } from '@ai-orchestrator/schemas';
+import type { SuccessCriterion, TaskBrief } from '@ai-dev-orchestrator/schemas';
+import { taskBriefSchema } from '@ai-dev-orchestrator/schemas';
 
 export interface TaskBriefParams {
   readonly roleId: string;

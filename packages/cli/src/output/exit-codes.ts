@@ -1,4 +1,4 @@
-import { getErrorMessage } from '@ai-orchestrator/utils';
+import { getErrorMessage } from '@ai-dev-orchestrator/utils';
 
 /** Process exit codes following sysexits.h conventions where applicable. */
 export const ExitCode = {

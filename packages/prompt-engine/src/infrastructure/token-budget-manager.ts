@@ -1,10 +1,10 @@
-import type { TokenEstimator } from '@ai-orchestrator/ports';
+import type { TokenEstimator } from '@ai-dev-orchestrator/ports';
 import type {
   ArtifactContextBlock,
   ArtifactPriority,
   TokenBudget,
   TruncationRecord,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 import { TokenBudgetExceededError } from '../domain/errors';
 

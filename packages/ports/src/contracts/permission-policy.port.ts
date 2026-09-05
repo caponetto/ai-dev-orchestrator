@@ -3,7 +3,7 @@ import type {
   PermissionDecisionAction,
   PermissionRule as SchemaPermissionRule,
   ThreeTierSeverity,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 export interface PermissionRequestPayload {
   readonly action: PermissionAction;

@@ -2,7 +2,7 @@ import {
   BUILT_IN_CODING_RUNNER_ID,
   type RoleUsageView,
   type RunConfigView,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import { Info } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';

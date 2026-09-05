@@ -1,4 +1,4 @@
-import type { DashboardEvent } from '@ai-orchestrator/schemas';
+import type { DashboardEvent } from '@ai-dev-orchestrator/schemas';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type NotificationPermissionState = 'default' | 'granted' | 'denied';

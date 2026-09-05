@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { AgentSessionSnapshot } from '@ai-orchestrator/schemas';
+import type { AgentSessionSnapshot } from '@ai-dev-orchestrator/schemas';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { AgentSessionRegistry } from '../agent-session-registry';

@@ -1,6 +1,6 @@
-import { createProtocolMessage, PROTOCOL_VERSION } from '@ai-orchestrator/agent-protocol';
-import type { AgentOutputStreamEvent, PermissionPolicy } from '@ai-orchestrator/ports';
-import type { AgentTask } from '@ai-orchestrator/schemas';
+import { createProtocolMessage, PROTOCOL_VERSION } from '@ai-dev-orchestrator/agent-protocol';
+import type { AgentOutputStreamEvent, PermissionPolicy } from '@ai-dev-orchestrator/ports';
+import type { AgentTask } from '@ai-dev-orchestrator/schemas';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { LiveRequestStore } from '../file-backed-live-request-store';

@@ -1,9 +1,9 @@
-import type { HealthChecker } from '@ai-orchestrator/ports';
+import type { HealthChecker } from '@ai-dev-orchestrator/ports';
 import type {
   HealthCheckResult,
   HealthProbeConfig,
   SubsystemHealth,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 import { HealthCheckFailedError } from '../domain/metrics-errors';
 

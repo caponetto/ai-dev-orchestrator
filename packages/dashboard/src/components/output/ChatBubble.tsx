@@ -1,4 +1,4 @@
-import type { ArtifactRef } from '@ai-orchestrator/schemas';
+import type { ArtifactRef } from '@ai-dev-orchestrator/schemas';
 import { Bot, Check, ChevronDown, User2, X, Zap } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 

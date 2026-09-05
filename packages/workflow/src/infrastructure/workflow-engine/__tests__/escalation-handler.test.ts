@@ -1,5 +1,5 @@
-import { createRunId } from '@ai-orchestrator/ports';
-import type { EscalationContext } from '@ai-orchestrator/schemas';
+import { createRunId } from '@ai-dev-orchestrator/ports';
+import type { EscalationContext } from '@ai-dev-orchestrator/schemas';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { EscalationHandler } from '../escalation-handler';

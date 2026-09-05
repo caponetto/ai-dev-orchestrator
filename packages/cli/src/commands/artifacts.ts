@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 
-import { DefaultManifestQuery } from '@ai-orchestrator/run-manifest';
-import { formatBytes } from '@ai-orchestrator/utils';
+import { DefaultManifestQuery } from '@ai-dev-orchestrator/run-manifest';
+import { formatBytes } from '@ai-dev-orchestrator/utils';
 
 import { ExitCode } from '../output/exit-codes';
 import type { OutputFormatter } from '../output/formatter';

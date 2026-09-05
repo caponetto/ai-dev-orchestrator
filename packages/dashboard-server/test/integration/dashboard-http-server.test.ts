@@ -1,14 +1,14 @@
 import { request } from 'node:http';
 
-import type { DashboardActionHandler, DashboardDataProvider } from '@ai-orchestrator/ports';
-import type { LiveRequestStore } from '@ai-orchestrator/runner';
+import type { DashboardActionHandler, DashboardDataProvider } from '@ai-dev-orchestrator/ports';
+import type { LiveRequestStore } from '@ai-dev-orchestrator/runner';
 import type {
   DashboardActionResult,
   DashboardEvent,
   RunStateView,
   RunSummaryView,
-} from '@ai-orchestrator/schemas';
-import { err, ok } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
+import { err, ok } from '@ai-dev-orchestrator/schemas';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { DashboardHttpServer } from '../../src/dashboard/dashboard-http-server';

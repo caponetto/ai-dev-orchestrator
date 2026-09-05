@@ -1,4 +1,4 @@
-export type { LogLevel } from '@ai-orchestrator/schemas';
+export type { LogLevel } from '@ai-dev-orchestrator/schemas';
 
 /**
  * Minimal structured logger port.

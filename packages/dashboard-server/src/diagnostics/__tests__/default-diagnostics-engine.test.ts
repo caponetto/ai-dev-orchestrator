@@ -1,4 +1,4 @@
-import type { DiagnosticEntry } from '@ai-orchestrator/schemas';
+import type { DiagnosticEntry } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import type { DiagnosticsDataSources } from '../default-diagnostics-engine';

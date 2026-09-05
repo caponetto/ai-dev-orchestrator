@@ -1,4 +1,4 @@
-import type { Event, EventInput, EventType } from '@ai-orchestrator/schemas';
+import type { Event, EventInput, EventType } from '@ai-dev-orchestrator/schemas';
 import * as fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 

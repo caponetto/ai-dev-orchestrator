@@ -1,4 +1,4 @@
-# @ai-orchestrator/policy-engine
+# @ai-dev-orchestrator/policy-engine
 
 Policy evaluation engine that loads, resolves, and enforces governance policies from YAML configuration. Provides the rule evaluation layer that the governance engine delegates to for iteration limits, quality thresholds, and budget constraints.
 
@@ -8,9 +8,9 @@ Policy evaluation engine that loads, resolves, and enforces governance policies 
 
 ## Workspace Dependencies
 
-- `@ai-orchestrator/ports`
-- `@ai-orchestrator/schemas`
-- `@ai-orchestrator/utils`
+- `@ai-dev-orchestrator/ports`
+- `@ai-dev-orchestrator/schemas`
+- `@ai-dev-orchestrator/utils`
 
 ## Structure
 

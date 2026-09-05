@@ -1,5 +1,5 @@
-import { createRunId } from '@ai-orchestrator/ports';
-import type { DispatchRequest, DispatchResult, WorkerMetrics } from '@ai-orchestrator/schemas';
+import { createRunId } from '@ai-dev-orchestrator/ports';
+import type { DispatchRequest, DispatchResult, WorkerMetrics } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ParallelManager } from '../parallel-manager';

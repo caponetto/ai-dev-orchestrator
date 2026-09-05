@@ -1,4 +1,4 @@
-import { NonRecoverableErrorBase } from '@ai-orchestrator/ports';
+import { NonRecoverableErrorBase } from '@ai-dev-orchestrator/ports';
 
 /** Thrown when a journal write operation fails. */
 export class JournalWriteError extends NonRecoverableErrorBase {

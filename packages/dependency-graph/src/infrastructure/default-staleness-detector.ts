@@ -3,14 +3,14 @@ import type {
   DependencyGraph,
   ProvenanceTracker,
   StalenessDetector,
-} from '@ai-orchestrator/ports';
+} from '@ai-dev-orchestrator/ports';
 import type {
   ArtifactRef,
   StaleArtifact,
   StaleInput,
   StaleSet,
   StalenessResult,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 /** Default implementation of staleness detector with propagation and clearing support. */
 export class DefaultStalenessDetector implements StalenessDetector {

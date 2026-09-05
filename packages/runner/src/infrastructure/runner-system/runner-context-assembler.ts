@@ -5,8 +5,8 @@ import type {
   ProjectContextStore,
   PromptEngine,
   RoleRegistry,
-} from '@ai-orchestrator/ports';
-import { buildTaskBrief } from '@ai-orchestrator/prompt-engine';
+} from '@ai-dev-orchestrator/ports';
+import { buildTaskBrief } from '@ai-dev-orchestrator/prompt-engine';
 import type {
   ArtifactRef,
   ArtifactType,
@@ -17,8 +17,8 @@ import type {
   TaskBrief,
   WorkerConstraints,
   WorkerContext,
-} from '@ai-orchestrator/schemas';
-import { learnedPreferencesSchema } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
+import { learnedPreferencesSchema } from '@ai-dev-orchestrator/schemas';
 
 import { ContextAssemblyError } from '../../domain/runner-system/errors';
 

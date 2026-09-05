@@ -2,7 +2,7 @@ import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { safeJsonParse } from '@ai-orchestrator/artifacts';
+import { safeJsonParse } from '@ai-dev-orchestrator/artifacts';
 import { z } from 'zod';
 
 import { ExitCode } from '../output/exit-codes';

@@ -1,6 +1,6 @@
-import type { RoleRegistry } from '@ai-orchestrator/ports';
-import { DefaultRoleRegistry } from '@ai-orchestrator/role-system';
-import type { RoleContract } from '@ai-orchestrator/schemas';
+import type { RoleRegistry } from '@ai-dev-orchestrator/ports';
+import { DefaultRoleRegistry } from '@ai-dev-orchestrator/role-system';
+import type { RoleContract } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { TEST_ROLES } from '../../../../test/fixtures/test-defaults';

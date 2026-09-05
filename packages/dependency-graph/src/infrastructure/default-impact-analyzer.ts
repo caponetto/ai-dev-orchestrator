@@ -1,10 +1,10 @@
-import type { DependencyGraph, ImpactAnalyzer } from '@ai-orchestrator/ports';
+import type { DependencyGraph, ImpactAnalyzer } from '@ai-dev-orchestrator/ports';
 import type {
   ArtifactType,
   RebuildEstimate,
   RebuildPlan,
   StaleSet,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 /** Artifact types that represent governance agreements (inlined to avoid circular dependency on artifacts). */
 const AGREEMENT_ARTIFACT_TYPES: ReadonlySet<ArtifactType> = new Set<ArtifactType>([

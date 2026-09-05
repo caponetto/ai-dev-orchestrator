@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { WorkflowStateView } from '@ai-orchestrator/schemas';
+import type { WorkflowStateView } from '@ai-dev-orchestrator/schemas';
 import { cleanup, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';

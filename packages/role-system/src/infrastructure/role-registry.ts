@@ -1,4 +1,4 @@
-import type { OwnershipRegistry, RoleRegistry } from '@ai-orchestrator/ports';
+import type { OwnershipRegistry, RoleRegistry } from '@ai-dev-orchestrator/ports';
 import type {
   AgentConfig,
   ArtifactType,
@@ -8,7 +8,7 @@ import type {
   RoleContract,
   RoleId,
   RoleValidationResult,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 import { validateContracts } from './contract-validator';
 import type { ModelAssignmentConfig } from './model-assigner';

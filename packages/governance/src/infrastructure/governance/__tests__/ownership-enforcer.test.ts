@@ -1,5 +1,5 @@
-import type { OwnershipRegistry } from '@ai-orchestrator/ports';
-import type { ArtifactRef, ArtifactType } from '@ai-orchestrator/schemas';
+import type { OwnershipRegistry } from '@ai-dev-orchestrator/ports';
+import type { ArtifactRef, ArtifactType } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { OwnershipEnforcer } from '../ownership-enforcer';

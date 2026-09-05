@@ -2,8 +2,8 @@ import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { createRunId } from '@ai-orchestrator/ports';
-import type { RunManifest, RunResult } from '@ai-orchestrator/schemas';
+import { createRunId } from '@ai-dev-orchestrator/ports';
+import type { RunManifest, RunResult } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 import { resumeOrchestrator } from '../../composition-root';

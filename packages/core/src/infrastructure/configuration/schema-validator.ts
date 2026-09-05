@@ -1,7 +1,7 @@
-import type { ValidationIssue, ValidationReport } from '@ai-orchestrator/ports';
-import type { LogLevel, MergedConfiguration, RunnerDefinition } from '@ai-orchestrator/schemas';
-import { DISPATCH_TYPES, workflowConfigSchema } from '@ai-orchestrator/schemas';
-import { isObject } from '@ai-orchestrator/utils';
+import type { ValidationIssue, ValidationReport } from '@ai-dev-orchestrator/ports';
+import type { LogLevel, MergedConfiguration, RunnerDefinition } from '@ai-dev-orchestrator/schemas';
+import { DISPATCH_TYPES, workflowConfigSchema } from '@ai-dev-orchestrator/schemas';
+import { isObject } from '@ai-dev-orchestrator/utils';
 import { z } from 'zod';
 
 const roleAssignmentSchema = z

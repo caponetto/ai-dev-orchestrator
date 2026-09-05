@@ -6,7 +6,7 @@ import type {
   FindingSummary,
   IterationSummary,
   RunId,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 export class EscalationManager {
   /** Assemble escalation context for the given trigger. */
   buildContext(

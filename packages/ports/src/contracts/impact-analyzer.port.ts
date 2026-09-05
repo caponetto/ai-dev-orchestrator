@@ -1,4 +1,4 @@
-import type { RebuildEstimate, RebuildPlan, StaleSet } from '@ai-orchestrator/schemas';
+import type { RebuildEstimate, RebuildPlan, StaleSet } from '@ai-dev-orchestrator/schemas';
 
 /** Port for computing rebuild plans from stale artifact sets. */
 export interface ImpactAnalyzer {

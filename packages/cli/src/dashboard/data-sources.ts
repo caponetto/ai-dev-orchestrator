@@ -1,13 +1,13 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, extname, join, relative } from 'node:path';
 
-import { ARTIFACT_DESCRIPTORS, safeJsonParse } from '@ai-orchestrator/artifacts';
-import { DefaultStatePersistence } from '@ai-orchestrator/core';
-import type { DashboardDataSources, FindingData } from '@ai-orchestrator/dashboard-server';
-import { toDashboardEvent } from '@ai-orchestrator/dashboard-server';
-import { buildContracts } from '@ai-orchestrator/governance';
-import { DefaultJournalReader } from '@ai-orchestrator/journal';
-import { DefaultManifestQuery } from '@ai-orchestrator/run-manifest';
+import { ARTIFACT_DESCRIPTORS, safeJsonParse } from '@ai-dev-orchestrator/artifacts';
+import { DefaultStatePersistence } from '@ai-dev-orchestrator/core';
+import type { DashboardDataSources, FindingData } from '@ai-dev-orchestrator/dashboard-server';
+import { toDashboardEvent } from '@ai-dev-orchestrator/dashboard-server';
+import { buildContracts } from '@ai-dev-orchestrator/governance';
+import { DefaultJournalReader } from '@ai-dev-orchestrator/journal';
+import { DefaultManifestQuery } from '@ai-dev-orchestrator/run-manifest';
 import type {
   AgentSessionSnapshot,
   ArtifactSummary,
@@ -17,15 +17,15 @@ import type {
   RunId,
   TransitionRecord,
   WorkflowDefinition,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import {
   ARTIFACT_TYPES,
   ARTIFACTS_DIR_NAME,
   INVENTORY_FILENAME,
   WORKFLOW_DEFINITION_FILENAME,
   workflowSchema,
-} from '@ai-orchestrator/schemas';
-import { hashContent } from '@ai-orchestrator/utils';
+} from '@ai-dev-orchestrator/schemas';
+import { hashContent } from '@ai-dev-orchestrator/utils';
 import { parse as parseYaml } from 'yaml';
 
 import { loadWorkflowFromConfig } from '../composition-root';

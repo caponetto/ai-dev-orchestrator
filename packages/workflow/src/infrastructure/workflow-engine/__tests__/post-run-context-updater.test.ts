@@ -1,4 +1,4 @@
-import type { ProjectContextStore } from '@ai-orchestrator/ports';
+import type { ProjectContextStore } from '@ai-dev-orchestrator/ports';
 import { describe, expect, it, vi } from 'vitest';
 
 import { PostRunContextUpdater } from '../post-run-context-updater';

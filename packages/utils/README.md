@@ -1,4 +1,4 @@
-# @ai-orchestrator/utils
+# @ai-dev-orchestrator/utils
 
 Shared low-level utilities for error handling, YAML parsing, content hashing, formatting, key conversion, type guards, and async timing helpers.
 

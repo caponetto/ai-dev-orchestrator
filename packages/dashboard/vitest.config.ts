@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
-import { NamedGithubActionsReporter } from '@ai-orchestrator/build-config';
+import { NamedGithubActionsReporter } from '@ai-dev-orchestrator/build-config';
 
 const reporters: ('default' | NamedGithubActionsReporter)[] =
   process.env['GITHUB_ACTIONS'] === 'true'

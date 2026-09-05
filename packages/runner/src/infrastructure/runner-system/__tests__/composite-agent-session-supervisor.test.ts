@@ -1,5 +1,5 @@
-import type { AgentSessionSupervisor, SessionAdvanceResult } from '@ai-orchestrator/ports';
-import type { AgentSessionSnapshot, AgentSessionState } from '@ai-orchestrator/schemas';
+import type { AgentSessionSupervisor, SessionAdvanceResult } from '@ai-dev-orchestrator/ports';
+import type { AgentSessionSnapshot, AgentSessionState } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi } from 'vitest';
 
 import { CompositeAgentSessionSupervisor } from '../composite-agent-session-supervisor';

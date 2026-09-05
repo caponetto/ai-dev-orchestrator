@@ -6,7 +6,7 @@ import type {
   StateNode,
   UsageBreakdownView,
   WorkflowStateView,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api } from '../api/client';

@@ -1,4 +1,4 @@
-import type { ErrorChainEntry, FailureAnalysis } from '@ai-orchestrator/schemas';
+import type { ErrorChainEntry, FailureAnalysis } from '@ai-dev-orchestrator/schemas';
 interface FailureEvent {
   readonly type: string;
   readonly timestamp: string;

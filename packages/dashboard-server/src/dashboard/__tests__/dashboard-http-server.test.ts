@@ -6,8 +6,8 @@ import type {
   DashboardActionHandler,
   DashboardDataProvider,
   SettingsProvider,
-} from '@ai-orchestrator/ports';
-import type { LiveRequestStore, PermissionApprovalStore } from '@ai-orchestrator/runner';
+} from '@ai-dev-orchestrator/ports';
+import type { LiveRequestStore, PermissionApprovalStore } from '@ai-dev-orchestrator/runner';
 import type {
   ArtifactContentView,
   ArtifactDetailView,
@@ -21,8 +21,8 @@ import type {
   UsageBreakdownView,
   WorkflowStateView,
   WorkflowSummary,
-} from '@ai-orchestrator/schemas';
-import { err, ok } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
+import { err, ok } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, afterEach, vi } from 'vitest';
 
 import { DashboardHttpServer } from '../dashboard-http-server';

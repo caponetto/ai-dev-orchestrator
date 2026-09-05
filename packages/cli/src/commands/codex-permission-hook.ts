@@ -1,4 +1,4 @@
-import { CODEX_HOOK_CONTEXT_ENV, handleCodexPermissionHook } from '@ai-orchestrator/runner';
+import { CODEX_HOOK_CONTEXT_ENV, handleCodexPermissionHook } from '@ai-dev-orchestrator/runner';
 
 export async function codexPermissionHookCommand(): Promise<number> {
   const contextPath = process.env[CODEX_HOOK_CONTEXT_ENV];

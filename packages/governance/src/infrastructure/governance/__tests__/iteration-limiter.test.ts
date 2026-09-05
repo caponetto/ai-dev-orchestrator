@@ -1,4 +1,4 @@
-import type { IterationContractRegistry } from '@ai-orchestrator/ports';
+import type { IterationContractRegistry } from '@ai-dev-orchestrator/ports';
 import { describe, expect, it, vi } from 'vitest';
 
 import { PLAN_REVIEW_LOOP } from '../../iteration-contracts/built-in-contracts';

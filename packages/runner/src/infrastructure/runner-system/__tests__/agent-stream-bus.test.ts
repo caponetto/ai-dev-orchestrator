@@ -1,4 +1,4 @@
-import type { AgentStreamEvent } from '@ai-orchestrator/ports';
+import type { AgentStreamEvent } from '@ai-dev-orchestrator/ports';
 import { describe, expect, it, vi } from 'vitest';
 
 import { InMemoryAgentStreamBus } from '../agent-stream-bus';

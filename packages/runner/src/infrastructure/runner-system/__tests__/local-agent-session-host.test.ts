@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 
-import type { AgentSessionRef } from '@ai-orchestrator/schemas';
+import type { AgentSessionRef } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import { LocalAgentSessionHost } from '../local-agent-session-host';

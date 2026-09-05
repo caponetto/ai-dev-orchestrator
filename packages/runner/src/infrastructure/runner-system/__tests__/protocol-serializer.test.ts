@@ -2,7 +2,7 @@ import {
   PROTOCOL_VERSION,
   createProtocolMessage,
   resetMessageCounter,
-} from '@ai-orchestrator/agent-protocol';
+} from '@ai-dev-orchestrator/agent-protocol';
 import { describe, expect, it, beforeEach } from 'vitest';
 
 import { serializeMessage, deserializeMessage } from '../protocol-serializer';

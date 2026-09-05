@@ -1,4 +1,4 @@
-import type { ArtifactType } from '@ai-orchestrator/schemas';
+import type { ArtifactType } from '@ai-dev-orchestrator/schemas';
 
 import { renderAgreement } from './agreement-renderer';
 import { renderClarificationList } from './clarification-renderer';

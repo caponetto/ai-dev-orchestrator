@@ -1,4 +1,4 @@
-import type { ArtifactType } from '@ai-orchestrator/schemas';
+import type { ArtifactType } from '@ai-dev-orchestrator/schemas';
 import * as fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 

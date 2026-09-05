@@ -4,7 +4,7 @@ import {
   executionProfileSchema,
   staticConfigBaselineSchema,
   workerOutcomeRecordSchema,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { NO_RECOMMENDATION } from '../adaptive-config';

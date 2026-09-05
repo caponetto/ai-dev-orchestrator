@@ -1,7 +1,7 @@
-import { DefaultAgreementGate } from '@ai-orchestrator/artifacts';
-import type { ArtifactStore, IterationContractRegistry } from '@ai-orchestrator/ports';
-import { createRunId } from '@ai-orchestrator/ports';
-import type { TransitionRequest } from '@ai-orchestrator/schemas';
+import { DefaultAgreementGate } from '@ai-dev-orchestrator/artifacts';
+import type { ArtifactStore, IterationContractRegistry } from '@ai-dev-orchestrator/ports';
+import { createRunId } from '@ai-dev-orchestrator/ports';
+import type { TransitionRequest } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi } from 'vitest';
 
 import { PLAN_REVIEW_LOOP } from '../../iteration-contracts/built-in-contracts';

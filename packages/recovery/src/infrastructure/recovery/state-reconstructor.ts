@@ -1,5 +1,5 @@
-import type { JournalReader } from '@ai-orchestrator/ports';
-import type { JournalEvent, PersistedState, RunId } from '@ai-orchestrator/schemas';
+import type { JournalReader } from '@ai-dev-orchestrator/ports';
+import type { JournalEvent, PersistedState, RunId } from '@ai-dev-orchestrator/schemas';
 
 /** Function that rebuilds a PersistedState by replaying journal events. */
 export type StateRebuilder = (runId: RunId, events: readonly JournalEvent[]) => PersistedState;

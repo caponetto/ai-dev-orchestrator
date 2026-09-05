@@ -7,7 +7,7 @@ import {
   permissionActionSchema,
   permissionDecisionActionSchema,
   roleTrustLevelSchema,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import { z } from 'zod';
 
 // ── Config schema (config.yaml) ──

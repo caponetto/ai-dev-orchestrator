@@ -1,11 +1,11 @@
-import type { PolicyEvaluator } from '@ai-orchestrator/ports';
+import type { PolicyEvaluator } from '@ai-dev-orchestrator/ports';
 import type {
   ConfidenceReport,
   PolicyConfidenceGateConfig,
   PolicyContext,
   PolicyDefinition,
   PolicyResult,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 const RETRY_PENALTY = 0.15;
 const MAX_RETRY_PENALTY = 0.45;

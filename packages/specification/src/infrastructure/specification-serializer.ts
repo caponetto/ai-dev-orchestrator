@@ -1,4 +1,4 @@
-import type { CanonicalSpecification, SpecificationId } from '@ai-orchestrator/schemas';
+import type { CanonicalSpecification, SpecificationId } from '@ai-dev-orchestrator/schemas';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
 const FRONTMATTER_DELIMITER = '---';

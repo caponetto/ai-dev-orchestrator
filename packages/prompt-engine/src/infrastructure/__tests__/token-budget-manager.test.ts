@@ -1,4 +1,4 @@
-import type { ArtifactContextBlock, TokenBudget } from '@ai-orchestrator/schemas';
+import type { ArtifactContextBlock, TokenBudget } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { TokenBudgetExceededError } from '../../domain/errors';

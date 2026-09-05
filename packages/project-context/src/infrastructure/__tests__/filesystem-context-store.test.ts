@@ -2,7 +2,7 @@ import { chmod, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { ContextDocument } from '@ai-orchestrator/schemas';
+import type { ContextDocument } from '@ai-dev-orchestrator/schemas';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ContextStoreInitError } from '../../domain/errors';

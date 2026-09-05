@@ -11,7 +11,7 @@ vi.mock('../workspace-paths', () => ({
   getAiDir: vi.fn(() => '/home/user/.ai'),
 }));
 
-vi.mock('@ai-orchestrator/core', async (importOriginal) => {
+vi.mock('@ai-dev-orchestrator/core', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...(actual as object),
@@ -23,7 +23,7 @@ vi.mock('@ai-orchestrator/core', async (importOriginal) => {
   };
 });
 
-vi.mock('@ai-orchestrator/config-templates', () => ({
+vi.mock('@ai-dev-orchestrator/config-templates', () => ({
   generateAll: vi.fn().mockReturnValue([]),
   getBuiltInWorkflowByName: vi.fn().mockImplementation((name: string) => {
     if (name === 'dev') {
@@ -70,7 +70,7 @@ describe('loadDefaultWorkflow', () => {
   });
 
   it('throws when dev workflow is not found', async () => {
-    const { getBuiltInWorkflowByName } = await import('@ai-orchestrator/config-templates');
+    const { getBuiltInWorkflowByName } = await import('@ai-dev-orchestrator/config-templates');
     vi.mocked(getBuiltInWorkflowByName).mockReturnValueOnce(undefined as never);
     expect(() => loadDefaultWorkflow()).toThrow("Failed to load built-in 'dev' workflow.");
   });

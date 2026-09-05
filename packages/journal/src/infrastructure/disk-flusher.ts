@@ -9,7 +9,7 @@ import {
 } from 'node:fs';
 import { dirname } from 'node:path';
 
-import { getErrorMessage } from '@ai-orchestrator/utils';
+import { getErrorMessage } from '@ai-dev-orchestrator/utils';
 
 import { JournalWriteError } from '../domain/errors';
 

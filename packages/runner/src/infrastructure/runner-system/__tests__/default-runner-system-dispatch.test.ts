@@ -6,9 +6,9 @@ import type {
   PromptEngine,
   ProvenanceTracker,
   RoleRegistry,
-} from '@ai-orchestrator/ports';
-import { createRunId } from '@ai-orchestrator/ports';
-import type { Artifact, JournalEvent } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/ports';
+import { createRunId } from '@ai-dev-orchestrator/ports';
+import type { Artifact, JournalEvent } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi } from 'vitest';
 
 import { DefaultRunnerSystem } from '../default-runner-system';

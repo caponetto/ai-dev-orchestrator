@@ -2,7 +2,7 @@ import type {
   ArtifactEntryView,
   ArtifactRef,
   DashboardWaitingContext,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import { ArrowUp, User2 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 

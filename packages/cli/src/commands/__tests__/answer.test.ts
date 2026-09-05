@@ -2,10 +2,10 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { DefaultStatePersistence } from '@ai-orchestrator/core';
-import { createRunId } from '@ai-orchestrator/ports';
-import { FileBackedLiveRequestStore } from '@ai-orchestrator/runner';
-import type { PersistedState, RunManifest, RunResult } from '@ai-orchestrator/schemas';
+import { DefaultStatePersistence } from '@ai-dev-orchestrator/core';
+import { createRunId } from '@ai-dev-orchestrator/ports';
+import { FileBackedLiveRequestStore } from '@ai-dev-orchestrator/runner';
+import type { PersistedState, RunManifest, RunResult } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 import { resumeOrchestrator } from '../../composition-root';
@@ -25,7 +25,7 @@ vi.mock('../../workspace-paths', async (importOriginal) => {
   };
 });
 
-vi.mock('@ai-orchestrator/core', async (importOriginal) => {
+vi.mock('@ai-dev-orchestrator/core', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...(actual as object),

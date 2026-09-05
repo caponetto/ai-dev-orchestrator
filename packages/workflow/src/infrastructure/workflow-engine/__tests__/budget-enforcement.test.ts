@@ -6,8 +6,12 @@ import type {
   ManifestProducer,
   RunnerSystem,
   StatePersistence,
-} from '@ai-orchestrator/ports';
-import type { RunManifest, WorkflowDefinition, WorkflowRunConfig } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/ports';
+import type {
+  RunManifest,
+  WorkflowDefinition,
+  WorkflowRunConfig,
+} from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi } from 'vitest';
 
 import { LifecycleController } from '../lifecycle-controller';

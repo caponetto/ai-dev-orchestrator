@@ -2,8 +2,8 @@ import type {
   DispatchRequest,
   DispatchResult,
   StreamEventCallback,
-} from '@ai-orchestrator/schemas';
-import { getErrorMessage } from '@ai-orchestrator/utils';
+} from '@ai-dev-orchestrator/schemas';
+import { getErrorMessage } from '@ai-dev-orchestrator/utils';
 export type DispatchFn = (
   request: DispatchRequest,
   onStreamEvent?: StreamEventCallback,

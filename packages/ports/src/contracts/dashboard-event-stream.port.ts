@@ -1,4 +1,4 @@
-import type { DashboardEvent } from '@ai-orchestrator/schemas';
+import type { DashboardEvent } from '@ai-dev-orchestrator/schemas';
 
 export interface DashboardEventStream {
   subscribe(callback: (event: DashboardEvent) => void): string;

@@ -1,4 +1,4 @@
-import type { StateNode, TransitionEdge, WorkflowStateView } from '@ai-orchestrator/schemas';
+import type { StateNode, TransitionEdge, WorkflowStateView } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import {

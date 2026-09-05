@@ -6,10 +6,10 @@ import {
   generateAll,
   getBuiltInWorkflowByName,
   loadRunnerRegistry,
-} from '@ai-orchestrator/config-templates';
-import { FileSystemConfigurationLoader, REQUIRED_CONFIG_FILES } from '@ai-orchestrator/core';
-import type { ValidationReport } from '@ai-orchestrator/ports';
-import type { MergedConfiguration, WorkflowDefinition } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/config-templates';
+import { FileSystemConfigurationLoader, REQUIRED_CONFIG_FILES } from '@ai-dev-orchestrator/core';
+import type { ValidationReport } from '@ai-dev-orchestrator/ports';
+import type { MergedConfiguration, WorkflowDefinition } from '@ai-dev-orchestrator/schemas';
 
 import { getAiDir } from './workspace-paths';
 

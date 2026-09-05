@@ -1,5 +1,5 @@
-import type { ArtifactTypeValidator, ArtifactValidationResult } from '@ai-orchestrator/ports';
-import type { ArtifactType } from '@ai-orchestrator/schemas';
+import type { ArtifactTypeValidator, ArtifactValidationResult } from '@ai-dev-orchestrator/ports';
+import type { ArtifactType } from '@ai-dev-orchestrator/schemas';
 
 import { ARTIFACT_SCHEMA_MAP } from '../../domain/artifact-system/artifact-descriptors';
 

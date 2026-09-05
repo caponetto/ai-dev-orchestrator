@@ -1,4 +1,4 @@
-# @ai-orchestrator/test-utils
+# @ai-dev-orchestrator/test-utils
 
 Shared test fixtures, mock port implementations, and helper utilities used across the monorepo's test suites.
 
@@ -8,8 +8,8 @@ Shared test fixtures, mock port implementations, and helper utilities used acros
 
 ## Workspace Dependencies
 
-- `@ai-orchestrator/ports`
-- `@ai-orchestrator/schemas`
+- `@ai-dev-orchestrator/ports`
+- `@ai-dev-orchestrator/schemas`
 
 ## Structure
 

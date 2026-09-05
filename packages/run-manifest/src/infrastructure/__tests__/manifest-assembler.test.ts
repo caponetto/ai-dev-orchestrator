@@ -1,4 +1,4 @@
-import type { ManifestContext, ManifestContextConfig } from '@ai-orchestrator/schemas';
+import type { ManifestContext, ManifestContextConfig } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { assembleManifest } from '../manifest-assembler';

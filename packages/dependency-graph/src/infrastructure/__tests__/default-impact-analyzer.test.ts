@@ -1,4 +1,4 @@
-import type { ArtifactRef, StaleArtifact, StaleSet } from '@ai-orchestrator/schemas';
+import type { ArtifactRef, StaleArtifact, StaleSet } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { DefaultDependencyGraph } from '../default-dependency-graph';

@@ -6,9 +6,9 @@ import type {
   PermissionRequestMessage,
   ProgressMessage,
   ProtocolMessage,
-} from '@ai-orchestrator/agent-protocol';
-import { createProtocolMessage, payloadToRecord } from '@ai-orchestrator/agent-protocol';
-import type { AgentOutputStreamEvent } from '@ai-orchestrator/ports';
+} from '@ai-dev-orchestrator/agent-protocol';
+import { createProtocolMessage, payloadToRecord } from '@ai-dev-orchestrator/agent-protocol';
+import type { AgentOutputStreamEvent } from '@ai-dev-orchestrator/ports';
 import type {
   AgentSessionRef,
   AgentSessionState,
@@ -16,7 +16,7 @@ import type {
   PermissionPayload,
   SessionPendingRequest,
   AgentResult as AgentResultSchema,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 import { extractUsageFromRawLine } from './cli-agent-runner';
 import type { StdioProtocolTransport } from './stdio-protocol-transport';

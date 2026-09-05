@@ -1,4 +1,4 @@
-import type { WorkerError } from '@ai-orchestrator/schemas';
+import type { WorkerError } from '@ai-dev-orchestrator/schemas';
 const RETRYABLE_TYPES: ReadonlySet<WorkerError['type']> = new Set(['agent_error', 'timeout']);
 
 const NON_RETRYABLE_TYPES: ReadonlySet<WorkerError['type']> = new Set([

@@ -7,9 +7,9 @@ import {
   DefaultArtifactTypeValidator,
   DefaultOwnershipRegistry,
   FilesystemArtifactStore,
-} from '@ai-orchestrator/artifacts';
-import { DefaultRoleRegistry } from '@ai-orchestrator/role-system';
-import type { ArtifactRef, Event } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/artifacts';
+import { DefaultRoleRegistry } from '@ai-dev-orchestrator/role-system';
+import type { ArtifactRef, Event } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi } from 'vitest';
 
 import { FileSystemConfigurationLoader } from '../../src/infrastructure/configuration/configuration-loader';

@@ -1,8 +1,8 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { DefaultStatePersistence } from '@ai-orchestrator/core';
-import { RUN_LOCK_FILENAME } from '@ai-orchestrator/schemas';
+import { DefaultStatePersistence } from '@ai-dev-orchestrator/core';
+import { RUN_LOCK_FILENAME } from '@ai-dev-orchestrator/schemas';
 
 import { TERMINAL_STATES, buildAbortedState, writeAbortJournalEntries } from '../abort-run';
 import { ExitCode, toCLIError } from '../output/exit-codes';

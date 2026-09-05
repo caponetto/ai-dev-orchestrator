@@ -1,6 +1,6 @@
-# @ai-orchestrator/dashboard
+# @ai-dev-orchestrator/dashboard
 
-React single-page application that visualizes orchestrator runs, artifacts, workflow graphs, and metrics. Built with Vite, Tailwind CSS, Radix UI, and React Flow. Served by `@ai-orchestrator/dashboard-server`.
+React single-page application that visualizes orchestrator runs, artifacts, workflow graphs, and metrics. Built with Vite, Tailwind CSS, Radix UI, and React Flow. Served by `@ai-dev-orchestrator/dashboard-server`.
 
 ## Architecture Layer
 
@@ -8,8 +8,8 @@ React single-page application that visualizes orchestrator runs, artifacts, work
 
 ## Workspace Dependencies
 
-- `@ai-orchestrator/schemas`
-- `@ai-orchestrator/utils`
+- `@ai-dev-orchestrator/schemas`
+- `@ai-dev-orchestrator/utils`
 
 ## Structure
 

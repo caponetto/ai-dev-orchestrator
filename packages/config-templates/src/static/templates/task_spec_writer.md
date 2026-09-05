@@ -172,7 +172,7 @@ Current state: {{run.currentState}}, iteration: {{run.iterationCount}}.
     },
     {
       "id": "NFR-002",
-      "description": "All exported types must be importable via @ai-orchestrator/schemas without deep path imports",
+      "description": "All exported types must be importable via @ai-dev-orchestrator/schemas without deep path imports",
       "category": "maintainability"
     }
   ],

@@ -1,4 +1,4 @@
-import type { ActionResult } from '@ai-orchestrator/schemas';
+import type { ActionResult } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { extractConfidenceReport } from '../confidence-extractor';

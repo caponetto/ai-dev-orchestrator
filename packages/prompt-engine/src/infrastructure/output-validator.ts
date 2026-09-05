@@ -1,9 +1,9 @@
-import { ARTIFACT_SCHEMA_MAP } from '@ai-orchestrator/artifacts';
+import { ARTIFACT_SCHEMA_MAP } from '@ai-dev-orchestrator/artifacts';
 import type {
   OutputContract,
   OutputValidationResult,
   ValidationError,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import { parse as parseYaml } from 'yaml';
 
 export function validateOutput(output: string, contract: OutputContract): OutputValidationResult {

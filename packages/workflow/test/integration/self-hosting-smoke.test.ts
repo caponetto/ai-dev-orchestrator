@@ -2,14 +2,14 @@ import { mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { DefaultIterationContractRegistry } from '@ai-orchestrator/governance';
-import { DefaultJournalReader, DefaultJournalWriter } from '@ai-orchestrator/journal';
-import type { GovernanceEngine } from '@ai-orchestrator/ports';
-import { createRunId } from '@ai-orchestrator/ports';
-import type { TransitionDecision } from '@ai-orchestrator/schemas';
+import { DefaultIterationContractRegistry } from '@ai-dev-orchestrator/governance';
+import { DefaultJournalReader, DefaultJournalWriter } from '@ai-dev-orchestrator/journal';
+import type { GovernanceEngine } from '@ai-dev-orchestrator/ports';
+import { createRunId } from '@ai-dev-orchestrator/ports';
+import type { TransitionDecision } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 
-import { LifecycleController } from '@ai-orchestrator/workflow';
+import { LifecycleController } from '@ai-dev-orchestrator/workflow';
 
 import { TEST_WORKFLOW } from '../fixtures/test-defaults';
 import {

@@ -1,4 +1,4 @@
-import type { ArtifactRef } from '@ai-orchestrator/schemas';
+import type { ArtifactRef } from '@ai-dev-orchestrator/schemas';
 
 import type { DashboardAgentStreamEvent, DispatchGroup } from '../../hooks/use-agent-stream';
 import { formatTokens } from '../../lib/format';

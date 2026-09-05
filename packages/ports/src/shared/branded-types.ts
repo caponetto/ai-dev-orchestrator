@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
-import type { RunId, WorkerId } from '@ai-orchestrator/schemas';
+import type { RunId, WorkerId } from '@ai-dev-orchestrator/schemas';
 
 /** Create a RunId from a validated string, or auto-generate one. */
 export function createRunId(value?: string): RunId {

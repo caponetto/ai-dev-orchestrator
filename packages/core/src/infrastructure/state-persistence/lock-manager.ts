@@ -2,8 +2,8 @@ import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from '
 import { hostname } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { RUN_LOCK_FILENAME, lockHandleSchema } from '@ai-orchestrator/schemas';
-import type { LockHandle, RunId } from '@ai-orchestrator/schemas';
+import { RUN_LOCK_FILENAME, lockHandleSchema } from '@ai-dev-orchestrator/schemas';
+import type { LockHandle, RunId } from '@ai-dev-orchestrator/schemas';
 import { parse, stringify } from 'yaml';
 
 import { LockAcquisitionError, RunAlreadyActiveError } from '../../domain/state-persistence/errors';

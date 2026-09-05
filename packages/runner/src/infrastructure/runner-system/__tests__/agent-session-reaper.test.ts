@@ -1,5 +1,5 @@
-import type { AgentSessionStore } from '@ai-orchestrator/ports';
-import type { AgentSessionSnapshot } from '@ai-orchestrator/schemas';
+import type { AgentSessionStore } from '@ai-dev-orchestrator/ports';
+import type { AgentSessionSnapshot } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi } from 'vitest';
 
 import { AgentSessionReaper } from '../agent-session-reaper';

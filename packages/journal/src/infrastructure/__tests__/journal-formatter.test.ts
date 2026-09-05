@@ -1,4 +1,4 @@
-import type { JournalEvent } from '@ai-orchestrator/schemas';
+import type { JournalEvent } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { formatEvent, formatEvents, formatJournalHeader } from '../journal-formatter';

@@ -2,9 +2,9 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { DefaultStatePersistence } from '@ai-orchestrator/core';
-import { createRunId } from '@ai-orchestrator/ports';
-import type { PersistedState, RunId } from '@ai-orchestrator/schemas';
+import { DefaultStatePersistence } from '@ai-dev-orchestrator/core';
+import { createRunId } from '@ai-dev-orchestrator/ports';
+import type { PersistedState, RunId } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 import { ExitCode } from '../../output/exit-codes';

@@ -1,4 +1,4 @@
-# @ai-orchestrator/schemas
+# @ai-dev-orchestrator/schemas
 
 Shared Zod schemas and inferred TypeScript types that define every data structure in the platform. All other packages depend on these schemas for type-safe validation at runtime boundaries.
 

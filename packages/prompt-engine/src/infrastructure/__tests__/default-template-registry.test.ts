@@ -1,4 +1,4 @@
-import type { PromptTemplate } from '@ai-orchestrator/schemas';
+import type { PromptTemplate } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { DefaultTemplateRegistry } from '../default-template-registry';

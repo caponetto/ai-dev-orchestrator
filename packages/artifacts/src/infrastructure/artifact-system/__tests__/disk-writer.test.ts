@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { ArtifactMetadata } from '@ai-orchestrator/schemas';
+import type { ArtifactMetadata } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { DiskWriteError } from '../../../domain/artifact-system/errors';

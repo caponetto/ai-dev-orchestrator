@@ -2,7 +2,7 @@ import type {
   ConfidenceReport,
   PermissionAction,
   ThreeTierSeverity,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 // --- Protocol version and capabilities ---
 

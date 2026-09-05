@@ -1,4 +1,4 @@
-import type { AgentStreamEvent, HistoryCapableStreamBus } from '@ai-orchestrator/ports';
+import type { AgentStreamEvent, HistoryCapableStreamBus } from '@ai-dev-orchestrator/ports';
 
 export class InMemoryAgentStreamBus implements HistoryCapableStreamBus {
   private readonly clients = new Map<string, (event: AgentStreamEvent) => void>();

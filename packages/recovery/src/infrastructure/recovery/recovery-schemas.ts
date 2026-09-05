@@ -1,4 +1,4 @@
-import { persistedStateSchema } from '@ai-orchestrator/schemas';
+import { persistedStateSchema } from '@ai-dev-orchestrator/schemas';
 import { z } from 'zod/v4';
 
 export const recoveryScenarioSchema = z.enum([

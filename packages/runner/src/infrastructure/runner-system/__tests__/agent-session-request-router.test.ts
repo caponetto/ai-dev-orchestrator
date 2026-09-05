@@ -1,4 +1,4 @@
-import type { AgentSessionSnapshot, SessionPendingRequest } from '@ai-orchestrator/schemas';
+import type { AgentSessionSnapshot, SessionPendingRequest } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { AgentSessionRegistry } from '../agent-session-registry';

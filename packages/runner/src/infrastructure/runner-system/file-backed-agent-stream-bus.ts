@@ -11,8 +11,8 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 
-import { safeJsonParse } from '@ai-orchestrator/artifacts';
-import type { AgentStreamEvent, HistoryCapableStreamBus } from '@ai-orchestrator/ports';
+import { safeJsonParse } from '@ai-dev-orchestrator/artifacts';
+import type { AgentStreamEvent, HistoryCapableStreamBus } from '@ai-dev-orchestrator/ports';
 import { z } from 'zod';
 
 export const agentStreamEventSchema = z.object({

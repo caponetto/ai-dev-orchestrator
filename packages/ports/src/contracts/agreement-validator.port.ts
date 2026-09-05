@@ -1,4 +1,4 @@
-import type { AgreementArtifact, AgreementValidationResult } from '@ai-orchestrator/schemas';
+import type { AgreementArtifact, AgreementValidationResult } from '@ai-dev-orchestrator/schemas';
 
 /** Port for validating agreement artifact integrity. */
 export interface AgreementValidator {

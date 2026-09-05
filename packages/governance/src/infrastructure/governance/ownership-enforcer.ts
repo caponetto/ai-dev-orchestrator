@@ -1,5 +1,5 @@
-import type { OwnershipRegistry } from '@ai-orchestrator/ports';
-import type { ArtifactRef } from '@ai-orchestrator/schemas';
+import type { OwnershipRegistry } from '@ai-dev-orchestrator/ports';
+import type { ArtifactRef } from '@ai-dev-orchestrator/schemas';
 
 import type { OwnershipCheckResult } from '../../domain/governance/ownership-check-result';
 

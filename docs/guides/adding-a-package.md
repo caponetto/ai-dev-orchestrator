@@ -25,11 +25,11 @@ Not every package uses the `domain/infrastructure` split. Simple packages (e.g. 
 
 ## 2. package.json
 
-Use `@ai-orchestrator/<name>` as the package name. Reference workspace dependencies with `"workspace:*"`.
+Use `@ai-dev-orchestrator/<name>` as the package name. Reference workspace dependencies with `"workspace:*"`.
 
 ```json
 {
-  "name": "@ai-orchestrator/<name>",
+  "name": "@ai-dev-orchestrator/<name>",
   "version": "1.0.0",
   "license": "MIT",
   "repository": {
@@ -58,10 +58,10 @@ Use `@ai-orchestrator/<name>` as the package name. Reference workspace dependenc
     "typecheck": "tsc -p tsconfig.build.json --noEmit"
   },
   "dependencies": {
-    "@ai-orchestrator/schemas": "workspace:*"
+    "@ai-dev-orchestrator/schemas": "workspace:*"
   },
   "devDependencies": {
-    "@ai-orchestrator/build-config": "workspace:*",
+    "@ai-dev-orchestrator/build-config": "workspace:*",
     "vitest": "^4.1.10"
   }
 }
@@ -123,7 +123,7 @@ Choose the tag that matches the package's role:
 
 ```ts
 import { defineConfig } from 'vitest/config';
-import { createBaseTestConfig } from '@ai-orchestrator/build-config';
+import { createBaseTestConfig } from '@ai-dev-orchestrator/build-config';
 
 export default defineConfig(createBaseTestConfig({ useAliases: true }));
 ```
@@ -160,7 +160,7 @@ These files contain package lists that must include the new package:
 
 If other packages or the composition root need the new package:
 
-1. Add `"@ai-orchestrator/<name>": "workspace:*"` to the consumer's `package.json` dependencies.
+1. Add `"@ai-dev-orchestrator/<name>": "workspace:*"` to the consumer's `package.json` dependencies.
 2. If the package implements a port interface, create the port type in `packages/ports/src/contracts/` and export it from `packages/ports/src/contracts/index.ts`.
 3. Wire it into `packages/cli/src/composition-root.ts` where all services are instantiated.
 4. Run `pnpm install` again after adding dependencies.

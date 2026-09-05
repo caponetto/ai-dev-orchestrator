@@ -1,4 +1,4 @@
-import type { RoleContract } from '@ai-orchestrator/schemas';
+import type { RoleContract } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { TEST_ROLES } from '../../../test/fixtures/test-defaults';

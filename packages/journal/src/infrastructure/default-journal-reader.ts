@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 
-import type { JournalReader } from '@ai-orchestrator/ports';
-import type { JournalEvent, JournalFilter } from '@ai-orchestrator/schemas';
+import type { JournalReader } from '@ai-dev-orchestrator/ports';
+import type { JournalEvent, JournalFilter } from '@ai-dev-orchestrator/schemas';
 import { parse } from 'yaml';
 
 /** Default journal reader that parses YAML blocks from a Markdown journal file. */

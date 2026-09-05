@@ -1,6 +1,6 @@
 /** Pass-through evaluator for custom policies. Always returns pass. */
-import type { PolicyEvaluator } from '@ai-orchestrator/ports';
-import type { PolicyContext, PolicyDefinition, PolicyResult } from '@ai-orchestrator/schemas';
+import type { PolicyEvaluator } from '@ai-dev-orchestrator/ports';
+import type { PolicyContext, PolicyDefinition, PolicyResult } from '@ai-dev-orchestrator/schemas';
 export class CustomEvaluator implements PolicyEvaluator {
   /** @inheritdoc */
   evaluate(policy: PolicyDefinition, _context: PolicyContext): PolicyResult {

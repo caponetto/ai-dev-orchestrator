@@ -1,5 +1,5 @@
-import type { AgentSessionStore } from '@ai-orchestrator/ports';
-import type { AgentSessionSnapshot, AgentSessionState } from '@ai-orchestrator/schemas';
+import type { AgentSessionStore } from '@ai-dev-orchestrator/ports';
+import type { AgentSessionSnapshot, AgentSessionState } from '@ai-dev-orchestrator/schemas';
 const TERMINAL_STATES: ReadonlySet<AgentSessionState> = new Set(['completed', 'failed', 'aborted']);
 
 export interface ReaperPolicy {

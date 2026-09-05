@@ -1,5 +1,5 @@
 import { defineConfig, mergeConfig } from 'vitest/config';
-import { createBaseTestConfig } from '@ai-orchestrator/build-config';
+import { createBaseTestConfig } from '@ai-dev-orchestrator/build-config';
 
 export default mergeConfig(
   defineConfig(createBaseTestConfig({ useAliases: true })),

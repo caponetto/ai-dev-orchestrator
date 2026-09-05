@@ -1,4 +1,4 @@
-# @ai-orchestrator/journal
+# @ai-dev-orchestrator/journal
 
 Journal writer and reader for persisting orchestration events to disk. Formats workflow events into human-readable, append-only journal files that serve as the audit trail for a run.
 
@@ -8,9 +8,9 @@ Journal writer and reader for persisting orchestration events to disk. Formats w
 
 ## Workspace Dependencies
 
-- `@ai-orchestrator/ports`
-- `@ai-orchestrator/schemas`
-- `@ai-orchestrator/utils`
+- `@ai-dev-orchestrator/ports`
+- `@ai-dev-orchestrator/schemas`
+- `@ai-dev-orchestrator/utils`
 
 ## Structure
 

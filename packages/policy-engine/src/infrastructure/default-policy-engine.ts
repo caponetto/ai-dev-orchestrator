@@ -1,4 +1,4 @@
-import type { PolicyEngine } from '@ai-orchestrator/ports';
+import type { PolicyEngine } from '@ai-dev-orchestrator/ports';
 import type {
   EscalationTrigger,
   PolicyContext,
@@ -9,7 +9,7 @@ import type {
   PolicyTypeInfo,
   PolicyValidationResult,
   ResolvedPolicySet,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 import type { DefaultPolicyRegistry } from './policy-registry';
 import type { PolicyResolver } from './policy-resolver';

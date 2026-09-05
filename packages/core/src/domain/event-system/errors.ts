@@ -1,4 +1,4 @@
-import { RecoverableErrorBase } from '@ai-orchestrator/ports';
+import { RecoverableErrorBase } from '@ai-dev-orchestrator/ports';
 
 /** Error publishing or dispatching an event. */
 export class EventBusError extends RecoverableErrorBase {

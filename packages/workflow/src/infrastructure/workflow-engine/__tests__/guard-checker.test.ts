@@ -2,8 +2,8 @@ import type {
   ArtifactStore,
   IterationContractRegistry,
   ProjectContextStore,
-} from '@ai-orchestrator/ports';
-import type { Guard, TransitionContext } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/ports';
+import type { Guard, TransitionContext } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi } from 'vitest';
 
 import { GuardChecker } from '../guard-checker';

@@ -1,4 +1,4 @@
-import type { ArtifactStore } from '@ai-orchestrator/ports';
+import type { ArtifactStore } from '@ai-dev-orchestrator/ports';
 import { describe, expect, it } from 'vitest';
 
 import { DefaultAgreementGate } from '../agreement-gate';

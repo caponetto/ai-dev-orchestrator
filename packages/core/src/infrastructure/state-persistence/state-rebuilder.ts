@@ -4,7 +4,7 @@ import type {
   PersistedState,
   PersistedWaitingContext,
   RunId,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 import { computeStateChecksum } from './checksum-verifier';
 import { SCHEMA_VERSION } from './schema-version';

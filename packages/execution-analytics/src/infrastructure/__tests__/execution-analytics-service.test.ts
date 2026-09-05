@@ -1,5 +1,5 @@
-import type { ProjectContextStore } from '@ai-orchestrator/ports';
-import type { ContextDocument } from '@ai-orchestrator/schemas';
+import type { ProjectContextStore } from '@ai-dev-orchestrator/ports';
+import type { ContextDocument } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ExecutionAnalyticsService } from '../execution-analytics-service';

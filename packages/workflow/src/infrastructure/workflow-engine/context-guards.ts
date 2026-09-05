@@ -1,5 +1,10 @@
-import type { ProjectContextStore } from '@ai-orchestrator/ports';
-import type { FailurePattern, Guard, GuardResult, RunHistoryEntry } from '@ai-orchestrator/schemas';
+import type { ProjectContextStore } from '@ai-dev-orchestrator/ports';
+import type {
+  FailurePattern,
+  Guard,
+  GuardResult,
+  RunHistoryEntry,
+} from '@ai-dev-orchestrator/schemas';
 
 type PreviousRunPatternGuard = Extract<Guard, { type: 'previous_run_pattern' }>;
 type KnownFailurePatternGuard = Extract<Guard, { type: 'known_failure_pattern' }>;

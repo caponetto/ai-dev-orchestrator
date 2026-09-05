@@ -1,5 +1,5 @@
-import type { ProjectSettingsView, SettingsPermissionPolicy } from '@ai-orchestrator/schemas';
-import { permissionActionSchema } from '@ai-orchestrator/schemas';
+import type { ProjectSettingsView, SettingsPermissionPolicy } from '@ai-dev-orchestrator/schemas';
+import { permissionActionSchema } from '@ai-dev-orchestrator/schemas';
 import { useRef, useState } from 'react';
 
 import { Input } from '@/components/ui/input';

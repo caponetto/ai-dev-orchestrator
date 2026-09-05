@@ -3,13 +3,13 @@ import type {
   AgentSessionSupervisor,
   SessionAdvanceResult,
   SessionResponsePayload,
-} from '@ai-orchestrator/ports';
+} from '@ai-dev-orchestrator/ports';
 import type {
   AgentSessionHandle,
   AgentSessionRef,
   AgentSessionSnapshot,
   AgentSessionState,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 import type { AgentSessionRegistry } from './agent-session-registry';
 import type { LocalAgentSessionHost } from './local-agent-session-host';

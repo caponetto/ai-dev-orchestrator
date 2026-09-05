@@ -1,4 +1,4 @@
-import type { ArtifactEntryView, ArtifactRef } from '@ai-orchestrator/schemas';
+import type { ArtifactEntryView, ArtifactRef } from '@ai-dev-orchestrator/schemas';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 

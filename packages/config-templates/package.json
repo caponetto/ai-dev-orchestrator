@@ -1,6 +1,6 @@
 {
-  "name": "@ai-orchestrator/config-templates",
-  "version": "1.0.0",
+  "name": "@ai-dev-orchestrator/config-templates",
+  "version": "0.1.0",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -25,20 +25,20 @@
     "clean": "rimraf dist tsconfig.build.tsbuildinfo",
     "build:base": "rimraf dist tsconfig.build.tsbuildinfo && tsc -p tsconfig.build.json && pnpm run copy:static",
     "build:dev": "pnpm run build:base",
-    "build:prod": "tsc -p tsconfig.build.json --sourceMap false --declarationMap false && pnpm run copy:static",
+    "build:prod": "pnpm run clean && tsc -p tsconfig.build.json --sourceMap false --declarationMap false && pnpm run copy:static",
     "lint": "eslint src/",
     "test:unit": "vitest run",
     "typecheck": "tsc -p tsconfig.build.json --noEmit"
   },
   "dependencies": {
-    "@ai-orchestrator/schemas": "workspace:*",
-    "@ai-orchestrator/utils": "workspace:*",
-    "@ai-orchestrator/workflow": "workspace:*",
+    "@ai-dev-orchestrator/schemas": "workspace:*",
+    "@ai-dev-orchestrator/utils": "workspace:*",
+    "@ai-dev-orchestrator/workflow": "workspace:*",
     "yaml": "^2.9.0",
     "zod": "^4.5.4"
   },
   "devDependencies": {
-    "@ai-orchestrator/build-config": "workspace:*",
+    "@ai-dev-orchestrator/build-config": "workspace:*",
     "@types/node": "^26.4.0",
     "cpy-cli": "^7.0.0",
     "vitest": "^4.1.11"

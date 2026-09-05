@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 
-import { AgreementGenerator, safeJsonParse } from '@ai-orchestrator/artifacts';
+import { AgreementGenerator, safeJsonParse } from '@ai-dev-orchestrator/artifacts';
 import type {
   AgentStreamBus,
   AgreementGate,
@@ -9,8 +9,8 @@ import type {
   Logger,
   RunnerSystem,
   StalenessDetector,
-} from '@ai-orchestrator/ports';
-import { noopLogger } from '@ai-orchestrator/ports';
+} from '@ai-dev-orchestrator/ports';
+import { noopLogger } from '@ai-dev-orchestrator/ports';
 import type {
   Action,
   ActionResult,
@@ -25,9 +25,9 @@ import type {
   RunId,
   StreamEventCallback,
   WorkerResult,
-} from '@ai-orchestrator/schemas';
-import { ARTIFACTS_DIR_NAME } from '@ai-orchestrator/schemas';
-import { FRONTMATTER_REGEX, getErrorMessage } from '@ai-orchestrator/utils';
+} from '@ai-dev-orchestrator/schemas';
+import { ARTIFACTS_DIR_NAME } from '@ai-dev-orchestrator/schemas';
+import { FRONTMATTER_REGEX, getErrorMessage } from '@ai-dev-orchestrator/utils';
 import { z } from 'zod';
 
 import { resolveCanonicalSpecification } from './resolve-canonical-specification';

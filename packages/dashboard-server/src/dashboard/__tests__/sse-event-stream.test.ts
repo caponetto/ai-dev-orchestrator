@@ -1,4 +1,4 @@
-import type { DashboardEvent } from '@ai-orchestrator/schemas';
+import type { DashboardEvent } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import { SseEventStream } from '../sse-event-stream';

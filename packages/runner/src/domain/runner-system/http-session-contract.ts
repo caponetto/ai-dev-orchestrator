@@ -1,4 +1,4 @@
-import { PROTOCOL_VERSION } from '@ai-orchestrator/agent-protocol';
+import { PROTOCOL_VERSION } from '@ai-dev-orchestrator/agent-protocol';
 
 export interface AgentSessionDescriptor {
   readonly sessionId: string;

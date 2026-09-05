@@ -1,4 +1,4 @@
-import type { PolicyDefinition } from '@ai-orchestrator/schemas';
+import type { PolicyDefinition } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { TEST_POLICIES } from '../../../test/fixtures/test-defaults';

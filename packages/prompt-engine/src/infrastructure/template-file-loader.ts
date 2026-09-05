@@ -1,15 +1,15 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { ARTIFACT_SCHEMA_MAP } from '@ai-orchestrator/artifacts';
+import { ARTIFACT_SCHEMA_MAP } from '@ai-dev-orchestrator/artifacts';
 import type {
   ArtifactType,
   OutputContract,
   PartialMap,
   PromptTemplate,
   VariableDeclaration,
-} from '@ai-orchestrator/schemas';
-import { isObject, snakeToCamelDeep } from '@ai-orchestrator/utils';
+} from '@ai-dev-orchestrator/schemas';
+import { isObject, snakeToCamelDeep } from '@ai-dev-orchestrator/utils';
 import { parse as parseYaml, YAMLParseError } from 'yaml';
 import { z } from 'zod';
 

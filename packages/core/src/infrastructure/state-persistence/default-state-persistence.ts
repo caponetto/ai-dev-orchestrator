@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-import type { StatePersistence } from '@ai-orchestrator/ports';
+import type { StatePersistence } from '@ai-dev-orchestrator/ports';
 import {
   STATE_FILENAME,
   type JournalEvent,
@@ -9,7 +9,7 @@ import {
   type PersistedState,
   type RunId,
   type StateValidationResult,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import { stringify } from 'yaml';
 
 import { atomicWriteState } from './atomic-writer';

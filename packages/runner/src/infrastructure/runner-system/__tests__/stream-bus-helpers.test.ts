@@ -2,7 +2,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { AgentStreamEvent } from '@ai-orchestrator/ports';
+import type { AgentStreamEvent } from '@ai-dev-orchestrator/ports';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {

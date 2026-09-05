@@ -1,5 +1,5 @@
-import { createRunId } from '@ai-orchestrator/ports';
-import type { PersistedState } from '@ai-orchestrator/schemas';
+import { createRunId } from '@ai-dev-orchestrator/ports';
+import type { PersistedState } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { computeStateChecksum, verifyStateChecksum } from '../checksum-verifier';

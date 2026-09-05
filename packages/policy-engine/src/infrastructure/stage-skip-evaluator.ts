@@ -1,6 +1,6 @@
 /** Evaluates whether a stage should be skipped based on configured criteria. */
-import type { PolicyEvaluator } from '@ai-orchestrator/ports';
-import type { PolicyContext, PolicyDefinition, PolicyResult } from '@ai-orchestrator/schemas';
+import type { PolicyEvaluator } from '@ai-dev-orchestrator/ports';
+import type { PolicyContext, PolicyDefinition, PolicyResult } from '@ai-dev-orchestrator/schemas';
 export class StageSkipEvaluator implements PolicyEvaluator {
   /** @inheritdoc */
   evaluate(policy: PolicyDefinition, context: PolicyContext): PolicyResult {

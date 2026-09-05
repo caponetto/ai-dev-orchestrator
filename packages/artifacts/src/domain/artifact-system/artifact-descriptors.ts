@@ -1,4 +1,4 @@
-import type { ArtifactType } from '@ai-orchestrator/schemas';
+import type { ArtifactType } from '@ai-dev-orchestrator/schemas';
 import { type z } from 'zod/v4';
 
 import {

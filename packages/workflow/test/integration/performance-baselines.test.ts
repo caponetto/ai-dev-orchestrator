@@ -1,16 +1,16 @@
-import { InMemoryEventBus } from '@ai-orchestrator/core';
-import { DefaultDependencyGraph } from '@ai-orchestrator/dependency-graph';
-import { DefaultPolicyRegistry } from '@ai-orchestrator/policy-engine';
-import { DefaultTemplateRegistry, DefaultTokenEstimator } from '@ai-orchestrator/prompt-engine';
+import { InMemoryEventBus } from '@ai-dev-orchestrator/core';
+import { DefaultDependencyGraph } from '@ai-dev-orchestrator/dependency-graph';
+import { DefaultPolicyRegistry } from '@ai-dev-orchestrator/policy-engine';
+import { DefaultTemplateRegistry, DefaultTokenEstimator } from '@ai-dev-orchestrator/prompt-engine';
 import type {
   EventSource,
   EventType,
   PolicyDefinition,
   PromptTemplate,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
-import { WorkflowParser } from '@ai-orchestrator/workflow';
+import { WorkflowParser } from '@ai-dev-orchestrator/workflow';
 
 function measure(
   fn: () => void,

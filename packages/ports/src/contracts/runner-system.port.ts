@@ -3,7 +3,7 @@ import type {
   DispatchResult,
   StreamEventCallback,
   WorkerStatus,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 /**
  * Port for the runner system that dispatches workers and manages their lifecycle.

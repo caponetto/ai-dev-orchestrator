@@ -2,10 +2,10 @@ import type {
   OrchestratorToAgentMessage,
   ProtocolMessage,
   ProtocolMessageType,
-} from '@ai-orchestrator/agent-protocol';
-import { PROTOCOL_VERSION, createProtocolMessage } from '@ai-orchestrator/agent-protocol';
-import type { ThreeTierSeverity } from '@ai-orchestrator/schemas';
-import { BUILT_IN_CODING_RUNNER_ID } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/agent-protocol';
+import { PROTOCOL_VERSION, createProtocolMessage } from '@ai-dev-orchestrator/agent-protocol';
+import type { ThreeTierSeverity } from '@ai-dev-orchestrator/schemas';
+import { BUILT_IN_CODING_RUNNER_ID } from '@ai-dev-orchestrator/schemas';
 
 import type { AgentAdapter, AgentAdapterCapabilities } from './adapter-types';
 import type {

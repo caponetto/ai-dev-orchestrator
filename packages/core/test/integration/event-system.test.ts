@@ -1,10 +1,10 @@
-import type { EventJournal } from '@ai-orchestrator/ports';
+import type { EventJournal } from '@ai-dev-orchestrator/ports';
 import type {
   Event,
   EventInput,
   RunStartedData,
   SystemWarningData,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { SubscriberError } from '../../src/domain/event-system/errors';

@@ -2,11 +2,11 @@ import { randomUUID } from 'node:crypto';
 import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import type { PermissionRequestPayload } from '@ai-orchestrator/agent-protocol';
-import { payloadToRecord } from '@ai-orchestrator/agent-protocol';
-import type { AgentStreamEvent, PermissionPolicyConfig } from '@ai-orchestrator/ports';
-import type { AgentTask, RoleId, ThreeTierSeverity } from '@ai-orchestrator/schemas';
-import { livePermissionResponsePayloadSchema } from '@ai-orchestrator/schemas';
+import type { PermissionRequestPayload } from '@ai-dev-orchestrator/agent-protocol';
+import { payloadToRecord } from '@ai-dev-orchestrator/agent-protocol';
+import type { AgentStreamEvent, PermissionPolicyConfig } from '@ai-dev-orchestrator/ports';
+import type { AgentTask, RoleId, ThreeTierSeverity } from '@ai-dev-orchestrator/schemas';
+import { livePermissionResponsePayloadSchema } from '@ai-dev-orchestrator/schemas';
 
 import { DefaultPermissionPolicy } from './default-permission-policy';
 import {

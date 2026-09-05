@@ -6,7 +6,7 @@ import type {
   ApprovalStatus,
   ApprovalType,
   ArtifactRef,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 /** Algorithm for computing approval from votes. */
 type VerdictAlgorithm = 'unanimous' | 'majority' | 'quorum';

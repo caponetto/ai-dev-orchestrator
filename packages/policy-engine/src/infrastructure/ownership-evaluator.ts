@@ -1,6 +1,6 @@
 /** Checks whether the role has ownership permission for the artifact type in context. */
-import type { PolicyEvaluator } from '@ai-orchestrator/ports';
-import type { PolicyContext, PolicyDefinition, PolicyResult } from '@ai-orchestrator/schemas';
+import type { PolicyEvaluator } from '@ai-dev-orchestrator/ports';
+import type { PolicyContext, PolicyDefinition, PolicyResult } from '@ai-dev-orchestrator/schemas';
 export class OwnershipEvaluator implements PolicyEvaluator {
   /** @inheritdoc */
   evaluate(policy: PolicyDefinition, context: PolicyContext): PolicyResult {

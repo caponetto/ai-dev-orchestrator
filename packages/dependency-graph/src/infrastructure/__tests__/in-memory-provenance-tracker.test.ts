@@ -1,4 +1,4 @@
-import type { ArtifactRef } from '@ai-orchestrator/schemas';
+import type { ArtifactRef } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { InMemoryProvenanceTracker } from '../in-memory-provenance-tracker';

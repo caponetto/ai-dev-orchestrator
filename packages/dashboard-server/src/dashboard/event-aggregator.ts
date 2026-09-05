@@ -1,5 +1,5 @@
 /** Raw event from the event bus before mapping to dashboard event. */
-import type { DashboardEvent, DashboardEventType } from '@ai-orchestrator/schemas';
+import type { DashboardEvent, DashboardEventType } from '@ai-dev-orchestrator/schemas';
 export interface RawEvent {
   readonly type: string;
   readonly timestamp: string;

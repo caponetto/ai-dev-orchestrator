@@ -1,6 +1,6 @@
 {
-  "name": "@ai-orchestrator/prompt-engine",
-  "version": "1.0.0",
+  "name": "@ai-dev-orchestrator/prompt-engine",
+  "version": "0.1.0",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -24,22 +24,22 @@
     "clean": "rimraf dist tsconfig.build.tsbuildinfo",
     "build:base": "rimraf dist tsconfig.build.tsbuildinfo && tsc -p tsconfig.build.json",
     "build:dev": "pnpm run build:base",
-    "build:prod": "tsc -p tsconfig.build.json --sourceMap false --declarationMap false",
+    "build:prod": "pnpm run clean && tsc -p tsconfig.build.json --sourceMap false --declarationMap false",
     "lint": "eslint src/",
     "test:unit": "vitest run",
     "typecheck": "tsc -p tsconfig.build.json --noEmit"
   },
   "dependencies": {
-    "@ai-orchestrator/artifacts": "workspace:*",
-    "@ai-orchestrator/ports": "workspace:*",
-    "@ai-orchestrator/schemas": "workspace:*",
-    "@ai-orchestrator/utils": "workspace:*",
+    "@ai-dev-orchestrator/artifacts": "workspace:*",
+    "@ai-dev-orchestrator/ports": "workspace:*",
+    "@ai-dev-orchestrator/schemas": "workspace:*",
+    "@ai-dev-orchestrator/utils": "workspace:*",
     "diff": "^9.0.0",
     "yaml": "^2.9.0",
     "zod": "^4.5.4"
   },
   "devDependencies": {
-    "@ai-orchestrator/build-config": "workspace:*",
+    "@ai-dev-orchestrator/build-config": "workspace:*",
     "@types/diff": "^8.0.0",
     "@types/node": "^26.4.0",
     "vitest": "^4.1.11"

@@ -1,4 +1,4 @@
-import type { ArtifactEntryView, ArtifactInventoryView } from '@ai-orchestrator/schemas';
+import type { ArtifactEntryView, ArtifactInventoryView } from '@ai-dev-orchestrator/schemas';
 import { useMemo, useState } from 'react';
 import { format } from 'timeago.js';
 

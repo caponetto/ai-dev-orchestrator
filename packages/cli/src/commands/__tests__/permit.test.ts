@@ -2,9 +2,9 @@ import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { DefaultStatePersistence } from '@ai-orchestrator/core';
-import { FileBackedLiveRequestStore } from '@ai-orchestrator/runner';
-import type { PersistedState } from '@ai-orchestrator/schemas';
+import { DefaultStatePersistence } from '@ai-dev-orchestrator/core';
+import { FileBackedLiveRequestStore } from '@ai-dev-orchestrator/runner';
+import type { PersistedState } from '@ai-dev-orchestrator/schemas';
 import type { Mock } from 'vitest';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
@@ -25,7 +25,7 @@ vi.mock('../../workspace-paths', async (importOriginal) => {
   };
 });
 
-vi.mock('@ai-orchestrator/core', async (importOriginal) => {
+vi.mock('@ai-dev-orchestrator/core', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...(actual as object),

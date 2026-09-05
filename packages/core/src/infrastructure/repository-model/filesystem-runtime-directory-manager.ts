@@ -1,14 +1,14 @@
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-import type { RuntimeDirectoryManager } from '@ai-orchestrator/ports';
-import { RUN_LOCK_FILENAME } from '@ai-orchestrator/schemas';
+import type { RuntimeDirectoryManager } from '@ai-dev-orchestrator/ports';
+import { RUN_LOCK_FILENAME } from '@ai-dev-orchestrator/schemas';
 import {
   STATE_FILENAME,
   type DiscoveredRunStatus,
   type RunDirectoryInfo,
-} from '@ai-orchestrator/schemas';
-import { getErrorMessage } from '@ai-orchestrator/utils';
+} from '@ai-dev-orchestrator/schemas';
+import { getErrorMessage } from '@ai-dev-orchestrator/utils';
 
 import {
   RuntimeDirectoryError,

@@ -1,5 +1,5 @@
-import { NonRecoverableErrorBase } from '@ai-orchestrator/ports';
-import type { ValidationError } from '@ai-orchestrator/schemas';
+import { NonRecoverableErrorBase } from '@ai-dev-orchestrator/ports';
+import type { ValidationError } from '@ai-dev-orchestrator/schemas';
 
 /** Thrown when a template contains invalid syntax. */
 export class TemplateSyntaxError extends NonRecoverableErrorBase {

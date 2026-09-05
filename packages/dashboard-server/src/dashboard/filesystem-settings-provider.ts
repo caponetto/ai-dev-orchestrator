@@ -1,16 +1,16 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { FileSystemConfigurationLoader, parseYamlFile } from '@ai-orchestrator/core';
-import type { SettingsProvider } from '@ai-orchestrator/ports';
+import { FileSystemConfigurationLoader, parseYamlFile } from '@ai-dev-orchestrator/core';
+import type { SettingsProvider } from '@ai-dev-orchestrator/ports';
 import type {
   MergedConfiguration,
   ProjectSettingsView,
   RunnerDefinition,
   SettingsPermissionPolicy,
   SettingsRoleAssignment,
-} from '@ai-orchestrator/schemas';
-import { camelToSnake, camelToSnakeDeep, snakeToCamelDeep } from '@ai-orchestrator/utils';
+} from '@ai-dev-orchestrator/schemas';
+import { camelToSnake, camelToSnakeDeep, snakeToCamelDeep } from '@ai-dev-orchestrator/utils';
 import { stringify } from 'yaml';
 
 import {

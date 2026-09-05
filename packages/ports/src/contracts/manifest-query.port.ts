@@ -1,4 +1,4 @@
-import type { RunManifest } from '@ai-orchestrator/schemas';
+import type { RunManifest } from '@ai-dev-orchestrator/schemas';
 
 /** Filter criteria for listing run manifests. */
 export interface ManifestFilter {

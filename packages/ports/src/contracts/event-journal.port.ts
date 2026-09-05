@@ -1,4 +1,4 @@
-import type { Event } from '@ai-orchestrator/schemas';
+import type { Event } from '@ai-dev-orchestrator/schemas';
 
 /**
  * Port for EventBus-level event persistence and replay.

@@ -2,7 +2,7 @@ import type {
   HealthCheckResult,
   HealthProbeConfig,
   SubsystemHealth,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 /** Runs health checks across subsystems. */
 export interface HealthChecker {

@@ -2,7 +2,7 @@ import type {
   AdaptiveConfig,
   ExecutionProfile,
   StaticConfigBaseline,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 import { NO_RECOMMENDATION } from '../domain';
 

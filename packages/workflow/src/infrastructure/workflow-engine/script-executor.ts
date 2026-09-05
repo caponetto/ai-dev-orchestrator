@@ -5,11 +5,11 @@ import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import type { AgentStreamBus, JournalWriter, Logger } from '@ai-orchestrator/ports';
-import { noopLogger } from '@ai-orchestrator/ports';
-import type { ActionResult, RunId, ScriptOutput, ScriptResult } from '@ai-orchestrator/schemas';
-import { AI_CONFIG_DIR_NAME, scriptOutputSchema } from '@ai-orchestrator/schemas';
-import { getErrorMessage } from '@ai-orchestrator/utils';
+import type { AgentStreamBus, JournalWriter, Logger } from '@ai-dev-orchestrator/ports';
+import { noopLogger } from '@ai-dev-orchestrator/ports';
+import type { ActionResult, RunId, ScriptOutput, ScriptResult } from '@ai-dev-orchestrator/schemas';
+import { AI_CONFIG_DIR_NAME, scriptOutputSchema } from '@ai-dev-orchestrator/schemas';
+import { getErrorMessage } from '@ai-dev-orchestrator/utils';
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 const MAX_OUTPUT_BYTES = 1_048_576; // 1 MB

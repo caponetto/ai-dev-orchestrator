@@ -1,5 +1,5 @@
-import type { ProvenanceTracker } from '@ai-orchestrator/ports';
-import type { ArtifactRef, ProvenanceNode, ProvenanceRecord } from '@ai-orchestrator/schemas';
+import type { ProvenanceTracker } from '@ai-dev-orchestrator/ports';
+import type { ArtifactRef, ProvenanceNode, ProvenanceRecord } from '@ai-dev-orchestrator/schemas';
 
 /** In-memory implementation of provenance tracker. */
 export class InMemoryProvenanceTracker implements ProvenanceTracker {

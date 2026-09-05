@@ -1,4 +1,4 @@
-import type { PermissionRequestPayload } from '@ai-orchestrator/agent-protocol';
+import type { PermissionRequestPayload } from '@ai-dev-orchestrator/agent-protocol';
 import type {
   PermissionContext,
   PermissionDecision,
@@ -6,9 +6,9 @@ import type {
   PermissionPolicyConfig,
   PermissionRule,
   RoleTrustLevel,
-} from '@ai-orchestrator/ports';
-import { AI_CONFIG_DIR_NAME } from '@ai-orchestrator/schemas';
-import type { RoleId } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/ports';
+import { AI_CONFIG_DIR_NAME } from '@ai-dev-orchestrator/schemas';
+import type { RoleId } from '@ai-dev-orchestrator/schemas';
 
 import type { PermissionApprovalStore } from './permission-approval-store';
 

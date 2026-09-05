@@ -12,7 +12,7 @@ import {
   probeClaudeCodeCapabilities,
   probeCodexCliCapabilities,
   probeCursorCliCapabilities,
-} from '@ai-orchestrator/agent-adapters';
+} from '@ai-dev-orchestrator/agent-adapters';
 import {
   buildOwnershipOverrides,
   DefaultAgreementGate,
@@ -20,7 +20,7 @@ import {
   DefaultOwnershipRegistry,
   FilesystemArtifactStore,
   safeJsonParse,
-} from '@ai-orchestrator/artifacts';
+} from '@ai-dev-orchestrator/artifacts';
 import {
   ALL_PARTIAL_IDS,
   ALL_ROLE_IDS,
@@ -32,27 +32,27 @@ import {
   loadRunnerRegistry,
   PARTIALS_DIR,
   TEMPLATES_DIR,
-} from '@ai-orchestrator/config-templates';
-import { createLogger, DefaultStatePersistence, InMemoryEventBus } from '@ai-orchestrator/core';
+} from '@ai-dev-orchestrator/config-templates';
+import { createLogger, DefaultStatePersistence, InMemoryEventBus } from '@ai-dev-orchestrator/core';
 import {
   DefaultDependencyGraph,
   DefaultStalenessDetector,
   InMemoryProvenanceTracker,
-} from '@ai-orchestrator/dependency-graph';
-import { ExecutionAnalyticsService } from '@ai-orchestrator/execution-analytics';
+} from '@ai-dev-orchestrator/dependency-graph';
+import { ExecutionAnalyticsService } from '@ai-dev-orchestrator/execution-analytics';
 import {
   DefaultGovernanceEngine,
   DefaultIterationContractRegistry,
   buildContracts,
-} from '@ai-orchestrator/governance';
-import { DefaultJournalReader, DefaultJournalWriter } from '@ai-orchestrator/journal';
+} from '@ai-dev-orchestrator/governance';
+import { DefaultJournalReader, DefaultJournalWriter } from '@ai-dev-orchestrator/journal';
 import {
   DefaultPolicyEngine,
   DefaultPolicyRegistry,
   loadPoliciesFromGovernance,
   PolicyResolver,
-} from '@ai-orchestrator/policy-engine';
-import { createRunId } from '@ai-orchestrator/ports';
+} from '@ai-dev-orchestrator/policy-engine';
+import { createRunId } from '@ai-dev-orchestrator/ports';
 import type {
   AgentRunner,
   AgentStreamBus,
@@ -64,8 +64,8 @@ import type {
   PermissionPolicyConfig,
   StatePersistence,
   WorkflowEngine,
-} from '@ai-orchestrator/ports';
-import { FilesystemProjectContextStore } from '@ai-orchestrator/project-context';
+} from '@ai-dev-orchestrator/ports';
+import { FilesystemProjectContextStore } from '@ai-dev-orchestrator/project-context';
 import {
   DefaultPromptEngine,
   DefaultTemplateRegistry,
@@ -73,15 +73,18 @@ import {
   loadPartialsFromDirectory,
   loadTemplateFromMarkdown,
   loadTemplatesFromDirectory,
-} from '@ai-orchestrator/prompt-engine';
-import { ShutdownCoordinator } from '@ai-orchestrator/recovery';
+} from '@ai-dev-orchestrator/prompt-engine';
+import { ShutdownCoordinator } from '@ai-dev-orchestrator/recovery';
 import {
   DefaultRoleRegistry,
   loadRolesFromFile,
   loadRolesFromYaml,
-} from '@ai-orchestrator/role-system';
-import type { DispatchOverride } from '@ai-orchestrator/role-system';
-import { DefaultManifestProducer, FilesystemManifestWriter } from '@ai-orchestrator/run-manifest';
+} from '@ai-dev-orchestrator/role-system';
+import type { DispatchOverride } from '@ai-dev-orchestrator/role-system';
+import {
+  DefaultManifestProducer,
+  FilesystemManifestWriter,
+} from '@ai-dev-orchestrator/run-manifest';
 import {
   AgentSessionReaper,
   AgentSessionRegistry,
@@ -97,8 +100,8 @@ import {
   LocalAgentSessionSupervisor,
   RemoteAgentSessionSupervisor,
   WebSocketProtocolTransport,
-} from '@ai-orchestrator/runner';
-import type { LiveRequestStore } from '@ai-orchestrator/runner';
+} from '@ai-dev-orchestrator/runner';
+import type { LiveRequestStore } from '@ai-dev-orchestrator/runner';
 import type {
   BudgetConfig,
   MergedConfiguration,
@@ -109,13 +112,13 @@ import type {
   RunId,
   WorkflowDefinition,
   WorkflowRunConfig,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import {
   BUILT_IN_CODING_RUNNER_ID,
   WORKFLOW_DEFINITION_FILENAME,
   workflowSchema,
-} from '@ai-orchestrator/schemas';
-import { LifecycleController } from '@ai-orchestrator/workflow';
+} from '@ai-dev-orchestrator/schemas';
+import { LifecycleController } from '@ai-dev-orchestrator/workflow';
 
 import type { ConfigSnapshot } from './config-snapshot';
 import { configSnapshotSchema } from './config-snapshot';

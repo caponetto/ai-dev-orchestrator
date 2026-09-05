@@ -1,4 +1,4 @@
-import type { AgreementArtifact } from '@ai-orchestrator/schemas';
+import type { AgreementArtifact } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { DefaultAgreementValidator } from '../agreement-validator';

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { ArtifactRef } from '@ai-orchestrator/schemas';
+import type { ArtifactRef } from '@ai-dev-orchestrator/schemas';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 

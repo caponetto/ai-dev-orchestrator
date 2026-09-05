@@ -1,4 +1,4 @@
-import type { AgentStreamEventType } from '@ai-orchestrator/schemas';
+import type { AgentStreamEventType } from '@ai-dev-orchestrator/schemas';
 import { useEffect, useRef, useState } from 'react';
 
 import type { SseStatus } from './use-event-stream';

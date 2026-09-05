@@ -1,4 +1,4 @@
-import type { TransitionEdge, WorkflowStateView } from '@ai-orchestrator/schemas';
+import type { TransitionEdge, WorkflowStateView } from '@ai-dev-orchestrator/schemas';
 
 /** Horizontal distance between main spine and side columns. */
 export const COLUMN_OFFSET_PX = 380;

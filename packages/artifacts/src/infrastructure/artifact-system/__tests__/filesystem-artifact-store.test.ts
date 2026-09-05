@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { ArtifactInput } from '@ai-orchestrator/schemas';
+import type { ArtifactInput } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import {

@@ -1,4 +1,4 @@
-import type { ArtifactRef, DashboardWaitingContext } from '@ai-orchestrator/schemas';
+import type { ArtifactRef, DashboardWaitingContext } from '@ai-dev-orchestrator/schemas';
 import { useState } from 'react';
 
 import { api } from '../api/client';

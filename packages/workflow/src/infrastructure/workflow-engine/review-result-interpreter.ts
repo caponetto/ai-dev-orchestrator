@@ -1,8 +1,8 @@
-import { REVIEW_ARTIFACT_TYPES, safeJsonParse } from '@ai-orchestrator/artifacts';
-import type { ArtifactStore, IterationContractRegistry, Logger } from '@ai-orchestrator/ports';
-import { noopLogger } from '@ai-orchestrator/ports';
-import type { ActionResult, ArtifactType, TransitionTrigger } from '@ai-orchestrator/schemas';
-import { FRONTMATTER_REGEX } from '@ai-orchestrator/utils';
+import { REVIEW_ARTIFACT_TYPES, safeJsonParse } from '@ai-dev-orchestrator/artifacts';
+import type { ArtifactStore, IterationContractRegistry, Logger } from '@ai-dev-orchestrator/ports';
+import { noopLogger } from '@ai-dev-orchestrator/ports';
+import type { ActionResult, ArtifactType, TransitionTrigger } from '@ai-dev-orchestrator/schemas';
+import { FRONTMATTER_REGEX } from '@ai-dev-orchestrator/utils';
 import { z } from 'zod';
 
 const FAIL_SAFE_REJECTION_ERROR_TYPES: ReadonlySet<NonNullable<ActionResult['errorType']>> =
