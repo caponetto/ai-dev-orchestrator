@@ -8,7 +8,6 @@
     "packages/schemas": { "component": "schemas" },
     "packages/utils": { "component": "utils" },
     "packages/ports": { "component": "ports" },
-    "packages/build-config": { "component": "build-config", "skip-github-release": true },
     "packages/artifacts": { "component": "artifacts" },
     "packages/agent-protocol": { "component": "agent-protocol" },
     "packages/agent-adapters": { "component": "agent-adapters" },
@@ -27,9 +26,7 @@
     "packages/workflow": { "component": "workflow" },
     "packages/config-templates": { "component": "config-templates" },
     "packages/dashboard-server": { "component": "dashboard-server" },
-    "packages/dashboard": { "component": "dashboard", "skip-github-release": true },
     "packages/cli": { "component": "cli" },
-    "packages/test-utils": { "component": "test-utils", "skip-github-release": true },
     "packages/execution-analytics": { "component": "execution-analytics" }
   }
 }
