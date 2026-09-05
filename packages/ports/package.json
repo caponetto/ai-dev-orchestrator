@@ -34,6 +34,7 @@
   },
   "devDependencies": {
     "@ai-orchestrator/build-config": "workspace:*",
+    "@types/node": "^26.4.0",
     "vitest": "^4.1.11"
   }
 }

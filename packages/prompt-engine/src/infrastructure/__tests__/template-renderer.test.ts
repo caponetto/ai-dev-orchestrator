@@ -91,6 +91,21 @@ describe('renderTemplate', () => {
     expect(result).toBe('beforeafter');
   });
 
+  it('strips multiple and consecutive comments', () => {
+    const result = renderTemplate('a{{! comment 1 }}b{{! comment 2 }}{{! comment 3 }}c', {});
+    expect(result).toBe('abc');
+  });
+
+  it('strips multiline comments', () => {
+    const result = renderTemplate('before{{!\n  multi\n  line\n  comment\n}}after', {});
+    expect(result).toBe('beforeafter');
+  });
+
+  it('preserves unclosed comments at end of template', () => {
+    const result = renderTemplate('before {{! unclosed comment', {});
+    expect(result).toBe('before {{! unclosed comment');
+  });
+
   it('resolves partials', () => {
     const result = renderTemplate('{{> header}}\nbody', {}, { header: '# Title' });
     expect(result).toBe('# Title\nbody');
