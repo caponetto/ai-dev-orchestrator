@@ -147,4 +147,16 @@ describe('renderTemplate', () => {
     const result = renderTemplate('{{#if value}}yes{{/if}}', { value: null });
     expect(result).toBe('');
   });
+
+  it('handles nested #if and #each blocks efficiently', () => {
+    const template = '{{#if outer}}{{#each items}}{{.}}{{/each}}{{/if}}';
+    const result = renderTemplate(template, { outer: true, items: ['x', 'y'] });
+    expect(result).toBe('xy');
+  });
+
+  it('handles unclosed #each and #if blocks without polynomial performance degredation', () => {
+    const template = '{{#each .}}a'.repeat(100);
+    const result = renderTemplate(template, {});
+    expect(result).toBe(template);
+  });
 });
