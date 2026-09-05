@@ -2,7 +2,6 @@
   "packages/schemas": "0.1.1",
   "packages/utils": "0.1.1",
   "packages/ports": "0.1.1",
-  "packages/build-config": "0.1.1",
   "packages/artifacts": "0.1.1",
   "packages/agent-protocol": "0.1.1",
   "packages/agent-adapters": "0.1.1",
@@ -21,8 +20,6 @@
   "packages/workflow": "0.1.1",
   "packages/config-templates": "0.1.1",
   "packages/dashboard-server": "0.1.1",
-  "packages/dashboard": "0.1.1",
   "packages/cli": "0.1.1",
-  "packages/test-utils": "0.1.1",
   "packages/execution-analytics": "0.1.1"
 }

@@ -37,7 +37,7 @@
     "packages/cli": {
       "entry": ["src/**/*.test.ts"],
       "project": ["src/**/*.ts"],
-      "ignoreDependencies": ["write-file-atomic"]
+      "ignoreDependencies": ["write-file-atomic", "@ai-dev-orchestrator/dashboard"]
     },
     "packages/prompt-engine": {
       "entry": ["src/**/*.test.ts"],

@@ -57,13 +57,30 @@ export interface DashboardOptions {
   readonly verbose: boolean;
 }
 
-function findDashboardDir(): string | null {
+interface DashboardLocation {
+  readonly uiDir: string | null;
+  readonly devDashboardDir: string | null;
+}
+
+function resolveDashboardLocation(): DashboardLocation {
   const cliPkgDir = resolve(fileURLToPath(new URL('.', import.meta.url)), '..');
-  const candidate = resolve(cliPkgDir, '..', 'dashboard');
-  if (existsSync(join(candidate, 'package.json'))) {
-    return candidate;
+
+  const bundledUiDir = resolve(cliPkgDir, 'dashboard');
+  if (existsSync(join(bundledUiDir, 'index.html'))) {
+    return { uiDir: bundledUiDir, devDashboardDir: null };
   }
-  return null;
+
+  const repoUiDir = resolve(cliPkgDir, '..', 'dashboard', 'dist');
+  if (existsSync(join(repoUiDir, 'index.html'))) {
+    return { uiDir: repoUiDir, devDashboardDir: null };
+  }
+
+  const devDashboardDir = resolve(cliPkgDir, '..', 'dashboard');
+  if (existsSync(join(devDashboardDir, 'package.json'))) {
+    return { uiDir: null, devDashboardDir };
+  }
+
+  return { uiDir: null, devDashboardDir: null };
 }
 
 function openBrowser(url: string): void {
@@ -80,13 +97,13 @@ export async function dashboardCommand(
   options: DashboardOptions,
   formatter: OutputFormatter,
 ): Promise<ExitCode> {
-  const dashboardDir = findDashboardDir();
+  const location = resolveDashboardLocation();
 
-  if (!dashboardDir) {
+  if (!location.uiDir && !location.devDashboardDir) {
     formatter.error({
       code: ExitCode.GENERAL_ERROR,
-      message: 'Dashboard package not found.',
-      remediation: 'The dashboard package should be at packages/dashboard/ in the monorepo.',
+      message: 'Dashboard package or static assets not found.',
+      remediation: 'Run "pnpm build:prod" to build static dashboard assets.',
     });
     return ExitCode.GENERAL_ERROR;
   }
@@ -201,7 +218,13 @@ export async function dashboardCommand(
   const approvalStore = new FileBackedPermissionApprovalStore(getPermissionApprovalsPath());
   await approvalStore.reload();
   const server = new DashboardHttpServer({
-    config: { port: options.port, host: options.host, runsDir, scriptsDir: getScriptsDir() },
+    config: {
+      port: options.port,
+      host: options.host,
+      runsDir,
+      scriptsDir: getScriptsDir(),
+      uiDir: location.uiDir ?? undefined,
+    },
     dataProvider,
     eventStream,
     agentStreamBus,
@@ -223,48 +246,54 @@ export async function dashboardCommand(
     return ExitCode.GENERAL_ERROR;
   }
 
-  formatter.info(`API server running on http://${options.host}:${String(options.port)}`);
-
   let viteProcess: ChildProcess | null = null;
 
   try {
-    viteProcess = spawn('npx', ['vite', '--host', '127.0.0.1'], {
-      cwd: dashboardDir,
-      stdio: ['pipe', 'pipe', options.verbose ? 'inherit' : 'pipe'],
-      shell: true,
-    });
+    let dashboardUrl: string;
 
-    viteProcess.on('error', (err) => {
-      formatter.error({
-        code: ExitCode.GENERAL_ERROR,
-        message: `Vite process error: ${err.message}`,
-        remediation: 'Run pnpm install first to install dashboard dependencies.',
+    if (location.uiDir) {
+      dashboardUrl = `http://${options.host}:${String(options.port)}`;
+    } else {
+      formatter.info(`API server running on http://${options.host}:${String(options.port)}`);
+
+      viteProcess = spawn('npx', ['vite', '--host', '127.0.0.1'], {
+        cwd: location.devDashboardDir ?? undefined,
+        stdio: ['pipe', 'pipe', options.verbose ? 'inherit' : 'pipe'],
+        shell: true,
       });
-    });
 
-    const VITE_STARTUP_TIMEOUT_MS = 15000;
-    const dashboardUrl = await new Promise<string>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        resolve('http://localhost:5173');
-      }, VITE_STARTUP_TIMEOUT_MS);
+      viteProcess.on('error', (err) => {
+        formatter.error({
+          code: ExitCode.GENERAL_ERROR,
+          message: `Vite process error: ${err.message}`,
+          remediation: 'Run pnpm install first to install dashboard dependencies.',
+        });
+      });
 
-      viteProcess?.stdout?.on('data', (data: Buffer) => {
-        const output = data.toString();
-        if (options.verbose) {
-          process.stdout.write(output);
-        }
-        const match = /Local:\s+(https?:\/\/[^\s]+)/u.exec(output);
-        if (match?.[1]) {
+      const VITE_STARTUP_TIMEOUT_MS = 15000;
+      dashboardUrl = await new Promise<string>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          resolve('http://localhost:5173');
+        }, VITE_STARTUP_TIMEOUT_MS);
+
+        viteProcess?.stdout?.on('data', (data: Buffer) => {
+          const output = data.toString();
+          if (options.verbose) {
+            process.stdout.write(output);
+          }
+          const match = /Local:\s+(https?:\/\/[^\s]+)/u.exec(output);
+          if (match?.[1]) {
+            clearTimeout(timeout);
+            resolve(match[1]);
+          }
+        });
+
+        viteProcess?.on('close', (code) => {
           clearTimeout(timeout);
-          resolve(match[1]);
-        }
+          reject(new Error(`Vite exited with code ${String(code)}`));
+        });
       });
-
-      viteProcess?.on('close', (code) => {
-        clearTimeout(timeout);
-        reject(new Error(`Vite exited with code ${String(code)}`));
-      });
-    });
+    }
 
     formatter.info(`Dashboard running on ${dashboardUrl}`);
 
