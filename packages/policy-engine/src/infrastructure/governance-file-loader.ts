@@ -1,5 +1,10 @@
-import type { GovernanceConfig, PolicyDefinition } from '@ai-orchestrator/schemas';
-import { isObject, requireNumber, requireObject, snakeToCamelDeep } from '@ai-orchestrator/utils';
+import type { GovernanceConfig, PolicyDefinition } from '@ai-dev-orchestrator/schemas';
+import {
+  isObject,
+  requireNumber,
+  requireObject,
+  snakeToCamelDeep,
+} from '@ai-dev-orchestrator/utils';
 import { parse as parseYaml, YAMLParseError } from 'yaml';
 
 /** Parses governance.yaml content into a typed governance configuration. */

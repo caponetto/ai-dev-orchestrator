@@ -1,4 +1,4 @@
-import type { PolicyContext, PolicyDefinition } from '@ai-orchestrator/schemas';
+import type { PolicyContext, PolicyDefinition } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { IterationLimitEvaluator } from '../iteration-limit-evaluator';

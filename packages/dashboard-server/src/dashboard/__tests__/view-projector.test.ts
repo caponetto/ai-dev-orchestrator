@@ -8,7 +8,7 @@ import type {
   RunManifest,
   TransitionRecord,
   WorkflowDefinition,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import type { FindingData } from '../view-projector';

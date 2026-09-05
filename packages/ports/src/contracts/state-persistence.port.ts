@@ -4,7 +4,7 @@ import type {
   PersistedState,
   RunId,
   StateValidationResult,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 export interface LockProbeResult {
   readonly exists: boolean;

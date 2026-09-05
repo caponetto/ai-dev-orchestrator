@@ -1,4 +1,4 @@
-import type { AgreementGateResult, AgreementType } from '@ai-orchestrator/schemas';
+import type { AgreementGateResult, AgreementType } from '@ai-dev-orchestrator/schemas';
 
 /** Port for checking whether a required agreement exists and is valid. */
 export interface AgreementGate {

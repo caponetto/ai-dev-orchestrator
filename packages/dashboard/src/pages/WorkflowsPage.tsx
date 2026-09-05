@@ -1,4 +1,4 @@
-import type { WorkflowStateView, WorkflowSummary } from '@ai-orchestrator/schemas';
+import type { WorkflowStateView, WorkflowSummary } from '@ai-dev-orchestrator/schemas';
 import { Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';

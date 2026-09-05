@@ -1,17 +1,17 @@
-import { validatePlanStructure, parseTypedArtifactContent } from '@ai-orchestrator/artifacts';
+import { validatePlanStructure, parseTypedArtifactContent } from '@ai-dev-orchestrator/artifacts';
 import type {
   ArtifactStore,
   IterationContractRegistry,
   Logger,
   ProjectContextStore,
-} from '@ai-orchestrator/ports';
-import { noopLogger } from '@ai-orchestrator/ports';
+} from '@ai-dev-orchestrator/ports';
+import { noopLogger } from '@ai-dev-orchestrator/ports';
 import type {
   ConfidenceReport,
   Guard,
   GuardResult,
   TransitionContext,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 import {
   evaluateKnownFailurePatternGuard,

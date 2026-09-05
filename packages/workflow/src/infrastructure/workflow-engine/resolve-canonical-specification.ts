@@ -1,5 +1,5 @@
-import type { ArtifactStore } from '@ai-orchestrator/ports';
-import type { Artifact } from '@ai-orchestrator/schemas';
+import type { ArtifactStore } from '@ai-dev-orchestrator/ports';
+import type { Artifact } from '@ai-dev-orchestrator/schemas';
 
 /**
  * Resolve the canonical_specification artifact using a two-step lookup:

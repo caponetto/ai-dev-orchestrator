@@ -1,4 +1,4 @@
-import type { PromptTemplate, PromptTemplateRef } from '@ai-orchestrator/schemas';
+import type { PromptTemplate, PromptTemplateRef } from '@ai-dev-orchestrator/schemas';
 
 /** Port for discovering, loading, and resolving prompt templates. */
 export interface PromptTemplateRegistry {

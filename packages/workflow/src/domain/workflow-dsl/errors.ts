@@ -1,4 +1,4 @@
-import { NonRecoverableErrorBase } from '@ai-orchestrator/ports';
+import { NonRecoverableErrorBase } from '@ai-dev-orchestrator/ports';
 
 export class WorkflowParseError extends NonRecoverableErrorBase {
   readonly code = 'WORKFLOW_PARSE_ERROR';

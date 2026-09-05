@@ -1,5 +1,5 @@
-import type { ProtocolMessage, ProtocolMessageType } from '@ai-orchestrator/agent-protocol';
-import { ALL_MESSAGE_TYPES, PROTOCOL_VERSION } from '@ai-orchestrator/agent-protocol';
+import type { ProtocolMessage, ProtocolMessageType } from '@ai-dev-orchestrator/agent-protocol';
+import { ALL_MESSAGE_TYPES, PROTOCOL_VERSION } from '@ai-dev-orchestrator/agent-protocol';
 
 type ParseResultStatus =
   | 'ok'

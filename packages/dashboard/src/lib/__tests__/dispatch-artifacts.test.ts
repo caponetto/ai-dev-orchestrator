@@ -1,4 +1,4 @@
-import type { ArtifactEntryView } from '@ai-orchestrator/schemas';
+import type { ArtifactEntryView } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import type { DashboardAgentStreamEvent } from '../../hooks/use-agent-stream';

@@ -3,9 +3,9 @@ import { type Dirent, existsSync, readdirSync, readFileSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
 
-import { DefaultStatePersistence } from '@ai-orchestrator/core';
-import { RUN_LOCK_FILENAME } from '@ai-orchestrator/schemas';
-import type { RunId } from '@ai-orchestrator/schemas';
+import { DefaultStatePersistence } from '@ai-dev-orchestrator/core';
+import { RUN_LOCK_FILENAME } from '@ai-dev-orchestrator/schemas';
+import type { RunId } from '@ai-dev-orchestrator/schemas';
 import { parse } from 'yaml';
 
 import { TERMINAL_STATES, abortRunState } from '../abort-run';

@@ -1,11 +1,11 @@
-import type { ArtifactType } from '@ai-orchestrator/schemas';
+import type { ArtifactType } from '@ai-dev-orchestrator/schemas';
 import {
   agreementTypeSchema,
   approvalStatusSchema,
   approvalTypeSchema,
   escalationTriggerSchema,
   intakeVerdictSchema,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import { z } from 'zod/v4';
 
 import { REVIEW_ARTIFACT_TYPES } from './constants';

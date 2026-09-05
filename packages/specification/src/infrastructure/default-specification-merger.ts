@@ -1,10 +1,10 @@
-import type { SpecificationMerger } from '@ai-orchestrator/ports';
+import type { SpecificationMerger } from '@ai-dev-orchestrator/ports';
 import type {
   CanonicalSpecification,
   MergeConflict,
   MergeResult,
   MergeStrategy,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 import { createSpecificationId } from '../domain/types';
 

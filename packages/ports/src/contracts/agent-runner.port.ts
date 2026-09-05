@@ -3,7 +3,7 @@ import type {
   AgentSessionHandle,
   AgentStreamEventType,
   AgentTask,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 export interface AgentOutputStreamEvent {
   readonly timestamp: string;

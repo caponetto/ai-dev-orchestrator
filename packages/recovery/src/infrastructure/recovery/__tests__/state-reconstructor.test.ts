@@ -1,7 +1,7 @@
-import { rebuildStateFromEvents } from '@ai-orchestrator/core';
-import type { JournalReader } from '@ai-orchestrator/ports';
-import { createRunId } from '@ai-orchestrator/ports';
-import type { JournalEvent } from '@ai-orchestrator/schemas';
+import { rebuildStateFromEvents } from '@ai-dev-orchestrator/core';
+import type { JournalReader } from '@ai-dev-orchestrator/ports';
+import { createRunId } from '@ai-dev-orchestrator/ports';
+import type { JournalEvent } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { StateReconstructor } from '../state-reconstructor';

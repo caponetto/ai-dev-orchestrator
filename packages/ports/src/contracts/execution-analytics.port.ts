@@ -3,7 +3,7 @@ import type {
   ExecutionProfile,
   StaticConfigBaseline,
   WorkerOutcomeRecord,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 export interface ExecutionAnalytics {
   recordOutcomes(outcomes: readonly WorkerOutcomeRecord[]): Promise<void>;

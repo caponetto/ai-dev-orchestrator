@@ -12,15 +12,15 @@ import {
   probeCodexCliCapabilities,
   probeCursorCliCapabilities,
   probeGhCliCapabilities,
-} from '@ai-orchestrator/agent-adapters';
-import { loadRunnerRegistry } from '@ai-orchestrator/config-templates';
-import { createLogger } from '@ai-orchestrator/core';
+} from '@ai-dev-orchestrator/agent-adapters';
+import { loadRunnerRegistry } from '@ai-dev-orchestrator/config-templates';
+import { createLogger } from '@ai-dev-orchestrator/core';
 import {
   DashboardHttpServer,
   DefaultDashboardDataProvider,
   FilesystemSettingsProvider,
   SseEventStream,
-} from '@ai-orchestrator/dashboard-server';
+} from '@ai-dev-orchestrator/dashboard-server';
 import {
   AgentSessionRegistry,
   CompositeAgentSessionSupervisor,
@@ -30,8 +30,8 @@ import {
   FileBackedPermissionApprovalStore,
   LocalAgentSessionSupervisor,
   RemoteAgentSessionSupervisor,
-} from '@ai-orchestrator/runner';
-import { BUILT_IN_CODING_RUNNER_ID } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/runner';
+import { BUILT_IN_CODING_RUNNER_ID } from '@ai-dev-orchestrator/schemas';
 
 import { buildDataSources, startJournalPoller } from '../dashboard/data-sources';
 import type { RunnerHealthEntry } from '../dashboard/data-sources';

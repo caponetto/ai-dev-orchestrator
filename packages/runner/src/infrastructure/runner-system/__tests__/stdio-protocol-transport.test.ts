@@ -1,7 +1,7 @@
 import { PassThrough } from 'node:stream';
 
-import type { ProtocolMessage } from '@ai-orchestrator/agent-protocol';
-import { createProtocolMessage, resetMessageCounter } from '@ai-orchestrator/agent-protocol';
+import type { ProtocolMessage } from '@ai-dev-orchestrator/agent-protocol';
+import { createProtocolMessage, resetMessageCounter } from '@ai-dev-orchestrator/agent-protocol';
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 
 import { serializeMessage } from '../protocol-serializer';

@@ -1,4 +1,4 @@
-# @ai-orchestrator/runner
+# @ai-dev-orchestrator/runner
 
 Agent dispatch, session management, and protocol transport for the runner system. Handles launching CLI and HTTP agent workers, processing their output, managing permissions, and coordinating parallel execution.
 
@@ -8,13 +8,13 @@ Agent dispatch, session management, and protocol transport for the runner system
 
 ## Workspace Dependencies
 
-- `@ai-orchestrator/agent-adapters`
-- `@ai-orchestrator/agent-protocol`
-- `@ai-orchestrator/artifacts`
-- `@ai-orchestrator/ports`
-- `@ai-orchestrator/prompt-engine`
-- `@ai-orchestrator/schemas`
-- `@ai-orchestrator/utils`
+- `@ai-dev-orchestrator/agent-adapters`
+- `@ai-dev-orchestrator/agent-protocol`
+- `@ai-dev-orchestrator/artifacts`
+- `@ai-dev-orchestrator/ports`
+- `@ai-dev-orchestrator/prompt-engine`
+- `@ai-dev-orchestrator/schemas`
+- `@ai-dev-orchestrator/utils`
 
 ## Structure
 

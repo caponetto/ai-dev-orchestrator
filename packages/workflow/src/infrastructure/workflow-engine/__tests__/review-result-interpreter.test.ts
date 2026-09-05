@@ -1,10 +1,10 @@
-import type { ArtifactStore, IterationContractRegistry } from '@ai-orchestrator/ports';
+import type { ArtifactStore, IterationContractRegistry } from '@ai-dev-orchestrator/ports';
 import type {
   ActionResult,
   Artifact,
   IterationContract,
   IterationState,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ReviewResultInterpreter } from '../review-result-interpreter';

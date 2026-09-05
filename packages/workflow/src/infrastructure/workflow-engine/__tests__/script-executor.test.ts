@@ -2,7 +2,7 @@ import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { AgentStreamBus, JournalWriter } from '@ai-orchestrator/ports';
+import type { AgentStreamBus, JournalWriter } from '@ai-dev-orchestrator/ports';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 import { ScriptExecutor } from '../script-executor';

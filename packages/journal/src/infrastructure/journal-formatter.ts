@@ -1,4 +1,4 @@
-import type { JournalEvent } from '@ai-orchestrator/schemas';
+import type { JournalEvent } from '@ai-dev-orchestrator/schemas';
 import { stringify } from 'yaml';
 
 /** Format a journal event as a YAML code block in Markdown. */

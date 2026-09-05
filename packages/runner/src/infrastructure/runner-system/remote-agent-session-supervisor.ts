@@ -4,14 +4,14 @@ import type {
   PermissionRequestMessage,
   ProgressMessage,
   ProtocolMessage,
-} from '@ai-orchestrator/agent-protocol';
-import { createProtocolMessage, payloadToRecord } from '@ai-orchestrator/agent-protocol';
+} from '@ai-dev-orchestrator/agent-protocol';
+import { createProtocolMessage, payloadToRecord } from '@ai-dev-orchestrator/agent-protocol';
 import type {
   AgentOutputStreamEvent,
   AgentSessionSupervisor,
   SessionAdvanceResult,
   SessionResponsePayload,
-} from '@ai-orchestrator/ports';
+} from '@ai-dev-orchestrator/ports';
 import type {
   AgentResult,
   AgentSessionHandle,
@@ -22,7 +22,7 @@ import type {
   PermissionPayload,
   RemoteReconnectMeta,
   SessionPendingRequest,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 import type { AgentSessionRegistry } from './agent-session-registry';
 import type { WebSocketProtocolTransport } from './websocket-protocol-transport';

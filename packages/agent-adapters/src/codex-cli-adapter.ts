@@ -1,6 +1,6 @@
-import type { ProtocolMessage } from '@ai-orchestrator/agent-protocol';
-import { createProtocolMessage } from '@ai-orchestrator/agent-protocol';
-import { BUILT_IN_CODING_RUNNER_ID } from '@ai-orchestrator/schemas';
+import type { ProtocolMessage } from '@ai-dev-orchestrator/agent-protocol';
+import { createProtocolMessage } from '@ai-dev-orchestrator/agent-protocol';
+import { BUILT_IN_CODING_RUNNER_ID } from '@ai-dev-orchestrator/schemas';
 
 import type { AgentAdapter, AgentAdapterCapabilities } from './adapter-types';
 import type {

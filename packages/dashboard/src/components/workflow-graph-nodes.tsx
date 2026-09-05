@@ -1,4 +1,4 @@
-import type { RoleAssignmentView, StateNode as StateNodeData } from '@ai-orchestrator/schemas';
+import type { RoleAssignmentView, StateNode as StateNodeData } from '@ai-dev-orchestrator/schemas';
 import { Handle, type NodeProps, Position } from '@xyflow/react';
 import { memo, type ReactNode, useEffect, useRef, useState } from 'react';
 

@@ -2,7 +2,7 @@ import { mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { RunManifest, RunResult } from '@ai-orchestrator/schemas';
+import type { RunManifest, RunResult } from '@ai-dev-orchestrator/schemas';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { resumeOrchestrator } from '../../composition-root';

@@ -1,4 +1,8 @@
-import type { PromptEngine, PromptTemplateRegistry, TokenEstimator } from '@ai-orchestrator/ports';
+import type {
+  PromptEngine,
+  PromptTemplateRegistry,
+  TokenEstimator,
+} from '@ai-dev-orchestrator/ports';
 import type {
   OutputContract,
   OutputValidationResult,
@@ -8,7 +12,7 @@ import type {
   RenderedPrompt,
   TemplateValidationResult,
   ValidationError,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 import { MissingPartialError, RequiredVariableMissingError } from '../domain/errors';
 

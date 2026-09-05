@@ -1,4 +1,4 @@
-import type { RoleAssignmentView, StateNode as StateNodeData } from '@ai-orchestrator/schemas';
+import type { RoleAssignmentView, StateNode as StateNodeData } from '@ai-dev-orchestrator/schemas';
 import type { Edge, EdgeMarker, Node } from '@xyflow/react';
 import type { CSSProperties } from 'react';
 

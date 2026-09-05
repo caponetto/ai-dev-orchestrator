@@ -3,29 +3,29 @@ import type {
   ClarificationRequestMessage,
   PermissionRequestMessage,
   ProtocolMessage,
-} from '@ai-orchestrator/agent-protocol';
-import { createProtocolMessage, payloadToRecord } from '@ai-orchestrator/agent-protocol';
-import { safeJsonParse } from '@ai-orchestrator/artifacts';
+} from '@ai-dev-orchestrator/agent-protocol';
+import { createProtocolMessage, payloadToRecord } from '@ai-dev-orchestrator/agent-protocol';
+import { safeJsonParse } from '@ai-dev-orchestrator/artifacts';
 import type {
   AgentDispatchResult,
   AgentOutputStreamEvent,
   PermissionContext,
   PermissionPolicy,
   SessionCapableRunner,
-} from '@ai-orchestrator/ports';
+} from '@ai-dev-orchestrator/ports';
 import type {
   AgentResult,
   AgentSessionRef,
   AgentTask,
   RemoteReconnectMeta,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import {
   liveClarificationResponsePayloadSchema,
   livePermissionResponsePayloadSchema,
   pollResponseSchema,
   submitResponseSchema,
-} from '@ai-orchestrator/schemas';
-import { getErrorMessage, raceWithTimeout, sleep } from '@ai-orchestrator/utils';
+} from '@ai-dev-orchestrator/schemas';
+import { getErrorMessage, raceWithTimeout, sleep } from '@ai-dev-orchestrator/utils';
 import { z } from 'zod';
 
 import {

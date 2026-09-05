@@ -1,4 +1,4 @@
-import type { DiagnosticsEngine } from '@ai-orchestrator/ports';
+import type { DiagnosticsEngine } from '@ai-dev-orchestrator/ports';
 import type {
   ConfigurationInspection,
   DiagnosticEntry,
@@ -7,8 +7,8 @@ import type {
   FailureAnalysis,
   SubsystemDiagnostic,
   Result,
-} from '@ai-orchestrator/schemas';
-import { err, ok } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
+import { err, ok } from '@ai-dev-orchestrator/schemas';
 
 import { DiagnosticsError, FailureAnalysisError } from '../domain/diagnostics-errors';
 

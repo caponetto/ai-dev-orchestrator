@@ -6,13 +6,13 @@ import type {
   ModelCapability,
   RoleContract,
   RoleId,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import {
   isObject,
   requireString,
   requireStringArray,
   snakeToCamelDeep,
-} from '@ai-orchestrator/utils';
+} from '@ai-dev-orchestrator/utils';
 import { parse as parseYaml, YAMLParseError } from 'yaml';
 
 const MISSING_ROLES_ARRAY_MESSAGE = 'roles.yaml must contain a "roles" array';

@@ -1,4 +1,4 @@
-import type { AssemblyRequest } from '@ai-orchestrator/schemas';
+import type { AssemblyRequest } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { ContextAssembler } from '../context-assembler';

@@ -4,12 +4,12 @@ import { dirname, join } from 'node:path';
 import type { Writable } from 'node:stream';
 import { PassThrough } from 'node:stream';
 
-import type { AgentAdapter, VendorTokenUsage } from '@ai-orchestrator/agent-adapters';
+import type { AgentAdapter, VendorTokenUsage } from '@ai-dev-orchestrator/agent-adapters';
 import {
   parseClaudeCodeEvent,
   parseCodexEvent,
   parseCursorEvent,
-} from '@ai-orchestrator/agent-adapters';
+} from '@ai-dev-orchestrator/agent-adapters';
 import type {
   AgentToOrchestratorMessage,
   ArtifactMessage,
@@ -18,8 +18,8 @@ import type {
   PermissionRequestMessage,
   ProgressMessage,
   ProtocolMessage,
-} from '@ai-orchestrator/agent-protocol';
-import { createProtocolMessage, payloadToRecord } from '@ai-orchestrator/agent-protocol';
+} from '@ai-dev-orchestrator/agent-protocol';
+import { createProtocolMessage, payloadToRecord } from '@ai-dev-orchestrator/agent-protocol';
 import type {
   AgentDispatchResult,
   AgentOutputStreamEvent,
@@ -27,20 +27,20 @@ import type {
   PermissionPolicy,
   PermissionPolicyConfig,
   SessionCapableRunner,
-} from '@ai-orchestrator/ports';
+} from '@ai-dev-orchestrator/ports';
 import type {
   AgentResult,
   AgentSessionRef,
   AgentTask,
   AgentTokenUsage,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import {
   AI_CONFIG_DIR_NAME,
   BUILT_IN_CODING_RUNNER_ID,
   liveClarificationResponsePayloadSchema,
   livePermissionResponsePayloadSchema,
-} from '@ai-orchestrator/schemas';
-import { getErrorMessage } from '@ai-orchestrator/utils';
+} from '@ai-dev-orchestrator/schemas';
+import { getErrorMessage } from '@ai-dev-orchestrator/utils';
 import { execa } from 'execa';
 
 import type { CodexPermissionBridgeConfig } from './codex-permission-hook';

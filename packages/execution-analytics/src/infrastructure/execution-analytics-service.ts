@@ -1,12 +1,12 @@
-import type { ProjectContextStore } from '@ai-orchestrator/ports';
+import type { ProjectContextStore } from '@ai-dev-orchestrator/ports';
 import type {
   AdaptiveConfig,
   ExecutionProfile,
   ExecutionProfileStore,
   StaticConfigBaseline,
   WorkerOutcomeRecord,
-} from '@ai-orchestrator/schemas';
-import { executionProfileStoreSchema } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
+import { executionProfileStoreSchema } from '@ai-dev-orchestrator/schemas';
 
 import { NO_RECOMMENDATION } from '../domain';
 

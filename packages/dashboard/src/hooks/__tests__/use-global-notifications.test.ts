@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { DashboardEvent } from '@ai-orchestrator/schemas';
+import type { DashboardEvent } from '@ai-dev-orchestrator/schemas';
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

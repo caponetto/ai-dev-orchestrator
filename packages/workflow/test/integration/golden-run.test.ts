@@ -2,12 +2,12 @@ import { mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { DefaultIterationContractRegistry } from '@ai-orchestrator/governance';
-import { DefaultJournalReader, DefaultJournalWriter } from '@ai-orchestrator/journal';
-import { createRunId } from '@ai-orchestrator/ports';
+import { DefaultIterationContractRegistry } from '@ai-dev-orchestrator/governance';
+import { DefaultJournalReader, DefaultJournalWriter } from '@ai-dev-orchestrator/journal';
+import { createRunId } from '@ai-dev-orchestrator/ports';
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 
-import { LifecycleController } from '@ai-orchestrator/workflow';
+import { LifecycleController } from '@ai-dev-orchestrator/workflow';
 
 import { TEST_WORKFLOW } from '../fixtures/test-defaults';
 import {

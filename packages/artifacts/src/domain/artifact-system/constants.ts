@@ -1,4 +1,4 @@
-import type { ArtifactType } from '@ai-orchestrator/schemas';
+import type { ArtifactType } from '@ai-dev-orchestrator/schemas';
 
 /** Artifact types that represent code/plan reviews. */
 export const REVIEW_ARTIFACT_TYPES: ReadonlySet<ArtifactType> = new Set<ArtifactType>([

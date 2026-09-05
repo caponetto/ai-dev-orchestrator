@@ -1,4 +1,4 @@
-# @ai-orchestrator/core
+# @ai-dev-orchestrator/core
 
 Central infrastructure for configuration loading, event dispatch, state persistence, repository discovery, and structured logging. Provides the foundational services that all higher-level packages depend on.
 
@@ -8,9 +8,9 @@ Central infrastructure for configuration loading, event dispatch, state persiste
 
 ## Workspace Dependencies
 
-- `@ai-orchestrator/ports`
-- `@ai-orchestrator/schemas`
-- `@ai-orchestrator/utils`
+- `@ai-dev-orchestrator/ports`
+- `@ai-dev-orchestrator/schemas`
+- `@ai-dev-orchestrator/utils`
 
 ## Structure
 

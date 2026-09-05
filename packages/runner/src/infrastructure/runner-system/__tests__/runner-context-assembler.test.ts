@@ -3,9 +3,9 @@ import type {
   DependencyGraph,
   PromptEngine,
   RoleRegistry,
-} from '@ai-orchestrator/ports';
-import { createRunId } from '@ai-orchestrator/ports';
-import type { Artifact } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/ports';
+import { createRunId } from '@ai-dev-orchestrator/ports';
+import type { Artifact } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ContextAssemblyError } from '../../../domain/runner-system/errors';

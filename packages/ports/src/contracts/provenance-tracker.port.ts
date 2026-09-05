@@ -1,4 +1,4 @@
-import type { ArtifactRef, ProvenanceNode, ProvenanceRecord } from '@ai-orchestrator/schemas';
+import type { ArtifactRef, ProvenanceNode, ProvenanceRecord } from '@ai-dev-orchestrator/schemas';
 
 /** Port for recording and querying artifact provenance (derivation relationships). */
 export interface ProvenanceTracker {

@@ -1,4 +1,4 @@
-import type { StateNode } from '@ai-orchestrator/schemas';
+import type { StateNode } from '@ai-dev-orchestrator/schemas';
 import type { Edge, Node } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 

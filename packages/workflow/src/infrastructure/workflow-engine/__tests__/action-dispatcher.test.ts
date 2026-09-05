@@ -6,9 +6,9 @@ import type {
   JournalWriter,
   RunnerSystem,
   StalenessDetector,
-} from '@ai-orchestrator/ports';
-import { createRunId } from '@ai-orchestrator/ports';
-import type { Action, AgreementGateResult } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/ports';
+import { createRunId } from '@ai-dev-orchestrator/ports';
+import type { Action, AgreementGateResult } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ActionDispatcher } from '../action-dispatcher';

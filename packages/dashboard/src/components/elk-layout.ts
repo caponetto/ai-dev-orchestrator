@@ -1,4 +1,4 @@
-import type { WorkflowStateView } from '@ai-orchestrator/schemas';
+import type { WorkflowStateView } from '@ai-dev-orchestrator/schemas';
 import type { ElkExtendedEdge, ElkNode } from 'elkjs/lib/elk-api';
 
 import { deriveSpine } from './workflow-graph-layout';

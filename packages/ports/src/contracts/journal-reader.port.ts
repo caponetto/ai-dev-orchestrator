@@ -1,4 +1,4 @@
-import type { JournalEvent, JournalFilter } from '@ai-orchestrator/schemas';
+import type { JournalEvent, JournalFilter } from '@ai-dev-orchestrator/schemas';
 
 /**
  * Port for reading structured workflow journal events (`JournalEvent`).

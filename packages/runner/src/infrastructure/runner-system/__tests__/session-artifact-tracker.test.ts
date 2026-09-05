@@ -1,4 +1,4 @@
-import type { ResolvedArtifact } from '@ai-orchestrator/schemas';
+import type { ResolvedArtifact } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { SessionArtifactTracker } from '../session-artifact-tracker';

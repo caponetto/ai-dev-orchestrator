@@ -1,4 +1,4 @@
-import type { WorkerError } from '@ai-orchestrator/schemas';
+import type { WorkerError } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { isRetryableWorkerError } from '../retry-manager';

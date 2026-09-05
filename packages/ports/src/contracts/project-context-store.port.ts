@@ -3,7 +3,7 @@ import type {
   ContextDocument,
   ContextFragment,
   ContextQuery,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 export interface ProjectContextStore {
   initialize(projectRoot: string): Promise<void>;

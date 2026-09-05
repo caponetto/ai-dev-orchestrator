@@ -1,5 +1,5 @@
-import type { IterationContractRegistry } from '@ai-orchestrator/ports';
-import type { IterationContract, IterationState } from '@ai-orchestrator/schemas';
+import type { IterationContractRegistry } from '@ai-dev-orchestrator/ports';
+import type { IterationContract, IterationState } from '@ai-dev-orchestrator/schemas';
 
 import { BUILT_IN_CONTRACTS } from './built-in-contracts';
 

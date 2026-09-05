@@ -1,4 +1,8 @@
-import type { ResolvedArtifact, RoleContract, WorkerConstraints } from '@ai-orchestrator/schemas';
+import type {
+  ResolvedArtifact,
+  RoleContract,
+  WorkerConstraints,
+} from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { AgentTaskAssembler } from '../agent-task-assembler';

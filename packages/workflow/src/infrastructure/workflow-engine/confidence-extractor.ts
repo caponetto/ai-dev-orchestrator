@@ -1,4 +1,4 @@
-import type { ActionResult, ConfidenceReport } from '@ai-orchestrator/schemas';
+import type { ActionResult, ConfidenceReport } from '@ai-dev-orchestrator/schemas';
 
 export function extractConfidenceReport(results: readonly ActionResult[]): ConfidenceReport | null {
   for (const result of results) {

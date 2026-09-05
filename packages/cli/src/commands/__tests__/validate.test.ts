@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { ValidationReport } from '@ai-orchestrator/ports';
+import type { ValidationReport } from '@ai-dev-orchestrator/ports';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 import { ExitCode } from '../../output/exit-codes';

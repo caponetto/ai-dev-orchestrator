@@ -1,4 +1,4 @@
-import type { DiscoveryResult } from '@ai-orchestrator/schemas';
+import type { DiscoveryResult } from '@ai-dev-orchestrator/schemas';
 
 /**
  * Discovers the target git repository from a working directory and the global

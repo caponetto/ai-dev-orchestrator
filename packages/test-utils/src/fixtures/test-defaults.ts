@@ -3,7 +3,7 @@ import type {
   PolicyDefinition,
   RoleContract,
   WorkflowDefinition,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 /**
  * Canonical test roles with minimal restrictions.

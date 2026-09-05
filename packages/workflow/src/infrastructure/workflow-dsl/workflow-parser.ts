@@ -1,5 +1,5 @@
-import type { StateDefinition, WorkflowDefinition } from '@ai-orchestrator/schemas';
-import { workflowSchema } from '@ai-orchestrator/schemas';
+import type { StateDefinition, WorkflowDefinition } from '@ai-dev-orchestrator/schemas';
+import { workflowSchema } from '@ai-dev-orchestrator/schemas';
 import { parse as parseYaml } from 'yaml';
 import type { z } from 'zod';
 

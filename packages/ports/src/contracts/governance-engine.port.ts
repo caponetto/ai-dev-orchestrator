@@ -3,7 +3,7 @@ import type {
   GovernanceDecision,
   TransitionDecision,
   TransitionRequest,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 /** Port for governance evaluation of workflow transitions. */
 export interface GovernanceEngine {

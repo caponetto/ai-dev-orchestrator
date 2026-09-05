@@ -1,17 +1,17 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { safeJsonParse } from '@ai-orchestrator/artifacts';
-import { DefaultStatePersistence } from '@ai-orchestrator/core';
-import { DefaultJournalReader } from '@ai-orchestrator/journal';
-import { DefaultManifestQuery } from '@ai-orchestrator/run-manifest';
-import { agentStreamEventSchema } from '@ai-orchestrator/runner';
+import { safeJsonParse } from '@ai-dev-orchestrator/artifacts';
+import { DefaultStatePersistence } from '@ai-dev-orchestrator/core';
+import { DefaultJournalReader } from '@ai-dev-orchestrator/journal';
+import { DefaultManifestQuery } from '@ai-dev-orchestrator/run-manifest';
+import { agentStreamEventSchema } from '@ai-dev-orchestrator/runner';
 import {
   RUN_LOCK_FILENAME,
   WORKFLOW_DEFINITION_FILENAME,
   type PersistedState,
   type RunManifest,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import { parse } from 'yaml';
 
 import { getConfigSnapshotPath, getJournalPath, getRunsDir } from './workspace-paths';

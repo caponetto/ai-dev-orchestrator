@@ -2,13 +2,13 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import type { ProjectContextStore } from '@ai-orchestrator/ports';
+import type { ProjectContextStore } from '@ai-dev-orchestrator/ports';
 import type {
   ContextCategory,
   ContextDocument,
   ContextFragment,
   ContextQuery,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 import { ContextReadError, ContextStoreInitError, ContextWriteError } from '../domain/errors';
 

@@ -1,4 +1,4 @@
-# @ai-orchestrator/dashboard-server
+# @ai-dev-orchestrator/dashboard-server
 
 HTTP server that backs the dashboard SPA. Exposes REST endpoints for run state, artifact details, workflow views, metrics, and diagnostics. Streams real-time events to the frontend via SSE.
 
@@ -8,12 +8,12 @@ HTTP server that backs the dashboard SPA. Exposes REST endpoints for run state, 
 
 ## Workspace Dependencies
 
-- `@ai-orchestrator/artifacts`
-- `@ai-orchestrator/core`
-- `@ai-orchestrator/ports`
-- `@ai-orchestrator/runner`
-- `@ai-orchestrator/schemas`
-- `@ai-orchestrator/utils`
+- `@ai-dev-orchestrator/artifacts`
+- `@ai-dev-orchestrator/core`
+- `@ai-dev-orchestrator/ports`
+- `@ai-dev-orchestrator/runner`
+- `@ai-dev-orchestrator/schemas`
+- `@ai-dev-orchestrator/utils`
 
 ## Structure
 

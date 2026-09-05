@@ -1,4 +1,4 @@
-import { RecoverableErrorBase } from '@ai-orchestrator/ports';
+import { RecoverableErrorBase } from '@ai-dev-orchestrator/ports';
 
 export class DashboardDataError extends RecoverableErrorBase {
   readonly code = 'DASHBOARD_DATA_ERROR';

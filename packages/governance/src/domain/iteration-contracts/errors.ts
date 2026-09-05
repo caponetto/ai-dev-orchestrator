@@ -1,4 +1,4 @@
-import { NonRecoverableErrorBase } from '@ai-orchestrator/ports';
+import { NonRecoverableErrorBase } from '@ai-dev-orchestrator/ports';
 
 /** Thrown when an iteration contract definition is invalid. */
 export class InvalidContractError extends NonRecoverableErrorBase {

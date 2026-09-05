@@ -1,10 +1,10 @@
-import type { AgreementGate as AgreementGatePort, ArtifactStore } from '@ai-orchestrator/ports';
+import type { AgreementGate as AgreementGatePort, ArtifactStore } from '@ai-dev-orchestrator/ports';
 import type {
   AgreementGateResult,
   AgreementType,
   ApprovalStatus,
   ApprovalType,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import { z } from 'zod';
 
 import { safeJsonParse } from '../artifact-system/content-parser';

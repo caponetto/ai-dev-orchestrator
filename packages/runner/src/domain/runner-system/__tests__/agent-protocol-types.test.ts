@@ -6,7 +6,7 @@ import {
   ALL_MESSAGE_TYPES,
   createProtocolMessage,
   resetMessageCounter,
-} from '@ai-orchestrator/agent-protocol';
+} from '@ai-dev-orchestrator/agent-protocol';
 import type {
   ProtocolMessage,
   HandshakeMessage,
@@ -23,8 +23,8 @@ import type {
   AbortMessage,
   AgentToOrchestratorMessage,
   OrchestratorToAgentMessage,
-} from '@ai-orchestrator/agent-protocol';
-import type { PermissionAction } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/agent-protocol';
+import type { PermissionAction } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, beforeEach } from 'vitest';
 
 describe('agent-protocol-types', () => {

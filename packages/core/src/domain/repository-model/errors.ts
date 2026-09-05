@@ -1,4 +1,4 @@
-import { NonRecoverableErrorBase } from '@ai-orchestrator/ports';
+import { NonRecoverableErrorBase } from '@ai-dev-orchestrator/ports';
 
 /** Global `~/.ai/` configuration directory is missing. */
 export class RepositoryNotFoundError extends NonRecoverableErrorBase {

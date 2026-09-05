@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { ArtifactEntryView } from '@ai-orchestrator/schemas';
+import type { ArtifactEntryView } from '@ai-dev-orchestrator/schemas';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

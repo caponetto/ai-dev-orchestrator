@@ -1,5 +1,5 @@
-import type { ResolvedArtifact } from '@ai-orchestrator/schemas';
-import { hashContent } from '@ai-orchestrator/utils';
+import type { ResolvedArtifact } from '@ai-dev-orchestrator/schemas';
+import { hashContent } from '@ai-dev-orchestrator/utils';
 
 export interface ArtifactTrackingEntry {
   readonly kind: 'new' | 'unchanged' | 'changed';

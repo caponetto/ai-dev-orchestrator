@@ -1,5 +1,5 @@
-import type { ProtocolMessage } from '@ai-orchestrator/agent-protocol';
-import { createProtocolMessage } from '@ai-orchestrator/agent-protocol';
+import type { ProtocolMessage } from '@ai-dev-orchestrator/agent-protocol';
+import { createProtocolMessage } from '@ai-dev-orchestrator/agent-protocol';
 import { describe, it, expect, beforeEach } from 'vitest';
 
 import { serializeMessage } from '../protocol-serializer';

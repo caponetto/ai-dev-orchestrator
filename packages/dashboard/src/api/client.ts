@@ -15,7 +15,7 @@ import type {
   WorkflowStateView,
   WorkflowSummary,
   SchemaLike,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import {
   artifactContentViewSchema,
   artifactDetailViewSchema,
@@ -32,7 +32,7 @@ import {
   usageBreakdownViewSchema,
   workflowStateViewSchema,
   workflowSummaryArraySchema,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 function extractErrorMessage(errorBody: unknown): string | undefined {
   if (typeof errorBody === 'object' && errorBody !== null && 'error' in errorBody) {

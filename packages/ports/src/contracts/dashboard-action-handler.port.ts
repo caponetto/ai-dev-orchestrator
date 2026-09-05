@@ -3,7 +3,7 @@ import type {
   RunCreationParams,
   WorkflowStateView,
   WorkflowSummary,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 /** Result of creating a new run. */
 export interface CreateRunResult extends DashboardActionResult {

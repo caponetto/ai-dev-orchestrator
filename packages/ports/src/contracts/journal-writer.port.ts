@@ -1,4 +1,4 @@
-import type { JournalEvent } from '@ai-orchestrator/schemas';
+import type { JournalEvent } from '@ai-dev-orchestrator/schemas';
 
 /**
  * Port for appending structured events to the workflow journal.

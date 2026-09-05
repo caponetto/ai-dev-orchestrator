@@ -1,5 +1,5 @@
-import type { AgreementValidator as AgreementValidatorPort } from '@ai-orchestrator/ports';
-import type { AgreementArtifact, AgreementValidationResult } from '@ai-orchestrator/schemas';
+import type { AgreementValidator as AgreementValidatorPort } from '@ai-dev-orchestrator/ports';
+import type { AgreementArtifact, AgreementValidationResult } from '@ai-dev-orchestrator/schemas';
 
 /** Validates agreement artifacts for structural and semantic correctness. */
 export class DefaultAgreementValidator implements AgreementValidatorPort {

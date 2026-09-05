@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 
-import type { RunResult } from '@ai-orchestrator/schemas';
+import type { RunResult } from '@ai-dev-orchestrator/schemas';
 
 import { resumeOrchestrator } from '../composition-root';
 import { ExitCode, toCLIError } from '../output/exit-codes';

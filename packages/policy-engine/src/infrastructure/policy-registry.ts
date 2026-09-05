@@ -1,5 +1,8 @@
-import type { PolicyEvaluator, PolicyRegistry as PolicyRegistryPort } from '@ai-orchestrator/ports';
-import type { PolicyType, PolicyTypeInfo } from '@ai-orchestrator/schemas';
+import type {
+  PolicyEvaluator,
+  PolicyRegistry as PolicyRegistryPort,
+} from '@ai-dev-orchestrator/ports';
+import type { PolicyType, PolicyTypeInfo } from '@ai-dev-orchestrator/schemas';
 
 import { UnknownPolicyTypeError } from '../domain/errors';
 

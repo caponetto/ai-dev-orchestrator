@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { HealthResponse } from '@ai-orchestrator/schemas';
+import type { HealthResponse } from '@ai-dev-orchestrator/schemas';
 import { cleanup, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';

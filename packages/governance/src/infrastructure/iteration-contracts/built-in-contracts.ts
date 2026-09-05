@@ -1,4 +1,4 @@
-import type { IterationContract, IterationLimitDefaults } from '@ai-orchestrator/schemas';
+import type { IterationContract, IterationLimitDefaults } from '@ai-dev-orchestrator/schemas';
 
 /**
  * Fallback limits used only when no governance config is available (e.g. fixture mode).

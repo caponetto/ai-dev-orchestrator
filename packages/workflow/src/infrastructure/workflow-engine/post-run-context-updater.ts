@@ -1,4 +1,4 @@
-import type { ProjectContextStore } from '@ai-orchestrator/ports';
+import type { ProjectContextStore } from '@ai-dev-orchestrator/ports';
 import type {
   CodebaseContext,
   ContextDocument,
@@ -6,7 +6,7 @@ import type {
   ModelCalibrationEntry,
   RunHistory,
   RunHistoryEntry,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 const MAX_FULL_RUNS = 5;
 const MAX_COMPRESSED_RUNS = 20;

@@ -3,13 +3,13 @@ import type {
   AgentSessionSupervisor,
   SessionAdvanceResult,
   SessionResponsePayload,
-} from '@ai-orchestrator/ports';
+} from '@ai-dev-orchestrator/ports';
 import type {
   AgentSessionHandle,
   AgentSessionRef,
   AgentSessionSnapshot,
   AgentSessionState,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 /**
  * Composite supervisor that delegates to multiple underlying supervisors.
  * Lookup operations try each delegate in order and return the first match.

@@ -4,7 +4,7 @@ import type {
   RoleContract,
   RoleId,
   RoleValidationResult,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 /** Port for querying role contracts and model assignments. */
 export interface RoleRegistry {

@@ -4,7 +4,7 @@ import type {
   ResolvedArtifact,
   RoleContract,
   WorkerConstraints,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 import { extensionForOutputFormat } from './output-format';
 

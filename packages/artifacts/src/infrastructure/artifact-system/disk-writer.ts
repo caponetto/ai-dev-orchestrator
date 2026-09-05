@@ -1,8 +1,8 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-import type { ArtifactMetadata } from '@ai-orchestrator/schemas';
-import { getErrorMessage } from '@ai-orchestrator/utils';
+import type { ArtifactMetadata } from '@ai-dev-orchestrator/schemas';
+import { getErrorMessage } from '@ai-dev-orchestrator/utils';
 import writeFileAtomic from 'write-file-atomic';
 import { stringify } from 'yaml';
 

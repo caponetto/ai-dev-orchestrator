@@ -1,11 +1,11 @@
-import type { CollaborationModel, RoleRegistry } from '@ai-orchestrator/ports';
+import type { CollaborationModel, RoleRegistry } from '@ai-dev-orchestrator/ports';
 import type {
   ArtifactFlowDefinition,
   ArtifactType,
   RoleId,
   RoleInteraction,
   VisibilityCheck,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 /** Default implementation of the CollaborationModel port backed by RoleRegistry. */
 export class DefaultCollaborationModel implements CollaborationModel {

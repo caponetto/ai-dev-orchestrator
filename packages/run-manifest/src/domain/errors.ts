@@ -1,4 +1,4 @@
-import { NonRecoverableErrorBase } from '@ai-orchestrator/ports';
+import { NonRecoverableErrorBase } from '@ai-dev-orchestrator/ports';
 
 /** Thrown when manifest production fails. */
 export class ManifestProductionError extends NonRecoverableErrorBase {

@@ -2,7 +2,7 @@ import type {
   DistributionSummary,
   ExecutionProfile,
   WorkerOutcomeRecord,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 const EMA_ALPHA = 0.3;
 

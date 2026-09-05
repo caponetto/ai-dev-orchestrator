@@ -45,7 +45,7 @@ pnpm publint          # Validate package.json exports
 
 ## Monorepo Layout
 
-All workspace packages live under `packages/`, scoped as `@ai-orchestrator/<name>`:
+All workspace packages live under `packages/`, scoped as `@ai-dev-orchestrator/<name>`:
 
 | Package               | Purpose                                         |
 | --------------------- | ----------------------------------------------- |
@@ -83,9 +83,9 @@ Architecture follows hexagonal (ports & adapters) with strict layering enforced 
 - **File naming:** kebab-case for all source and test files.
 - **Imports:** `import type` enforced by `@typescript-eslint/consistent-type-imports`. Import order enforced by `eslint-plugin-import-x` (builtin, external, internal, parent, sibling, index — alphabetized, blank lines between groups).
 - **No `any`:** `no-explicit-any` is an error. Prefix unused variables with `_`.
-- **No `console.log`:** Use `createLogger` from `@ai-orchestrator/core`.
+- **No `console.log`:** Use `createLogger` from `@ai-dev-orchestrator/core`.
 - **Exports:** Named exports via barrel `index.ts` files per module.
-- **Dependencies:** Workspace packages reference each other via `"@ai-orchestrator/<name>": "workspace:*"`.
+- **Dependencies:** Workspace packages reference each other via `"@ai-dev-orchestrator/<name>": "workspace:*"`.
 
 ## Module Structure
 

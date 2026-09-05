@@ -1,4 +1,4 @@
-import type { WorkflowDefinition } from '@ai-orchestrator/schemas';
+import type { WorkflowDefinition } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { TEST_WORKFLOW } from '../../../../test/fixtures/test-defaults';

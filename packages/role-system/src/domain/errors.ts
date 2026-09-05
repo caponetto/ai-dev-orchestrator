@@ -1,5 +1,5 @@
-import { NonRecoverableErrorBase } from '@ai-orchestrator/ports';
-import type { ArtifactType } from '@ai-orchestrator/schemas';
+import { NonRecoverableErrorBase } from '@ai-dev-orchestrator/ports';
+import type { ArtifactType } from '@ai-dev-orchestrator/schemas';
 
 /** Thrown when a requested role is not found in the registry. */
 export class RoleNotFoundError extends NonRecoverableErrorBase {

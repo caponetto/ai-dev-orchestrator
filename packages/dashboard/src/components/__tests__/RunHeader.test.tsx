@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { RunStateView } from '@ai-orchestrator/schemas';
+import type { RunStateView } from '@ai-dev-orchestrator/schemas';
 import { fireEvent, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 

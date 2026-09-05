@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ALL_PARTIAL_IDS, ALL_ROLE_IDS } from '@ai-orchestrator/config-templates';
+import { ALL_PARTIAL_IDS, ALL_ROLE_IDS } from '@ai-dev-orchestrator/config-templates';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 import { ExitCode } from '../../output/exit-codes';

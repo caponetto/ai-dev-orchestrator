@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { DashboardWaitingContext } from '@ai-orchestrator/schemas';
+import type { DashboardWaitingContext } from '@ai-dev-orchestrator/schemas';
 import { screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';

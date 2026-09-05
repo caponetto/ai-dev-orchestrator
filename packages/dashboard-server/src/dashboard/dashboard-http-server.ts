@@ -11,15 +11,15 @@ import type {
   Logger,
   SessionCapableDataProvider,
   SettingsProvider,
-} from '@ai-orchestrator/ports';
-import type { LiveRequestStore, PermissionApprovalStore } from '@ai-orchestrator/runner';
+} from '@ai-dev-orchestrator/ports';
+import type { LiveRequestStore, PermissionApprovalStore } from '@ai-dev-orchestrator/runner';
 import type {
   ArtifactType,
   DashboardEvent,
   DashboardEventType,
   RunSettings,
-} from '@ai-orchestrator/schemas';
-import { ARTIFACTS_DIR_NAME, MEDIA_MIME_TYPES } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
+import { ARTIFACTS_DIR_NAME, MEDIA_MIME_TYPES } from '@ai-dev-orchestrator/schemas';
 import { getRequestListener } from '@hono/node-server';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';

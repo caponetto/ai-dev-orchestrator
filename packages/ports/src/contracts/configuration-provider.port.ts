@@ -4,7 +4,7 @@ import type {
   RolesConfig,
   RuntimeConfig,
   WorkflowConfig,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 /** Tracks where a configuration value originated. */
 export interface ConfigSource {

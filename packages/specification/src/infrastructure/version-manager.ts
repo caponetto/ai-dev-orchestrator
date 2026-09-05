@@ -1,4 +1,4 @@
-import type { CanonicalSpecification } from '@ai-orchestrator/schemas';
+import type { CanonicalSpecification } from '@ai-dev-orchestrator/schemas';
 
 import { createSpecificationId } from '../domain/types';
 

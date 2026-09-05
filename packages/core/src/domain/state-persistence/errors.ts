@@ -1,4 +1,4 @@
-import { NonRecoverableErrorBase } from '@ai-orchestrator/ports';
+import { NonRecoverableErrorBase } from '@ai-dev-orchestrator/ports';
 
 /** Thrown when a state persistence operation fails. */
 export class StatePersistenceError extends NonRecoverableErrorBase {

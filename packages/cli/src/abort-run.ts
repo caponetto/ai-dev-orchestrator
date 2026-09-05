@@ -1,8 +1,8 @@
 import { join } from 'node:path';
 
-import { DefaultJournalWriter } from '@ai-orchestrator/journal';
-import type { StatePersistence } from '@ai-orchestrator/ports';
-import type { PersistedState } from '@ai-orchestrator/schemas';
+import { DefaultJournalWriter } from '@ai-dev-orchestrator/journal';
+import type { StatePersistence } from '@ai-dev-orchestrator/ports';
+import type { PersistedState } from '@ai-dev-orchestrator/schemas';
 
 import { getJournalPath } from './workspace-paths';
 

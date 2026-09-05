@@ -7,10 +7,10 @@ import {
   DefaultStatePersistence,
   rebuildStateFromEvents,
   RunAlreadyActiveError,
-} from '@ai-orchestrator/core';
-import type { JournalReader, JournalWriter } from '@ai-orchestrator/ports';
-import { createRunId } from '@ai-orchestrator/ports';
-import type { PersistedState } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/core';
+import type { JournalReader, JournalWriter } from '@ai-dev-orchestrator/ports';
+import { createRunId } from '@ai-dev-orchestrator/ports';
+import type { PersistedState } from '@ai-dev-orchestrator/schemas';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ArtifactConsistencyChecker } from '../artifact-consistency-checker';

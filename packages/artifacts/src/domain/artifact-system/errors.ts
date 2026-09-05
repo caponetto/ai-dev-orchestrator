@@ -1,5 +1,5 @@
-import { NonRecoverableErrorBase } from '@ai-orchestrator/ports';
-import type { ArtifactRef, ArtifactType } from '@ai-orchestrator/schemas';
+import { NonRecoverableErrorBase } from '@ai-dev-orchestrator/ports';
+import type { ArtifactRef, ArtifactType } from '@ai-dev-orchestrator/schemas';
 
 /** Thrown when a role attempts to produce an artifact type it does not own. */
 export class OwnershipViolationError extends NonRecoverableErrorBase {

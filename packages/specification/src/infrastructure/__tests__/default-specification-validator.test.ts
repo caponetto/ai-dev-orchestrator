@@ -1,5 +1,5 @@
-import type { CanonicalSpecification } from '@ai-orchestrator/schemas';
-import { COMPLETENESS_WEIGHTS } from '@ai-orchestrator/schemas';
+import type { CanonicalSpecification } from '@ai-dev-orchestrator/schemas';
+import { COMPLETENESS_WEIGHTS } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { createSpecificationId } from '../../domain/types';

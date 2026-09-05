@@ -2,12 +2,12 @@ import { existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { DefaultStatePersistence } from '@ai-orchestrator/core';
+import { DefaultStatePersistence } from '@ai-dev-orchestrator/core';
 import {
   DefaultCollaborationModel,
   DefaultGovernanceEngine,
   DefaultIterationContractRegistry,
-} from '@ai-orchestrator/governance';
+} from '@ai-dev-orchestrator/governance';
 import type {
   ArtifactStore,
   GovernanceEngine,
@@ -16,13 +16,13 @@ import type {
   ManifestProducer,
   RunnerSystem,
   StatePersistence,
-} from '@ai-orchestrator/ports';
-import { createRunId } from '@ai-orchestrator/ports';
-import { DefaultRoleRegistry } from '@ai-orchestrator/role-system';
-import type { RunManifest, WorkflowDefinition } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/ports';
+import { createRunId } from '@ai-dev-orchestrator/ports';
+import { DefaultRoleRegistry } from '@ai-dev-orchestrator/role-system';
+import type { RunManifest, WorkflowDefinition } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi } from 'vitest';
 
-import { LifecycleController } from '@ai-orchestrator/workflow';
+import { LifecycleController } from '@ai-dev-orchestrator/workflow';
 
 import { TEST_ROLES, TEST_WORKFLOW } from '../fixtures/test-defaults';
 

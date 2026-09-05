@@ -2,10 +2,10 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { generateAll } from '@ai-orchestrator/config-templates';
-import { DefaultStatePersistence } from '@ai-orchestrator/core';
-import { AI_CONFIG_DIR_NAME } from '@ai-orchestrator/schemas';
-import type { PersistedState, RunId } from '@ai-orchestrator/schemas';
+import { generateAll } from '@ai-dev-orchestrator/config-templates';
+import { DefaultStatePersistence } from '@ai-dev-orchestrator/core';
+import { AI_CONFIG_DIR_NAME } from '@ai-dev-orchestrator/schemas';
+import type { PersistedState, RunId } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 
 import {
@@ -38,7 +38,7 @@ vi.mock('../workspace-paths', async (importOriginal) => {
   };
 });
 
-vi.mock('@ai-orchestrator/agent-adapters', async (importOriginal) => {
+vi.mock('@ai-dev-orchestrator/agent-adapters', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...(actual as object),

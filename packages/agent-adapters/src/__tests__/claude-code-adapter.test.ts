@@ -1,4 +1,4 @@
-import { createProtocolMessage, PROTOCOL_VERSION } from '@ai-orchestrator/agent-protocol';
+import { createProtocolMessage, PROTOCOL_VERSION } from '@ai-dev-orchestrator/agent-protocol';
 import { describe, expect, it } from 'vitest';
 
 import { ClaudeCodeAdapter, createClaudeCodeAdapter } from '../claude-code-adapter';

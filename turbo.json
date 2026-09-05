@@ -94,7 +94,7 @@
       "outputs": ["dist/**"]
     },
     "build:prod": {
-      "dependsOn": ["build:dev", "^build:prod"],
+      "dependsOn": ["^build:prod"],
       "inputs": ["$TURBO_DEFAULT$", "tsconfig*.json"],
       "outputs": ["dist/**"]
     }

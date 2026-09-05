@@ -1,4 +1,4 @@
-import type { DependencyEdge } from '@ai-orchestrator/schemas';
+import type { DependencyEdge } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { ArtifactTypeNotInGraphError, DependencyGraphCycleError } from '../../domain/errors';

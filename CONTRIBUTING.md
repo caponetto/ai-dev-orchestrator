@@ -64,7 +64,7 @@ This project uses [Release Please](https://github.com/googleapis/release-please)
 - ESM modules (Node.js 22+)
 - Hexagonal architecture layers (domain, infrastructure)
 - No `any` types without justification
-- No `console.log` — use `createLogger` from `@ai-orchestrator/core`
+- No `console.log` — use `createLogger` from `@ai-dev-orchestrator/core`
 
 ### Architecture Layers
 

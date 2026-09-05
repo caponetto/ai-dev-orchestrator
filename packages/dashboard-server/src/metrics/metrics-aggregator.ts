@@ -1,5 +1,5 @@
 /** Computes summaries from raw metric entries. */
-import type { MetricEntry, MetricSummary } from '@ai-orchestrator/schemas';
+import type { MetricEntry, MetricSummary } from '@ai-dev-orchestrator/schemas';
 export function aggregateEntries(entries: readonly MetricEntry[]): MetricSummary | null {
   if (entries.length === 0) {
     return null;

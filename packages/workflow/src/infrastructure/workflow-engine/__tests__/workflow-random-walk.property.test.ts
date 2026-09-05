@@ -1,11 +1,11 @@
-import { DefaultIterationContractRegistry } from '@ai-orchestrator/governance';
-import type { ArtifactStore, RunnerSystem } from '@ai-orchestrator/ports';
+import { DefaultIterationContractRegistry } from '@ai-dev-orchestrator/governance';
+import type { ArtifactStore, RunnerSystem } from '@ai-dev-orchestrator/ports';
 import type {
   ArtifactType,
   DispatchResult,
   RoleId,
   WorkflowDefinition,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import * as fc from 'fast-check';
 import { describe, expect, it, vi } from 'vitest';
 

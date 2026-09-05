@@ -1,5 +1,5 @@
 import { defineConfig } from 'vitest/config';
-import { createBaseTestConfig } from '@ai-orchestrator/build-config';
+import { createBaseTestConfig } from '@ai-dev-orchestrator/build-config';
 
 const base = createBaseTestConfig();
 

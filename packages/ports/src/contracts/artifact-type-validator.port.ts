@@ -1,4 +1,4 @@
-import type { ArtifactType } from '@ai-orchestrator/schemas';
+import type { ArtifactType } from '@ai-dev-orchestrator/schemas';
 
 /** Result of validating artifact content against its type schema. */
 export interface ArtifactValidationResult {

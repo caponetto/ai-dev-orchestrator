@@ -1,4 +1,4 @@
-import type { ArtifactType, DependencyGraphValidation } from '@ai-orchestrator/schemas';
+import type { ArtifactType, DependencyGraphValidation } from '@ai-dev-orchestrator/schemas';
 
 /** Port for querying the static artifact type dependency graph. */
 export interface DependencyGraph {

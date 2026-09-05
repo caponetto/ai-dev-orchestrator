@@ -1,6 +1,6 @@
 {
-  "name": "@ai-orchestrator/dashboard",
-  "version": "1.0.0",
+  "name": "@ai-dev-orchestrator/dashboard",
+  "version": "0.1.0",
   "private": true,
   "license": "MIT",
   "repository": {
@@ -28,8 +28,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ai-orchestrator/schemas": "workspace:*",
-    "@ai-orchestrator/utils": "workspace:*",
+    "@ai-dev-orchestrator/schemas": "workspace:*",
+    "@ai-dev-orchestrator/utils": "workspace:*",
     "@tailwindcss/typography": "^0.5.20",
     "@xyflow/react": "^12.11.6",
     "class-variance-authority": "^0.7.1",
@@ -49,6 +49,7 @@
     "timeago.js": "^4.0.2"
   },
   "devDependencies": {
+    "@ai-dev-orchestrator/build-config": "workspace:*",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/jest-dom": "^7.0.1",
@@ -64,7 +65,6 @@
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
     "vite": "^8.2.2",
-    "@ai-orchestrator/build-config": "workspace:*",
     "vitest": "^4.1.11"
   }
 }

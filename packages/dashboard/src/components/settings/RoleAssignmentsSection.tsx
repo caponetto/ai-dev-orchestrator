@@ -2,8 +2,8 @@ import type {
   ProjectSettingsView,
   SettingsPermissionPolicy,
   SettingsRoleAssignment,
-} from '@ai-orchestrator/schemas';
-import { roleTrustLevelSchema } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
+import { roleTrustLevelSchema } from '@ai-dev-orchestrator/schemas';
 
 import { humanize } from '../../lib/humanize';
 

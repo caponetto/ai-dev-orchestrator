@@ -1,6 +1,6 @@
-import type { JournalWriter } from '@ai-orchestrator/ports';
-import { createRunId } from '@ai-orchestrator/ports';
-import type { GovernanceDecision, JournalEvent } from '@ai-orchestrator/schemas';
+import type { JournalWriter } from '@ai-dev-orchestrator/ports';
+import { createRunId } from '@ai-dev-orchestrator/ports';
+import type { GovernanceDecision, JournalEvent } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi } from 'vitest';
 
 import { DecisionRecorder } from '../decision-recorder';

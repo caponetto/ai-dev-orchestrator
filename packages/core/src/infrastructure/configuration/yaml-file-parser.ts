@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 
-import type { Result } from '@ai-orchestrator/schemas';
-import { err, ok } from '@ai-orchestrator/schemas';
+import type { Result } from '@ai-dev-orchestrator/schemas';
+import { err, ok } from '@ai-dev-orchestrator/schemas';
 import { parse as parseYaml, YAMLParseError } from 'yaml';
 
 import { YamlParseError } from '../../domain/configuration/errors';

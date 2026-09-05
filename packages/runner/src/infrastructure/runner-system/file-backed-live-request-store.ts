@@ -1,10 +1,10 @@
 import { mkdir, readFile, writeFile, readdir, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { safeJsonParse } from '@ai-orchestrator/artifacts';
-import type { LiveRequestKind } from '@ai-orchestrator/schemas';
-import { liveRequestKindSchema } from '@ai-orchestrator/schemas';
-import { sleep } from '@ai-orchestrator/utils';
+import { safeJsonParse } from '@ai-dev-orchestrator/artifacts';
+import type { LiveRequestKind } from '@ai-dev-orchestrator/schemas';
+import { liveRequestKindSchema } from '@ai-dev-orchestrator/schemas';
+import { sleep } from '@ai-dev-orchestrator/utils';
 import { z } from 'zod';
 
 export interface LiveRequest {

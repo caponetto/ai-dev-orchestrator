@@ -24,14 +24,14 @@ vi.mock('../workspace-paths', () => ({
 const mockLoad = vi.fn();
 const mockReconstruct = vi.fn();
 
-vi.mock('@ai-orchestrator/core', () => ({
+vi.mock('@ai-dev-orchestrator/core', () => ({
   DefaultStatePersistence: vi.fn().mockImplementation(function (this: Record<string, unknown>) {
     this.load = mockLoad;
     this.reconstructFromJournal = mockReconstruct;
   }),
 }));
 
-vi.mock('@ai-orchestrator/workflow', () => ({
+vi.mock('@ai-dev-orchestrator/workflow', () => ({
   DefaultJournalReader: vi.fn().mockImplementation(function (this: Record<string, unknown>) {
     this.readAll = vi.fn().mockReturnValue([]);
   }),

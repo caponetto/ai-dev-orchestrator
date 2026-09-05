@@ -1,4 +1,4 @@
-import type { PersistedState, RunId } from '@ai-orchestrator/schemas';
+import type { PersistedState, RunId } from '@ai-dev-orchestrator/schemas';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildAbortedState, writeAbortJournalEntries } from '../abort-run';
@@ -9,7 +9,7 @@ vi.mock('../workspace-paths', () => ({
 
 const mockAppend = vi.fn();
 
-vi.mock('@ai-orchestrator/journal', () => ({
+vi.mock('@ai-dev-orchestrator/journal', () => ({
   DefaultJournalWriter: vi.fn().mockImplementation(function (this: { append: typeof mockAppend }) {
     this.append = mockAppend;
   }),

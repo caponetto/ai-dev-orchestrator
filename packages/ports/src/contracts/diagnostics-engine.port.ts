@@ -4,7 +4,7 @@ import type {
   FailureAnalysis,
   Result,
   SubsystemDiagnostic,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 /** Port for system diagnostics — failure analysis, config inspection, subsystem health. */
 export interface DiagnosticsEngine {

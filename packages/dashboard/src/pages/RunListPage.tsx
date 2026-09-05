@@ -1,5 +1,5 @@
-import type { RunSummaryView } from '@ai-orchestrator/schemas';
-import { formatDuration } from '@ai-orchestrator/utils/formatters';
+import type { RunSummaryView } from '@ai-dev-orchestrator/schemas';
+import { formatDuration } from '@ai-dev-orchestrator/utils/formatters';
 import { ChevronLeft, ChevronRight, Inbox, Plus, Search, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';

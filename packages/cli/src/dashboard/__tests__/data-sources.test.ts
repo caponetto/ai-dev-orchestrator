@@ -1,4 +1,4 @@
-import type { ArtifactSummary, WorkflowDefinition } from '@ai-orchestrator/schemas';
+import type { ArtifactSummary, WorkflowDefinition } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import {

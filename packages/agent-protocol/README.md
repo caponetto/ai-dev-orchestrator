@@ -1,4 +1,4 @@
-# @ai-orchestrator/agent-protocol
+# @ai-dev-orchestrator/agent-protocol
 
 Defines the typed message protocol between agents and the orchestrator. All communication flows through structured messages with versioned payloads, enabling transport-agnostic agent integration.
 
@@ -8,7 +8,7 @@ Defines the typed message protocol between agents and the orchestrator. All comm
 
 ## Workspace Dependencies
 
-- `@ai-orchestrator/schemas`
+- `@ai-dev-orchestrator/schemas`
 
 ## Structure
 

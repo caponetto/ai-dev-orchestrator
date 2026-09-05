@@ -5,7 +5,7 @@ import type {
   RoleValidationError,
   RoleValidationResult,
   RoleValidationWarning,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 export function validateContracts(roles: readonly RoleContract[]): RoleValidationResult {
   const errors: RoleValidationError[] = [];
   const warnings: RoleValidationWarning[] = [];

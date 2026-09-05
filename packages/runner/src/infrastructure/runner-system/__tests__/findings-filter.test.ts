@@ -1,4 +1,4 @@
-import type { Finding } from '@ai-orchestrator/schemas';
+import type { Finding } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { filterFindings } from '../findings-filter';

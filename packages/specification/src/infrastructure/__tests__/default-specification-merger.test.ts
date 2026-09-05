@@ -1,4 +1,4 @@
-import type { CanonicalSpecification, MergeStrategy } from '@ai-orchestrator/schemas';
+import type { CanonicalSpecification, MergeStrategy } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { createSpecificationId } from '../../domain/types';

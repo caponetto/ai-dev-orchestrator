@@ -1,4 +1,4 @@
-# @ai-orchestrator/prompt-engine
+# @ai-dev-orchestrator/prompt-engine
 
 Template engine for assembling agent prompts with variable substitution, partial includes, token budget management, and output validation. Builds the context window that agents receive at each workflow step.
 
@@ -8,10 +8,10 @@ Template engine for assembling agent prompts with variable substitution, partial
 
 ## Workspace Dependencies
 
-- `@ai-orchestrator/artifacts`
-- `@ai-orchestrator/ports`
-- `@ai-orchestrator/schemas`
-- `@ai-orchestrator/utils`
+- `@ai-dev-orchestrator/artifacts`
+- `@ai-dev-orchestrator/ports`
+- `@ai-dev-orchestrator/schemas`
+- `@ai-dev-orchestrator/utils`
 
 ## Structure
 

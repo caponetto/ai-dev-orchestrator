@@ -1,4 +1,4 @@
-# @ai-orchestrator/dependency-graph
+# @ai-dev-orchestrator/dependency-graph
 
 Artifact dependency graph with impact analysis, staleness detection, and provenance tracking. Models relationships between artifacts so the orchestrator can determine what is affected when an artifact changes.
 
@@ -8,8 +8,8 @@ Artifact dependency graph with impact analysis, staleness detection, and provena
 
 ## Workspace Dependencies
 
-- `@ai-orchestrator/ports`
-- `@ai-orchestrator/schemas`
+- `@ai-dev-orchestrator/ports`
+- `@ai-dev-orchestrator/schemas`
 
 ## Structure
 

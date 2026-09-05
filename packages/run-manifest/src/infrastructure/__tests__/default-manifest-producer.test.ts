@@ -1,4 +1,4 @@
-import type { ManifestContext } from '@ai-orchestrator/schemas';
+import type { ManifestContext } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { DefaultManifestProducer } from '../default-manifest-producer';

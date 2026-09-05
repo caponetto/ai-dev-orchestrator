@@ -1,4 +1,4 @@
-# @ai-orchestrator/run-manifest
+# @ai-dev-orchestrator/run-manifest
 
 Manifest production, serialization, and report rendering for completed orchestration runs. Assembles run results into a structured manifest and writes them to the filesystem.
 
@@ -8,9 +8,9 @@ Manifest production, serialization, and report rendering for completed orchestra
 
 ## Workspace Dependencies
 
-- `@ai-orchestrator/ports`
-- `@ai-orchestrator/schemas`
-- `@ai-orchestrator/utils`
+- `@ai-dev-orchestrator/ports`
+- `@ai-dev-orchestrator/schemas`
+- `@ai-dev-orchestrator/utils`
 
 ## Structure
 

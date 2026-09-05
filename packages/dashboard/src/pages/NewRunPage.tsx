@@ -3,7 +3,7 @@ import type {
   RunSettings,
   WorkflowStateView,
   WorkflowSummary,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import { ChevronUp, FolderOpen, Loader2, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';

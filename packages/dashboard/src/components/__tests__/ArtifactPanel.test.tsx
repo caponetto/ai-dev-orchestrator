@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { ArtifactInventoryView } from '@ai-orchestrator/schemas';
+import type { ArtifactInventoryView } from '@ai-dev-orchestrator/schemas';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';

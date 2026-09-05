@@ -1,5 +1,5 @@
 /** Evaluates findings against quality gate thresholds. */
-import type { FindingSummary, PolicyEvaluation } from '@ai-orchestrator/schemas';
+import type { FindingSummary, PolicyEvaluation } from '@ai-dev-orchestrator/schemas';
 export class QualityGateChecker {
   /** Evaluate findings against severity thresholds. */
   evaluate(

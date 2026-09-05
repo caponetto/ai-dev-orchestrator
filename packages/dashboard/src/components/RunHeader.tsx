@@ -1,5 +1,5 @@
-import type { RunStateView } from '@ai-orchestrator/schemas';
-import { formatDuration } from '@ai-orchestrator/utils/formatters';
+import type { RunStateView } from '@ai-dev-orchestrator/schemas';
+import { formatDuration } from '@ai-dev-orchestrator/utils/formatters';
 import { Check, Copy } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 

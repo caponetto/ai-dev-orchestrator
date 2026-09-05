@@ -1,12 +1,12 @@
-import type { GovernanceEngine, Logger } from '@ai-orchestrator/ports';
-import { createRunId, noopLogger } from '@ai-orchestrator/ports';
+import type { GovernanceEngine, Logger } from '@ai-dev-orchestrator/ports';
+import { createRunId, noopLogger } from '@ai-dev-orchestrator/ports';
 import type {
   EvaluatedTransition,
   StateDefinition,
   TransitionContext,
   TransitionDefinition,
   TransitionTrigger,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 import type { GuardChecker } from './guard-checker';
 

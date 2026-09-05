@@ -1,4 +1,4 @@
-import type { ArtifactRef } from '@ai-orchestrator/schemas';
+import type { ArtifactRef } from '@ai-dev-orchestrator/schemas';
 import { Bot } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 

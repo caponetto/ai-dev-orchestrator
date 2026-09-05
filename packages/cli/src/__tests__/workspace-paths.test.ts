@@ -1,7 +1,7 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { AI_CONFIG_DIR_NAME } from '@ai-orchestrator/schemas';
+import { AI_CONFIG_DIR_NAME } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import {

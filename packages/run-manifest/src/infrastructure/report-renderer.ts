@@ -1,6 +1,6 @@
 /** Renders a RunManifest as a Markdown report string. */
-import type { RunManifest } from '@ai-orchestrator/schemas';
-import { formatBytes, formatDuration } from '@ai-orchestrator/utils';
+import type { RunManifest } from '@ai-dev-orchestrator/schemas';
+import { formatBytes, formatDuration } from '@ai-dev-orchestrator/utils';
 export function renderReport(manifest: RunManifest): string {
   const lines: string[] = [];
 

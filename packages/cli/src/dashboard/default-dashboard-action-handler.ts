@@ -3,23 +3,23 @@ import { closeSync, existsSync, openSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { DefaultStatePersistence } from '@ai-orchestrator/core';
-import { projectWorkflowPreview } from '@ai-orchestrator/dashboard-server';
-import { DefaultJournalWriter } from '@ai-orchestrator/journal';
+import { DefaultStatePersistence } from '@ai-dev-orchestrator/core';
+import { projectWorkflowPreview } from '@ai-dev-orchestrator/dashboard-server';
+import { DefaultJournalWriter } from '@ai-dev-orchestrator/journal';
 import type {
   AgentStreamBus,
   AgentSessionSupervisor,
   CreateRunResult,
   DashboardActionHandler,
-} from '@ai-orchestrator/ports';
-import { RUN_LOCK_FILENAME } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/ports';
+import { RUN_LOCK_FILENAME } from '@ai-dev-orchestrator/schemas';
 import type {
   DashboardActionResult,
   RunCreationParams,
   RunId,
   WorkflowStateView,
   WorkflowSummary,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 import { TERMINAL_STATES, buildAbortedState, writeAbortJournalEntries } from '../abort-run';
 import { loadAllWorkflows, loadWorkflowByName } from '../composition-root';

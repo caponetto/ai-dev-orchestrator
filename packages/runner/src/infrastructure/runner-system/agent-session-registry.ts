@@ -1,5 +1,5 @@
-import type { AgentSessionStore } from '@ai-orchestrator/ports';
-import type { AgentSessionSnapshot, AgentSessionState } from '@ai-orchestrator/schemas';
+import type { AgentSessionStore } from '@ai-dev-orchestrator/ports';
+import type { AgentSessionSnapshot, AgentSessionState } from '@ai-dev-orchestrator/schemas';
 /**
  * In-memory index over persisted session snapshots.
  * Provides fast lookups by sessionId, runId, and state while the

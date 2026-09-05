@@ -4,7 +4,7 @@ import type {
   AgentSessionSnapshot,
   AgentSessionState,
   SessionPendingRequest,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 import type { AgentOutputStreamEvent } from './agent-runner.port';
 

@@ -1,4 +1,4 @@
-# @ai-orchestrator/artifacts
+# @ai-dev-orchestrator/artifacts
 
 Artifact system implementing typed, immutable, content-addressed artifacts with ownership enforcement and agreement gates. Provides both domain logic (schemas, descriptors, validation) and infrastructure (filesystem storage, checksum verification, inventory management).
 
@@ -8,9 +8,9 @@ Artifact system implementing typed, immutable, content-addressed artifacts with 
 
 ## Workspace Dependencies
 
-- `@ai-orchestrator/ports`
-- `@ai-orchestrator/schemas`
-- `@ai-orchestrator/utils`
+- `@ai-dev-orchestrator/ports`
+- `@ai-dev-orchestrator/schemas`
+- `@ai-dev-orchestrator/utils`
 
 ## Structure
 

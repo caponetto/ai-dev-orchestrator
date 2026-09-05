@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { WorkflowStateView } from '@ai-orchestrator/schemas';
+import type { WorkflowStateView } from '@ai-dev-orchestrator/schemas';
 import { fireEvent, render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 

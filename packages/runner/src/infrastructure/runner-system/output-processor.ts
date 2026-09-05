@@ -1,5 +1,5 @@
-import type { ArtifactStore, PromptEngine } from '@ai-orchestrator/ports';
-import type { ArtifactRef, RenderedPrompt, WorkerContext } from '@ai-orchestrator/schemas';
+import type { ArtifactStore, PromptEngine } from '@ai-dev-orchestrator/ports';
+import type { ArtifactRef, RenderedPrompt, WorkerContext } from '@ai-dev-orchestrator/schemas';
 
 import { InvalidOutputError, OutputOwnershipError } from '../../domain/runner-system/errors';
 

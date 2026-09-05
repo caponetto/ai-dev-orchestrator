@@ -1,4 +1,4 @@
-import { RecoverableErrorBase } from '@ai-orchestrator/ports';
+import { RecoverableErrorBase } from '@ai-dev-orchestrator/ports';
 import { describe, expect, it } from 'vitest';
 
 import { DashboardDataError } from '../dashboard-errors';

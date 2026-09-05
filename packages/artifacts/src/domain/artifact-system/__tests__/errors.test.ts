@@ -1,5 +1,5 @@
-import { OrchestratorError } from '@ai-orchestrator/ports';
-import type { ArtifactRef } from '@ai-orchestrator/schemas';
+import { OrchestratorError } from '@ai-dev-orchestrator/ports';
+import type { ArtifactRef } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import {

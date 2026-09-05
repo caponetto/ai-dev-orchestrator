@@ -3,8 +3,8 @@ import type {
   WorkflowValidationError,
   WorkflowValidationResult,
   WorkflowValidationWarning,
-} from '@ai-orchestrator/schemas';
-import { ACTION_TYPES, GUARD_TYPES, TRANSITION_TRIGGERS } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
+import { ACTION_TYPES, GUARD_TYPES, TRANSITION_TRIGGERS } from '@ai-dev-orchestrator/schemas';
 const VALID_TRIGGERS: ReadonlySet<string> = new Set<string>(TRANSITION_TRIGGERS);
 
 const VALID_GUARD_TYPES: ReadonlySet<string> = new Set<string>(GUARD_TYPES);

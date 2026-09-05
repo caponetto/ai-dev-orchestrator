@@ -5,9 +5,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 
-import { createProtocolMessage } from '@ai-orchestrator/agent-protocol';
-import type { AgentOutputStreamEvent } from '@ai-orchestrator/ports';
-import type { AgentSessionRef } from '@ai-orchestrator/schemas';
+import { createProtocolMessage } from '@ai-dev-orchestrator/agent-protocol';
+import type { AgentOutputStreamEvent } from '@ai-dev-orchestrator/ports';
+import type { AgentSessionRef } from '@ai-dev-orchestrator/schemas';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { AgentSessionRegistry } from '../agent-session-registry';

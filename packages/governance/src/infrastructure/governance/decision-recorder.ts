@@ -1,5 +1,5 @@
-import type { JournalWriter } from '@ai-orchestrator/ports';
-import type { GovernanceDecision, GovernanceEventData } from '@ai-orchestrator/schemas';
+import type { JournalWriter } from '@ai-dev-orchestrator/ports';
+import type { GovernanceDecision, GovernanceEventData } from '@ai-dev-orchestrator/schemas';
 
 /** Records governance decisions for audit trail. */
 export class DecisionRecorder {

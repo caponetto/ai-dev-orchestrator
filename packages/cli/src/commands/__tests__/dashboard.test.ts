@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { WorkflowDefinition } from '@ai-orchestrator/schemas';
+import type { WorkflowDefinition } from '@ai-dev-orchestrator/schemas';
 import { afterEach, beforeAll, describe, expect, it, vi, beforeEach } from 'vitest';
 
 import type { OutputFormatter } from '../../output/formatter';
@@ -41,7 +41,7 @@ class MockFileBackedLiveRequestStore {
   removeRequest = vi.fn();
 }
 
-vi.mock('@ai-orchestrator/agent-adapters', async (importOriginal) => {
+vi.mock('@ai-dev-orchestrator/agent-adapters', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,
@@ -73,7 +73,7 @@ vi.mock('@ai-orchestrator/agent-adapters', async (importOriginal) => {
   };
 });
 
-vi.mock('@ai-orchestrator/runner', async (importOriginal) => {
+vi.mock('@ai-dev-orchestrator/runner', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,
@@ -82,7 +82,7 @@ vi.mock('@ai-orchestrator/runner', async (importOriginal) => {
   };
 });
 
-vi.mock('@ai-orchestrator/dashboard-server', async (importOriginal) => {
+vi.mock('@ai-dev-orchestrator/dashboard-server', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,

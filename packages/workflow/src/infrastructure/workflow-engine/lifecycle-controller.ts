@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 
-import { REVIEW_ARTIFACT_TYPES } from '@ai-orchestrator/artifacts';
+import { REVIEW_ARTIFACT_TYPES } from '@ai-dev-orchestrator/artifacts';
 import type {
   AgentSessionSupervisor,
   AgentStreamBus,
@@ -20,10 +20,10 @@ import type {
   StalenessDetector,
   StatePersistence,
   WorkflowEngine,
-} from '@ai-orchestrator/ports';
-import { createRunId, noopLogger } from '@ai-orchestrator/ports';
-import type { ShutdownCoordinator } from '@ai-orchestrator/recovery';
-import { renderReport } from '@ai-orchestrator/run-manifest';
+} from '@ai-dev-orchestrator/ports';
+import { createRunId, noopLogger } from '@ai-dev-orchestrator/ports';
+import type { ShutdownCoordinator } from '@ai-dev-orchestrator/recovery';
+import { renderReport } from '@ai-dev-orchestrator/run-manifest';
 import type {
   Action,
   ActionResult,
@@ -42,8 +42,8 @@ import type {
   TransitionTrigger,
   WaitingContext,
   WorkflowRunConfig,
-} from '@ai-orchestrator/schemas';
-import { getErrorMessage } from '@ai-orchestrator/utils';
+} from '@ai-dev-orchestrator/schemas';
+import { getErrorMessage } from '@ai-dev-orchestrator/utils';
 
 import {
   MaxTransitionsExceededError,

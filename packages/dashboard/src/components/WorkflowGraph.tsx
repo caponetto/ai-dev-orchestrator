@@ -1,4 +1,4 @@
-import type { RoleAssignmentView, WorkflowStateView } from '@ai-orchestrator/schemas';
+import type { RoleAssignmentView, WorkflowStateView } from '@ai-dev-orchestrator/schemas';
 import {
   Background,
   ControlButton,

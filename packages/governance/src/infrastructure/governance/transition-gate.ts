@@ -4,8 +4,8 @@ import type {
   IterationContractRegistry,
   Logger,
   PolicyEngine,
-} from '@ai-orchestrator/ports';
-import { noopLogger } from '@ai-orchestrator/ports';
+} from '@ai-dev-orchestrator/ports';
+import { noopLogger } from '@ai-dev-orchestrator/ports';
 import type {
   AgreementStatus,
   AgreementType,
@@ -15,7 +15,7 @@ import type {
   PolicyEvaluation,
   TransitionDecision,
   TransitionRequest,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 import type { OwnershipCheckResult } from '../../domain/governance/ownership-check-result';
 

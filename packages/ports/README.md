@@ -1,4 +1,4 @@
-# @ai-orchestrator/ports
+# @ai-dev-orchestrator/ports
 
 Port interfaces (abstract contracts) that define the boundaries between domain logic and infrastructure. Implementations live in their respective packages; consumers depend only on these interfaces.
 
@@ -8,7 +8,7 @@ Port interfaces (abstract contracts) that define the boundaries between domain l
 
 ## Workspace Dependencies
 
-- `@ai-orchestrator/schemas`
+- `@ai-dev-orchestrator/schemas`
 
 ## Structure
 

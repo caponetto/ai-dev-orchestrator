@@ -1,4 +1,4 @@
-import type { ProtocolMessage } from '@ai-orchestrator/agent-protocol';
+import type { ProtocolMessage } from '@ai-dev-orchestrator/agent-protocol';
 import { describe, expect, it } from 'vitest';
 
 import { CursorCliAdapter, createCursorCliAdapter } from '../cursor-cli-adapter';

@@ -1,4 +1,4 @@
-import type { ProjectSettingsView } from '@ai-orchestrator/schemas';
+import type { ProjectSettingsView } from '@ai-dev-orchestrator/schemas';
 
 import { humanize } from '../../lib/humanize';
 

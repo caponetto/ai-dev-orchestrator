@@ -1,4 +1,4 @@
-# @ai-orchestrator/cli
+# @ai-dev-orchestrator/cli
 
 The `ai` command-line interface. This is the composition root that wires together every workspace package into a single executable, built with Commander.js and bundled with esbuild.
 
@@ -8,25 +8,25 @@ The `ai` command-line interface. This is the composition root that wires togethe
 
 ## Workspace Dependencies
 
-- `@ai-orchestrator/agent-adapters`
-- `@ai-orchestrator/artifacts`
-- `@ai-orchestrator/config-templates`
-- `@ai-orchestrator/core`
-- `@ai-orchestrator/dashboard-server`
-- `@ai-orchestrator/dependency-graph`
-- `@ai-orchestrator/governance`
-- `@ai-orchestrator/journal`
-- `@ai-orchestrator/policy-engine`
-- `@ai-orchestrator/ports`
-- `@ai-orchestrator/prompt-engine`
-- `@ai-orchestrator/recovery`
-- `@ai-orchestrator/role-system`
-- `@ai-orchestrator/run-manifest`
-- `@ai-orchestrator/runner`
-- `@ai-orchestrator/schemas`
-- `@ai-orchestrator/utils`
-- `@ai-orchestrator/workflow`
-- `@ai-orchestrator/project-context`
+- `@ai-dev-orchestrator/agent-adapters`
+- `@ai-dev-orchestrator/artifacts`
+- `@ai-dev-orchestrator/config-templates`
+- `@ai-dev-orchestrator/core`
+- `@ai-dev-orchestrator/dashboard-server`
+- `@ai-dev-orchestrator/dependency-graph`
+- `@ai-dev-orchestrator/governance`
+- `@ai-dev-orchestrator/journal`
+- `@ai-dev-orchestrator/policy-engine`
+- `@ai-dev-orchestrator/ports`
+- `@ai-dev-orchestrator/prompt-engine`
+- `@ai-dev-orchestrator/recovery`
+- `@ai-dev-orchestrator/role-system`
+- `@ai-dev-orchestrator/run-manifest`
+- `@ai-dev-orchestrator/runner`
+- `@ai-dev-orchestrator/schemas`
+- `@ai-dev-orchestrator/utils`
+- `@ai-dev-orchestrator/workflow`
+- `@ai-dev-orchestrator/project-context`
 
 ## Structure
 

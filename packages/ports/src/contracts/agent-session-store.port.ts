@@ -1,4 +1,4 @@
-import type { AgentSessionSnapshot } from '@ai-orchestrator/schemas';
+import type { AgentSessionSnapshot } from '@ai-dev-orchestrator/schemas';
 
 /** Port for persisting agent session snapshots to durable storage. */
 export interface AgentSessionStore {

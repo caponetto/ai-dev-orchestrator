@@ -8,7 +8,7 @@ import {
   type ArtifactRef,
   type ArtifactSummary,
   type ArtifactType,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import { parse, stringify } from 'yaml';
 
 import { InventoryCorruptionError } from '../../domain/artifact-system/errors';

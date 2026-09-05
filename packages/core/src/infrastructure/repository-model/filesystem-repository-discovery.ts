@@ -2,9 +2,9 @@ import { existsSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
-import type { RepositoryDiscovery } from '@ai-orchestrator/ports';
-import { AI_CONFIG_DIR_NAME } from '@ai-orchestrator/schemas';
-import type { DiscoveryResult } from '@ai-orchestrator/schemas';
+import type { RepositoryDiscovery } from '@ai-dev-orchestrator/ports';
+import { AI_CONFIG_DIR_NAME } from '@ai-dev-orchestrator/schemas';
+import type { DiscoveryResult } from '@ai-dev-orchestrator/schemas';
 
 export interface FilesystemRepositoryDiscoveryOptions {
   /** Override for tests; defaults to `~/.ai`. */

@@ -6,7 +6,7 @@ import {
   ARTIFACTS_DIR_NAME,
   RUNS_DIR_NAME,
   STATE_FILENAME,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 const JOURNAL_FILENAME = 'journal.md';
 const CONFIG_SNAPSHOT_FILENAME = 'config-snapshot.json';

@@ -19,7 +19,7 @@ pnpm build:prod
 
 After the build, you can either:
 
-- run the CLI from the workspace with `pnpm --filter @ai-orchestrator/cli exec ai --help`
+- run the CLI from the workspace with `pnpm --filter @ai-dev-orchestrator/cli exec ai --help`
 - or install the local package globally with `pnpm link:cli`
 
 ## Initialize Configuration

@@ -1,4 +1,4 @@
-# @ai-orchestrator/workflow
+# @ai-dev-orchestrator/workflow
 
 Workflow DSL parsing and the state-machine-based workflow engine that drives the orchestration lifecycle. Defines workflow definitions in a declarative DSL, evaluates guards and transitions, dispatches actions, and manages escalation and review interpretation.
 
@@ -8,12 +8,12 @@ Workflow DSL parsing and the state-machine-based workflow engine that drives the
 
 ## Workspace Dependencies
 
-- `@ai-orchestrator/artifacts`
-- `@ai-orchestrator/core`
-- `@ai-orchestrator/ports`
-- `@ai-orchestrator/run-manifest`
-- `@ai-orchestrator/schemas`
-- `@ai-orchestrator/utils`
+- `@ai-dev-orchestrator/artifacts`
+- `@ai-dev-orchestrator/core`
+- `@ai-dev-orchestrator/ports`
+- `@ai-dev-orchestrator/run-manifest`
+- `@ai-dev-orchestrator/schemas`
+- `@ai-dev-orchestrator/utils`
 
 ## Structure
 

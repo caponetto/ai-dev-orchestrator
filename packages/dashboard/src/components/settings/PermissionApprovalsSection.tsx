@@ -1,4 +1,4 @@
-import type { PermissionApprovalEntry } from '@ai-orchestrator/schemas';
+import type { PermissionApprovalEntry } from '@ai-dev-orchestrator/schemas';
 import { useCallback, useEffect, useState } from 'react';
 
 import { api } from '../../api/client';

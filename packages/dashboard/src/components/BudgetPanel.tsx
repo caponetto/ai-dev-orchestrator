@@ -1,4 +1,4 @@
-import type { UsageBreakdownView } from '@ai-orchestrator/schemas';
+import type { UsageBreakdownView } from '@ai-dev-orchestrator/schemas';
 
 import { cn } from '../lib/utils';
 

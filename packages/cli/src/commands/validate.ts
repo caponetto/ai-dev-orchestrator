@@ -1,4 +1,4 @@
-import type { ValidationReport } from '@ai-orchestrator/ports';
+import type { ValidationReport } from '@ai-dev-orchestrator/ports';
 
 import { ExitCode, toCLIError } from '../output/exit-codes';
 import type { OutputFormatter } from '../output/formatter';

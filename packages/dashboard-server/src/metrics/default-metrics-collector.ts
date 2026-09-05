@@ -1,4 +1,4 @@
-import type { MetricsCollector } from '@ai-orchestrator/ports';
+import type { MetricsCollector } from '@ai-dev-orchestrator/ports';
 import type {
   MetricEntry,
   MetricSummary,
@@ -6,7 +6,7 @@ import type {
   MetricsSnapshot,
   PerformanceSnapshot,
   TimingMetric,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 interface MetricsCollectorConfig {
   readonly clock?: () => string;

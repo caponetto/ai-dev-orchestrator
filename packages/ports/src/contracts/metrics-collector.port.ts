@@ -4,7 +4,7 @@ import type {
   MetricsSnapshot,
   PerformanceSnapshot,
   TimingMetric,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 /** Collects and aggregates runtime metrics across subsystems. */
 export interface MetricsCollector {

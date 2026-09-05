@@ -7,7 +7,7 @@ import type {
   SessionDispatchOutcome,
   SessionPendingRequest,
   StdioReconnectMeta,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 describe('AgentSessionTypes', () => {

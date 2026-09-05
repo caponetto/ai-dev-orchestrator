@@ -1,4 +1,4 @@
-import type { FindingSummary } from '@ai-orchestrator/schemas';
+import type { FindingSummary } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { QualityGateChecker } from '../quality-gate-checker';

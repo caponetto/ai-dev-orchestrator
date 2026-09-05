@@ -1,4 +1,4 @@
-import type { ArtifactRef } from '@ai-orchestrator/schemas';
+import type { ArtifactRef } from '@ai-dev-orchestrator/schemas';
 import { Package } from 'lucide-react';
 import { Popover as PopoverPrimitive } from 'radix-ui';
 import { useMemo } from 'react';

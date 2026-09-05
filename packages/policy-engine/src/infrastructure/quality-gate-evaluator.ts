@@ -1,10 +1,10 @@
-import type { PolicyEvaluator } from '@ai-orchestrator/ports';
+import type { PolicyEvaluator } from '@ai-dev-orchestrator/ports';
 import type {
   ArtifactType,
   PolicyContext,
   PolicyDefinition,
   PolicyResult,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 const POST_CODE_REVIEW_STATES: ReadonlySet<string> = new Set([
   'CODE_REVIEW',
   'JUDGE_REVIEW',

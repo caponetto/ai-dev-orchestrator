@@ -1,4 +1,4 @@
-import type { PromptTemplate, RenderRequest } from '@ai-orchestrator/schemas';
+import type { PromptTemplate, RenderRequest } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { MissingPartialError, RequiredVariableMissingError } from '../../domain/errors';

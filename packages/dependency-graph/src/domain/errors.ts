@@ -1,4 +1,4 @@
-import { NonRecoverableErrorBase } from '@ai-orchestrator/ports';
+import { NonRecoverableErrorBase } from '@ai-dev-orchestrator/ports';
 
 /** Thrown when a cycle is detected in the artifact dependency graph. */
 export class DependencyGraphCycleError extends NonRecoverableErrorBase {

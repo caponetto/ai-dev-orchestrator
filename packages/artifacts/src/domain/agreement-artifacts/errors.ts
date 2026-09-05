@@ -1,5 +1,5 @@
-import { NonRecoverableErrorBase } from '@ai-orchestrator/ports';
-import type { AgreementType } from '@ai-orchestrator/schemas';
+import { NonRecoverableErrorBase } from '@ai-dev-orchestrator/ports';
+import type { AgreementType } from '@ai-dev-orchestrator/schemas';
 
 /** Thrown when an agreement artifact fails validation. */
 export class InvalidAgreementError extends NonRecoverableErrorBase {

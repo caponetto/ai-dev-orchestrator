@@ -5,7 +5,7 @@ import type {
   RenderRequest,
   RenderedPrompt,
   TemplateValidationResult,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 /** Port for the prompt engine that renders prompts and validates structured output. */
 export interface PromptEngine {

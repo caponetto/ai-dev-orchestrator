@@ -29,7 +29,7 @@ import type {
   UsageBreakdownView,
   WorkflowDefinition,
   WorkflowStateView,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 function projectRoleAssignments(raw: Record<string, unknown>): RoleAssignmentView[] {
   const roles: RoleAssignmentView[] = [];
   const rawRoles = raw.roles as

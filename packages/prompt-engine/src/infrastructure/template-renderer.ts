@@ -1,4 +1,4 @@
-import type { PartialMap } from '@ai-orchestrator/schemas';
+import type { PartialMap } from '@ai-dev-orchestrator/schemas';
 
 import { MissingPartialError, UndefinedVariableError } from '../domain/errors';
 

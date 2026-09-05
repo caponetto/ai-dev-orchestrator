@@ -8,7 +8,7 @@ import type {
   ManifestProducer,
   RunnerSystem,
   StatePersistence,
-} from '@ai-orchestrator/ports';
+} from '@ai-dev-orchestrator/ports';
 import type {
   ArtifactRef,
   ArtifactType,
@@ -17,7 +17,7 @@ import type {
   RoleId,
   RunManifest,
   TransitionDecision,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import { vi } from 'vitest';
 
 export function createArtifactRef(type: ArtifactType, version = 1): ArtifactRef {

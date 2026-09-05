@@ -1,4 +1,4 @@
-# @ai-orchestrator/specification
+# @ai-dev-orchestrator/specification
 
 Specification validation, merging, and versioning for canonical project specifications. Ensures specifications conform to schema rules, resolves merge conflicts between versions, and manages the version chain.
 
@@ -8,8 +8,8 @@ Specification validation, merging, and versioning for canonical project specific
 
 ## Workspace Dependencies
 
-- `@ai-orchestrator/ports`
-- `@ai-orchestrator/schemas`
+- `@ai-dev-orchestrator/ports`
+- `@ai-dev-orchestrator/schemas`
 
 ## Structure
 

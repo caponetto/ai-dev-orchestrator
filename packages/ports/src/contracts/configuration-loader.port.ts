@@ -1,4 +1,4 @@
-import type { MergedConfiguration, RunnerDefinition } from '@ai-orchestrator/schemas';
+import type { MergedConfiguration, RunnerDefinition } from '@ai-dev-orchestrator/schemas';
 
 /** Context required to load configuration. */
 export interface LoadContext {

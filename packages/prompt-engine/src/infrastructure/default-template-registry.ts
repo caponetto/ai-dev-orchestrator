@@ -1,5 +1,5 @@
-import type { PromptTemplateRegistry } from '@ai-orchestrator/ports';
-import type { PromptTemplate, PromptTemplateRef } from '@ai-orchestrator/schemas';
+import type { PromptTemplateRegistry } from '@ai-dev-orchestrator/ports';
+import type { PromptTemplate, PromptTemplateRef } from '@ai-dev-orchestrator/schemas';
 
 /** In-memory prompt template registry backed by built-in templates only. */
 export class DefaultTemplateRegistry implements PromptTemplateRegistry {

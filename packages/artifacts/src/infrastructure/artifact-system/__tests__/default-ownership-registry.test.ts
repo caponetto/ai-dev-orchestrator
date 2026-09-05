@@ -1,4 +1,4 @@
-import type { ArtifactType, RoleContract } from '@ai-orchestrator/schemas';
+import type { ArtifactType, RoleContract } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { buildOwnershipOverrides, DefaultOwnershipRegistry } from '../default-ownership-registry';

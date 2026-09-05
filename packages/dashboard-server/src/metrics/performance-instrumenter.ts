@@ -1,5 +1,5 @@
-import type { MetricsCollector } from '@ai-orchestrator/ports';
-import type { TimingMetric } from '@ai-orchestrator/schemas';
+import type { MetricsCollector } from '@ai-dev-orchestrator/ports';
+import type { TimingMetric } from '@ai-dev-orchestrator/schemas';
 
 export class PerformanceInstrumenter {
   constructor(private readonly collector: MetricsCollector) {}

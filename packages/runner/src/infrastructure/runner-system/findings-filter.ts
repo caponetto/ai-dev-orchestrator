@@ -1,4 +1,4 @@
-import type { Finding } from '@ai-orchestrator/schemas';
+import type { Finding } from '@ai-dev-orchestrator/schemas';
 
 const ACTIVE_STATUSES = new Set<string>(['open', 'escalated']);
 

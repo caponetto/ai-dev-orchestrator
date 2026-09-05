@@ -1,4 +1,4 @@
-import type { ModelAssignment, ModelCalibrationEntry, RoleId } from '@ai-orchestrator/schemas';
+import type { ModelAssignment, ModelCalibrationEntry, RoleId } from '@ai-dev-orchestrator/schemas';
 
 import { ModelAssignmentError } from '../domain/errors';
 

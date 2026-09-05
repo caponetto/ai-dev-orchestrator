@@ -3,7 +3,7 @@ import type {
   StaleArtifact,
   StaleSet,
   StalenessResult,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 /** Port for detecting and managing artifact staleness. */
 export interface StalenessDetector {

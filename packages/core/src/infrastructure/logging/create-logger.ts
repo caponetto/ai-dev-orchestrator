@@ -1,7 +1,7 @@
 import { createWriteStream } from 'node:fs';
 import type { WriteStream } from 'node:fs';
 
-import type { Logger, LogLevel } from '@ai-orchestrator/ports';
+import type { Logger, LogLevel } from '@ai-dev-orchestrator/ports';
 
 const SEVERITY: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 };
 
@@ -16,7 +16,7 @@ function formatLogLine(level: LogLevel, msg: string): string {
   return `${new Date().toISOString()} [${LEVEL_LABEL[level]}] ${msg}\n`;
 }
 
-export { noopLogger } from '@ai-orchestrator/ports';
+export { noopLogger } from '@ai-dev-orchestrator/ports';
 
 export function createLogger(minLevel: LogLevel, logFilePath?: string): Logger {
   const threshold = SEVERITY[minLevel];

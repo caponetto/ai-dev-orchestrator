@@ -8,8 +8,8 @@ import {
   DefaultOwnershipRegistry,
   FilesystemArtifactStore,
   InventoryManager,
-} from '@ai-orchestrator/artifacts';
-import type { ArtifactInput } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/artifacts';
+import type { ArtifactInput } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 function createTestStore(): { store: FilesystemArtifactStore; runDir: string } {

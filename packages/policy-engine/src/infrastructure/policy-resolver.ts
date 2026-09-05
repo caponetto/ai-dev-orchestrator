@@ -1,4 +1,4 @@
-import type { PolicyResolver as PolicyResolverPort } from '@ai-orchestrator/ports';
+import type { PolicyResolver as PolicyResolverPort } from '@ai-dev-orchestrator/ports';
 import type {
   MergeLogEntry,
   PolicyDefinition,
@@ -6,7 +6,7 @@ import type {
   PolicyScope,
   PolicySource,
   ResolvedPolicySet,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 interface PolicyHierarchy {
   readonly organization?: readonly PolicyDefinition[];
   readonly project?: readonly PolicyDefinition[];

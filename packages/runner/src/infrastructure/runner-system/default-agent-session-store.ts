@@ -1,10 +1,10 @@
 import { mkdir, readdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { safeJsonParse } from '@ai-orchestrator/artifacts';
-import type { AgentSessionStore } from '@ai-orchestrator/ports';
-import type { AgentSessionSnapshot } from '@ai-orchestrator/schemas';
-import { agentSessionSnapshotSchema } from '@ai-orchestrator/schemas';
+import { safeJsonParse } from '@ai-dev-orchestrator/artifacts';
+import type { AgentSessionStore } from '@ai-dev-orchestrator/ports';
+import type { AgentSessionSnapshot } from '@ai-dev-orchestrator/schemas';
+import { agentSessionSnapshotSchema } from '@ai-dev-orchestrator/schemas';
 
 /**
  * File-backed session store. Persists each session snapshot under:

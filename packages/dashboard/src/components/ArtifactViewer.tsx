@@ -1,6 +1,6 @@
-import type { ArtifactContentView, ArtifactEntryView } from '@ai-orchestrator/schemas';
-import { MEDIA_FILE_EXTENSIONS } from '@ai-orchestrator/schemas';
-import { formatBytes } from '@ai-orchestrator/utils/formatters';
+import type { ArtifactContentView, ArtifactEntryView } from '@ai-dev-orchestrator/schemas';
+import { MEDIA_FILE_EXTENSIONS } from '@ai-dev-orchestrator/schemas';
+import { formatBytes } from '@ai-dev-orchestrator/utils/formatters';
 import 'highlight.js/styles/github-dark.min.css';
 import { Check, Copy, X } from 'lucide-react';
 import type { ReactNode } from 'react';

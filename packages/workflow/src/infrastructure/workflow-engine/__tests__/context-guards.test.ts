@@ -1,5 +1,5 @@
-import type { ProjectContextStore } from '@ai-orchestrator/ports';
-import type { Guard } from '@ai-orchestrator/schemas';
+import type { ProjectContextStore } from '@ai-dev-orchestrator/ports';
+import type { Guard } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi } from 'vitest';
 
 import {

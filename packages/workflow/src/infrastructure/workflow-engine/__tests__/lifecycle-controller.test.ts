@@ -9,9 +9,13 @@ import type {
   ProjectContextStore,
   RunnerSystem,
   StatePersistence,
-} from '@ai-orchestrator/ports';
-import { ShutdownCoordinator } from '@ai-orchestrator/recovery';
-import type { GovernanceOutcome, RunManifest, WorkflowRunConfig } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/ports';
+import { ShutdownCoordinator } from '@ai-dev-orchestrator/recovery';
+import type {
+  GovernanceOutcome,
+  RunManifest,
+  WorkflowRunConfig,
+} from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi } from 'vitest';
 
 import { TEST_WORKFLOW } from '../../../../test/fixtures/test-defaults';

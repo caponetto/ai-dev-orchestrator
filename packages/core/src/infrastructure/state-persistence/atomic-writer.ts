@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, renameSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-import { getErrorMessage } from '@ai-orchestrator/utils';
+import { getErrorMessage } from '@ai-dev-orchestrator/utils';
 import writeFileAtomic from 'write-file-atomic';
 
 import { StatePersistenceError } from '../../domain/state-persistence/errors';

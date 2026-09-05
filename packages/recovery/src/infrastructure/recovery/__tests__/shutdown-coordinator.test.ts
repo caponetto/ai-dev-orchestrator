@@ -1,6 +1,6 @@
-import type { JournalWriter, StatePersistence } from '@ai-orchestrator/ports';
-import { createRunId } from '@ai-orchestrator/ports';
-import type { LockHandle, RunLifecycleData } from '@ai-orchestrator/schemas';
+import type { JournalWriter, StatePersistence } from '@ai-dev-orchestrator/ports';
+import { createRunId } from '@ai-dev-orchestrator/ports';
+import type { LockHandle, RunLifecycleData } from '@ai-dev-orchestrator/schemas';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ShutdownCoordinator } from '../shutdown-coordinator';

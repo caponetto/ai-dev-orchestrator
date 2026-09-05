@@ -1,8 +1,8 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import type { ManifestFilter, ManifestQuery } from '@ai-orchestrator/ports';
-import type { RunManifest } from '@ai-orchestrator/schemas';
+import type { ManifestFilter, ManifestQuery } from '@ai-dev-orchestrator/ports';
+import type { RunManifest } from '@ai-dev-orchestrator/schemas';
 import { parse } from 'yaml';
 
 import { MANIFEST_FILENAME } from './constants';

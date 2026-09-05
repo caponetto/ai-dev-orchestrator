@@ -1,4 +1,4 @@
-import { OrchestratorError } from '@ai-orchestrator/ports';
+import { OrchestratorError } from '@ai-dev-orchestrator/ports';
 import { describe, expect, it } from 'vitest';
 
 import { JournalCorruptionError, JournalReadError, JournalWriteError } from '../errors';

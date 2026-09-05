@@ -6,9 +6,9 @@ import type {
   LoadContext,
   ValidationIssue,
   ValidationReport,
-} from '@ai-orchestrator/ports';
-import type { MergedConfiguration } from '@ai-orchestrator/schemas';
-import { isObject, snakeToCamelDeep } from '@ai-orchestrator/utils';
+} from '@ai-dev-orchestrator/ports';
+import type { MergedConfiguration } from '@ai-dev-orchestrator/schemas';
+import { isObject, snakeToCamelDeep } from '@ai-dev-orchestrator/utils';
 
 import type { EnvVarResolutionError } from '../../domain/configuration/errors';
 import { ConfigurationLoadError } from '../../domain/configuration/errors';

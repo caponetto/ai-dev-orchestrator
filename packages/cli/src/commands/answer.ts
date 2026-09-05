@@ -1,9 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { DefaultStatePersistence } from '@ai-orchestrator/core';
-import { FileBackedLiveRequestStore } from '@ai-orchestrator/runner';
-import type { RunId, RunResult } from '@ai-orchestrator/schemas';
+import { DefaultStatePersistence } from '@ai-dev-orchestrator/core';
+import { FileBackedLiveRequestStore } from '@ai-dev-orchestrator/runner';
+import type { RunId, RunResult } from '@ai-dev-orchestrator/schemas';
 
 import { resumeOrchestrator } from '../composition-root';
 import { ExitCode, toCLIError } from '../output/exit-codes';

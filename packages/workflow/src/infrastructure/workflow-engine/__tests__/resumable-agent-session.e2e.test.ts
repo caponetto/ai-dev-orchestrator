@@ -7,8 +7,8 @@ import type {
   ManifestProducer,
   RunnerSystem,
   StatePersistence,
-} from '@ai-orchestrator/ports';
-import { AgentSessionReaper, DefaultAgentSessionStore } from '@ai-orchestrator/runner';
+} from '@ai-dev-orchestrator/ports';
+import { AgentSessionReaper, DefaultAgentSessionStore } from '@ai-dev-orchestrator/runner';
 import type {
   AgentSessionSnapshot,
   PersistedState,
@@ -16,7 +16,7 @@ import type {
   RunManifest,
   WorkflowDefinition,
   WorkflowRunConfig,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi } from 'vitest';
 
 import { LifecycleController } from '../lifecycle-controller';

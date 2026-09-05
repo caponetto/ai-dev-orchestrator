@@ -1,5 +1,5 @@
-import type { ProtocolMessage } from '@ai-orchestrator/agent-protocol';
-import type { BuiltInCodingRunnerId } from '@ai-orchestrator/schemas';
+import type { ProtocolMessage } from '@ai-dev-orchestrator/agent-protocol';
+import type { BuiltInCodingRunnerId } from '@ai-dev-orchestrator/schemas';
 
 export type BuiltInAdapterName = BuiltInCodingRunnerId | 'gh-cli';
 

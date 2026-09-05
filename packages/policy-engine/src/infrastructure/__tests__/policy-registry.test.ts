@@ -1,5 +1,5 @@
-import type { PolicyEvaluator } from '@ai-orchestrator/ports';
-import type { PolicyType } from '@ai-orchestrator/schemas';
+import type { PolicyEvaluator } from '@ai-dev-orchestrator/ports';
+import type { PolicyType } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { UnknownPolicyTypeError } from '../../domain/errors';

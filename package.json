@@ -1,6 +1,6 @@
 {
   "name": "ai-dev-orchestrator",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
   "license": "MIT",
   "repository": {
@@ -33,8 +33,8 @@
     "syncpack:check": "turbo run //#syncpack:check:run",
     "syncpack:check:run": "syncpack lint",
     "publint": "turbo run //#publint:run",
-    "publint:run": "pnpm -r --filter='./packages/*' --filter='!@ai-orchestrator/dashboard' --filter='!@ai-orchestrator/cli' exec publint",
-    "unlink:cli": "pnpm remove -g @ai-orchestrator/cli"
+    "publint:run": "pnpm -r --filter='./packages/*' --filter='!@ai-dev-orchestrator/dashboard' --filter='!@ai-dev-orchestrator/cli' exec publint",
+    "unlink:cli": "pnpm remove -g @ai-dev-orchestrator/cli"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

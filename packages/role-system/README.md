@@ -1,4 +1,4 @@
-# @ai-orchestrator/role-system
+# @ai-dev-orchestrator/role-system
 
 Role registry, model assignment, and contract validation for agent roles. Manages which AI models are assigned to which roles, enforces visibility and ownership rules, and loads role definitions from YAML configuration.
 
@@ -8,9 +8,9 @@ Role registry, model assignment, and contract validation for agent roles. Manage
 
 ## Workspace Dependencies
 
-- `@ai-orchestrator/ports`
-- `@ai-orchestrator/schemas`
-- `@ai-orchestrator/utils`
+- `@ai-dev-orchestrator/ports`
+- `@ai-dev-orchestrator/schemas`
+- `@ai-dev-orchestrator/utils`
 
 ## Structure
 

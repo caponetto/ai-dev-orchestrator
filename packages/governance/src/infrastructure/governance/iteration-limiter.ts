@@ -1,5 +1,5 @@
-import type { IterationContractRegistry } from '@ai-orchestrator/ports';
-import type { PolicyEvaluation } from '@ai-orchestrator/schemas';
+import type { IterationContractRegistry } from '@ai-dev-orchestrator/ports';
+import type { PolicyEvaluation } from '@ai-dev-orchestrator/schemas';
 
 /** Checks iteration counts against contract limits. */
 export class IterationLimiter {

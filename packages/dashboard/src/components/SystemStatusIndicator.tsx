@@ -1,4 +1,4 @@
-import type { HealthResponse } from '@ai-orchestrator/schemas';
+import type { HealthResponse } from '@ai-dev-orchestrator/schemas';
 import { Link } from 'react-router-dom';
 
 import { api } from '../api/client';

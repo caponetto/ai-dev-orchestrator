@@ -1,4 +1,4 @@
-import type { RunDirectoryInfo } from '@ai-orchestrator/schemas';
+import type { RunDirectoryInfo } from '@ai-dev-orchestrator/schemas';
 
 /**
  * Manages the runtime directory structure for orchestrator runs.

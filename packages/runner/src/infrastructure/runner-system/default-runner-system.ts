@@ -14,8 +14,8 @@ import type {
   ProvenanceTracker,
   RoleRegistry,
   RunnerSystem,
-} from '@ai-orchestrator/ports';
-import { ArtifactDiffGenerator } from '@ai-orchestrator/prompt-engine';
+} from '@ai-dev-orchestrator/ports';
+import { ArtifactDiffGenerator } from '@ai-dev-orchestrator/prompt-engine';
 import type {
   AgentResult,
   AgentSessionHandle,
@@ -31,7 +31,7 @@ import type {
   WorkerError,
   WorkerMetrics,
   WorkerStatus,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 import { WorkerDispatchError } from '../../domain/runner-system/errors';
 

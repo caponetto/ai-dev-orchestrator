@@ -1,4 +1,4 @@
-import { NonRecoverableErrorBase } from '@ai-orchestrator/ports';
+import { NonRecoverableErrorBase } from '@ai-dev-orchestrator/ports';
 
 export class ContextStoreInitError extends NonRecoverableErrorBase {
   readonly code = 'CONTEXT_STORE_INIT_ERROR';

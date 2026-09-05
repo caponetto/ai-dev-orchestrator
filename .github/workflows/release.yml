@@ -1,22 +1,39 @@
-# Disabled until repository secrets (GITHUB_TOKEN with contents:write) are configured.
-# To enable: uncomment the 'on' trigger below and remove the top-level 'on' line.
 name: Release
 
 on:
-  workflow_dispatch: {}
-# on:
-#   push:
-#     branches: [main]
+  push:
+    branches: [main]
 
 permissions:
   contents: write
   pull-requests: write
+  id-token: write
 
 jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
       - uses: googleapis/release-please-action@v5
+        id: release
         with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      - name: Checkout
+        if: ${{ steps.release.outputs.releases_created == 'true' }}
+        uses: actions/checkout@v7
+
+      - name: Setup
+        if: ${{ steps.release.outputs.releases_created == 'true' }}
+        uses: ./.github/actions/setup
+
+      - name: Build production
+        if: ${{ steps.release.outputs.releases_created == 'true' }}
+        run: pnpm build:prod
+
+      - name: Publish packages to npm
+        if: ${{ steps.release.outputs.releases_created == 'true' }}
+        run: pnpm -r publish --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

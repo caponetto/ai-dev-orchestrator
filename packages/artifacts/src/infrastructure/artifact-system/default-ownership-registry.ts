@@ -1,6 +1,6 @@
-import type { OwnershipRegistry } from '@ai-orchestrator/ports';
-import type { ArtifactType, RoleContract } from '@ai-orchestrator/schemas';
-import { ARTIFACT_TYPES } from '@ai-orchestrator/schemas';
+import type { OwnershipRegistry } from '@ai-dev-orchestrator/ports';
+import type { ArtifactType, RoleContract } from '@ai-dev-orchestrator/schemas';
+import { ARTIFACT_TYPES } from '@ai-dev-orchestrator/schemas';
 
 import { ARTIFACT_DESCRIPTORS } from '../../domain/artifact-system/artifact-descriptors';
 

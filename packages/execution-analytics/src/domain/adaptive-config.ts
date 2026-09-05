@@ -1,4 +1,4 @@
-import type { AdaptiveConfig } from '@ai-orchestrator/schemas';
+import type { AdaptiveConfig } from '@ai-dev-orchestrator/schemas';
 
 export const NO_RECOMMENDATION: AdaptiveConfig = {
   recommendedMaxOutputTokens: null,

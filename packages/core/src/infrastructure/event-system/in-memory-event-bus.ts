@@ -1,4 +1,4 @@
-import type { EventBus, EventJournal } from '@ai-orchestrator/ports';
+import type { EventBus, EventJournal } from '@ai-dev-orchestrator/ports';
 import type {
   Event,
   EventBusConfig,
@@ -7,7 +7,7 @@ import type {
   EventInput,
   Subscription,
   SubscriptionOptions,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 
 import { SubscriberError } from '../../domain/event-system/errors';
 

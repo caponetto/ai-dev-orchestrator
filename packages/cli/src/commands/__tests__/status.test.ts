@@ -2,14 +2,14 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { DefaultStatePersistence } from '@ai-orchestrator/core';
-import { createRunId } from '@ai-orchestrator/ports';
+import { DefaultStatePersistence } from '@ai-dev-orchestrator/core';
+import { createRunId } from '@ai-dev-orchestrator/ports';
 import type {
   JournalEvent,
   PersistedState,
   PersistedWaitingContext,
   RunId,
-} from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 import { ExitCode } from '../../output/exit-codes';
@@ -37,7 +37,7 @@ vi.mock('../../workspace-paths', async (importOriginal) => {
 
 const mockPendingRequests = vi.hoisted(() => vi.fn().mockResolvedValue([]));
 
-vi.mock('@ai-orchestrator/runner', async (importOriginal) => {
+vi.mock('@ai-dev-orchestrator/runner', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...(actual as object),

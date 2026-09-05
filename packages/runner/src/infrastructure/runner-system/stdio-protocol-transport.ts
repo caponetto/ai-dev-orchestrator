@@ -5,9 +5,9 @@ import type {
   HandshakeAckPayload,
   HandshakePayload,
   ProtocolMessage,
-} from '@ai-orchestrator/agent-protocol';
-import { createProtocolMessage } from '@ai-orchestrator/agent-protocol';
-import type { PermissionAction } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/agent-protocol';
+import { createProtocolMessage } from '@ai-dev-orchestrator/agent-protocol';
+import type { PermissionAction } from '@ai-dev-orchestrator/schemas';
 
 import { serializeMessage, deserializeMessage } from './protocol-serializer';
 

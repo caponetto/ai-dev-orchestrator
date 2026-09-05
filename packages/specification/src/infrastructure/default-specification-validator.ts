@@ -1,12 +1,12 @@
-import type { SpecificationValidator } from '@ai-orchestrator/ports';
+import type { SpecificationValidator } from '@ai-dev-orchestrator/ports';
 import type {
   CanonicalSpecification,
   CompletenessResult,
   SpecificationValidationError,
   SpecificationValidationResult,
   SpecificationValidationWarning,
-} from '@ai-orchestrator/schemas';
-import { COMPLETENESS_WEIGHTS } from '@ai-orchestrator/schemas';
+} from '@ai-dev-orchestrator/schemas';
+import { COMPLETENESS_WEIGHTS } from '@ai-dev-orchestrator/schemas';
 import { z } from 'zod';
 
 const structureSchema = z

@@ -1,4 +1,4 @@
-import { NonRecoverableErrorBase } from '@ai-orchestrator/ports';
+import { NonRecoverableErrorBase } from '@ai-dev-orchestrator/ports';
 
 /** Thrown when a YAML configuration file cannot be parsed. */
 export class YamlParseError extends NonRecoverableErrorBase {
