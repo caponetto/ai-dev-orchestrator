@@ -44,7 +44,7 @@
     "@ai-dev-orchestrator/build-config": "workspace:*",
     "@ai-dev-orchestrator/role-system": "workspace:*",
     "@ai-dev-orchestrator/test-utils": "workspace:*",
-    "@types/node": "^26.4.0",
+    "@types/node": "^26.4.1",
     "@types/write-file-atomic": "^4.0.3",
     "fast-check": "^4.9.0",
     "vitest": "^4.1.11"

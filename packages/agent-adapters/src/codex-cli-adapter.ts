@@ -2,7 +2,7 @@ import type { ProtocolMessage } from '@ai-dev-orchestrator/agent-protocol';
 import { createProtocolMessage } from '@ai-dev-orchestrator/agent-protocol';
 import { BUILT_IN_CODING_RUNNER_ID } from '@ai-dev-orchestrator/schemas';
 
-import type { AgentAdapter, AgentAdapterCapabilities } from './adapter-types';
+import type { AgentAdapter } from './adapter-types';
 import type {
   CodexItemEvent,
   CodexStreamEvent,
@@ -98,7 +98,6 @@ function mapErrorEvent(event: CodexTurnFailedEvent): ProtocolMessage {
   });
 }
 
-export function createCodexCliAdapter(capabilities: AgentAdapterCapabilities): CodexCliAdapter {
-  void capabilities;
+export function createCodexCliAdapter(): CodexCliAdapter {
   return new CodexCliAdapter();
 }

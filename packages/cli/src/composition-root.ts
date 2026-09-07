@@ -317,7 +317,7 @@ async function buildRunnerRegistry(
           '-c',
           'sandbox_workspace_write.network_access=true',
         ],
-        adapter: createCodexCliAdapter(codexProbe.capabilities),
+        adapter: createCodexCliAdapter(),
       });
       codexRunner.setPermissionPolicy(policy);
       codexRunner.setApprovalStore(approvalStore);
