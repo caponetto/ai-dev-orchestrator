@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/caponetto/ai-dev-orchestrator/compare/cli-v0.1.2...cli-v0.1.3) (2026-09-07)
+
+
+### Bug Fixes
+
+* **cli:** resolve help exit code and dashboard asset path bugs ([#36](https://github.com/caponetto/ai-dev-orchestrator/issues/36)) ([321debb](https://github.com/caponetto/ai-dev-orchestrator/commit/321debbc74320d053e6283e72bdec8bc6a9ec13b))
+
 ## [0.1.2](https://github.com/caponetto/ai-dev-orchestrator/compare/cli-v0.1.1...cli-v0.1.2) (2026-09-05)
 
 
