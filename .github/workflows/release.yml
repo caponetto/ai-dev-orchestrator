@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
   pull-requests: write
 
 jobs:
@@ -31,15 +32,6 @@ jobs:
         if: ${{ steps.release.outputs.releases_created == 'true' }}
         run: pnpm build:prod
 
-      - name: Configure npm authentication
-        if: ${{ steps.release.outputs.releases_created == 'true' }}
-        run: echo '//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}' > ~/.npmrc
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
       - name: Publish packages to npm
         if: ${{ steps.release.outputs.releases_created == 'true' }}
         run: pnpm -r publish --access public --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: 'false'
