@@ -1,5 +1,7 @@
 # Pre-commit quality gates for automated and agent-driven commits.
 
+set -e
+
 pnpm exec lint-staged
 pnpm typecheck
 pnpm lint
