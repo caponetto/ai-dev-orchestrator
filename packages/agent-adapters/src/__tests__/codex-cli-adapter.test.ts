@@ -67,12 +67,7 @@ describe('CodexCliAdapter', () => {
   });
 
   it('ignores malformed and unsupported output', () => {
-    const adapter = createCodexCliAdapter({
-      structuredIO: true,
-      permissionEvents: false,
-      clarificationEvents: false,
-      stdinResponses: false,
-    });
+    const adapter = createCodexCliAdapter();
     expect(adapter.translateOutput('not json')).toBeNull();
     expect(adapter.translateOutput('{"type":"unknown"}')).toBeNull();
   });
