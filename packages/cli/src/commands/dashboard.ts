@@ -63,9 +63,10 @@ interface DashboardLocation {
 }
 
 function resolveDashboardLocation(): DashboardLocation {
-  const cliPkgDir = resolve(fileURLToPath(new URL('.', import.meta.url)), '..');
+  const distDir = fileURLToPath(new URL('.', import.meta.url));
+  const cliPkgDir = resolve(distDir, '..');
 
-  const bundledUiDir = resolve(cliPkgDir, 'dashboard');
+  const bundledUiDir = resolve(distDir, 'dashboard');
   if (existsSync(join(bundledUiDir, 'index.html'))) {
     return { uiDir: bundledUiDir, devDashboardDir: null };
   }
