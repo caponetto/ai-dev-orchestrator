@@ -428,7 +428,11 @@ program.parseAsync(process.argv).catch((error: unknown) => {
     return;
   }
 
-  if (error.code === 'commander.helpDisplayed' || error.code === 'commander.version') {
+  if (
+    error.code === 'commander.helpDisplayed' ||
+    error.code === 'commander.help' ||
+    error.code === 'commander.version'
+  ) {
     return;
   }
 
