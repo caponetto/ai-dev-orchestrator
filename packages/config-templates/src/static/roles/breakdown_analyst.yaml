@@ -16,7 +16,7 @@ required_capabilities:
   - reasoning
   - structured_output
   - external_data_fetch
-model: claude-sonnet-5
+model: opencode/ling-3.0-flash-fin-free
 max_tokens: null
 dispatch_type: agent
-runner: claude-code
+runner: opencode

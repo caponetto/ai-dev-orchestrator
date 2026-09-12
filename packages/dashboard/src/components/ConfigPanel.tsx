@@ -17,6 +17,7 @@ const RUNNER_LABELS: Record<string, string> = {
   [BUILT_IN_CODING_RUNNER_ID.CLAUDE_CODE]: 'Claude Code',
   [BUILT_IN_CODING_RUNNER_ID.CURSOR]: 'Cursor',
   [BUILT_IN_CODING_RUNNER_ID.CODEX]: 'Codex',
+  [BUILT_IN_CODING_RUNNER_ID.OPENCODE]: 'OpenCode',
 };
 
 function formatRunner(runner?: string): string {

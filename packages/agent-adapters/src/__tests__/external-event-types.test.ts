@@ -4,6 +4,7 @@ import {
   narrowClaudeCodeEvent,
   parseClaudeCodeEvent,
   parseCursorEvent,
+  parseOpenCodeEvent,
 } from '../external-event-types';
 
 describe('narrowClaudeCodeEvent', () => {
@@ -126,5 +127,66 @@ describe('parseCursorEvent', () => {
     const result = parseCursorEvent('  {"type": "result"}  ');
     expect(result).not.toBeNull();
     expect(result?.type).toBe('result');
+  });
+});
+
+describe('parseOpenCodeEvent', () => {
+  it('parses step_start event', () => {
+    const result = parseOpenCodeEvent(
+      '{"type": "step_start", "part": {"id": "p1", "type": "step-start"}}',
+    );
+    expect(result).not.toBeNull();
+    expect(result?.type).toBe('step_start');
+  });
+
+  it('parses text event', () => {
+    const result = parseOpenCodeEvent(
+      '{"type": "text", "part": {"id": "p2", "type": "text", "text": "hello"}}',
+    );
+    expect(result).not.toBeNull();
+    expect(result?.type).toBe('text');
+  });
+
+  it('parses tool_use event', () => {
+    const result = parseOpenCodeEvent(
+      '{"type": "tool_use", "part": {"type": "tool", "tool": "read"}}',
+    );
+    expect(result).not.toBeNull();
+    expect(result?.type).toBe('tool_use');
+  });
+
+  it('parses step_finish event with tokens', () => {
+    const result = parseOpenCodeEvent(
+      JSON.stringify({
+        type: 'step_finish',
+        part: {
+          id: 'p3',
+          reason: 'stop',
+          tokens: {
+            total: 100,
+            input: 80,
+            output: 20,
+            reasoning: 0,
+            cache: { read: 10, write: 0 },
+          },
+        },
+      }),
+    );
+    expect(result).not.toBeNull();
+    expect(result?.type).toBe('step_finish');
+  });
+
+  it('parses error event', () => {
+    const result = parseOpenCodeEvent(
+      '{"type": "error", "error": {"name": "Err", "message": "boom"}}',
+    );
+    expect(result).not.toBeNull();
+    expect(result?.type).toBe('error');
+  });
+
+  it('returns null for non-JSON or unknown types', () => {
+    expect(parseOpenCodeEvent('plain text')).toBeNull();
+    expect(parseOpenCodeEvent('{"type": "other_event"}')).toBeNull();
+    expect(parseOpenCodeEvent('{broken')).toBeNull();
   });
 });

@@ -1,6 +1,6 @@
 # @ai-dev-orchestrator/agent-adapters
 
-CLI adapters that bridge vendor-specific coding agents (Claude Code, Cursor, Codex, GitHub CLI) into the orchestrator's unified agent protocol. Each adapter translates vendor stream events into protocol messages and probes for available capabilities.
+CLI adapters that bridge vendor-specific coding agents (Claude Code, Cursor, Codex, OpenCode, GitHub CLI) into the orchestrator's unified agent protocol. Each adapter translates vendor stream events into protocol messages and probes for available capabilities.
 
 ## Architecture Layer
 
@@ -44,6 +44,13 @@ src/
 - `probeCodexCliCapabilities`, `normalizeCodexProbeResult` -- capability and authentication detection
 - `CodexStreamEvent`, `CodexItemEvent`, `CodexTurnCompletedEvent`, and related event types
 - `parseCodexEvent` -- JSONL event parsing
+
+**OpenCode**:
+
+- `OpencodeCliAdapter`, `createOpencodeCliAdapter` -- adapter for `opencode run --format json --auto`
+- `probeOpencodeCliCapabilities`, `normalizeOpencodeProbeResult` -- capability and model roster detection
+- `OpenCodeStreamEvent`, `OpenCodeStepStartEvent`, `OpenCodeTextEvent`, `OpenCodeToolUseEvent`, `OpenCodeStepFinishEvent`, and related event types
+- `parseOpenCodeEvent` -- stream event parsing
 
 **GitHub CLI**:
 

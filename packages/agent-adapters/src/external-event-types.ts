@@ -1,7 +1,7 @@
 /**
  * Discriminated union types for vendor CLI stream-json events.
  *
- * Claude Code, Cursor CLI, and Codex CLI emit newline-delimited JSON on stdout.
+ * Claude Code, Cursor CLI, Codex CLI, and OpenCode CLI emit newline-delimited JSON on stdout.
  * These types capture the event shapes each vendor produces, enabling
  * typed property access in the adapter mapping functions.
  */
@@ -37,7 +37,21 @@ interface CodexTokenUsage {
   readonly reasoning_output_tokens?: number;
 }
 
-export type VendorTokenUsage = ClaudeTokenUsage & CursorTokenUsage & CodexTokenUsage;
+export interface OpenCodeTokenUsage {
+  readonly total?: number;
+  readonly input?: number;
+  readonly output?: number;
+  readonly reasoning?: number;
+  readonly cache?: {
+    readonly write?: number;
+    readonly read?: number;
+  };
+}
+
+export type VendorTokenUsage = ClaudeTokenUsage &
+  CursorTokenUsage &
+  CodexTokenUsage &
+  OpenCodeTokenUsage;
 
 // ---------------------------------------------------------------------------
 // Claude Code stream events
@@ -190,6 +204,100 @@ export type CodexStreamEvent =
   | CodexTurnFailedEvent;
 
 // ---------------------------------------------------------------------------
+// OpenCode CLI stream events
+// ---------------------------------------------------------------------------
+
+export interface OpenCodeStepStartPart {
+  readonly id?: string;
+  readonly messageID?: string;
+  readonly sessionID?: string;
+  readonly type?: string;
+  readonly snapshot?: string;
+}
+
+export interface OpenCodeStepStartEvent {
+  readonly type: 'step_start';
+  readonly timestamp?: number;
+  readonly sessionID?: string;
+  readonly part?: OpenCodeStepStartPart;
+}
+
+export interface OpenCodeTextPart {
+  readonly id?: string;
+  readonly messageID?: string;
+  readonly sessionID?: string;
+  readonly type?: string;
+  readonly text?: string;
+}
+
+export interface OpenCodeTextEvent {
+  readonly type: 'text';
+  readonly timestamp?: number;
+  readonly sessionID?: string;
+  readonly part?: OpenCodeTextPart;
+}
+
+export interface OpenCodeToolState {
+  readonly status?: string;
+  readonly input?: Record<string, unknown>;
+  readonly output?: string;
+}
+
+export interface OpenCodeToolPart {
+  readonly id?: string;
+  readonly type?: string;
+  readonly tool?: string;
+  readonly callID?: string;
+  readonly state?: OpenCodeToolState;
+  readonly title?: string;
+}
+
+export interface OpenCodeToolUseEvent {
+  readonly type: 'tool_use';
+  readonly timestamp?: number;
+  readonly sessionID?: string;
+  readonly part?: OpenCodeToolPart;
+}
+
+export interface OpenCodeStepFinishPart {
+  readonly id?: string;
+  readonly reason?: string;
+  readonly messageID?: string;
+  readonly sessionID?: string;
+  readonly type?: string;
+  readonly tokens?: OpenCodeTokenUsage;
+  readonly cost?: number;
+}
+
+export interface OpenCodeStepFinishEvent {
+  readonly type: 'step_finish';
+  readonly timestamp?: number;
+  readonly sessionID?: string;
+  readonly part?: OpenCodeStepFinishPart;
+}
+
+export interface OpenCodeErrorEvent {
+  readonly type: 'error';
+  readonly timestamp?: number;
+  readonly sessionID?: string;
+  readonly error?: {
+    readonly name?: string;
+    readonly message?: string;
+    readonly data?: {
+      readonly message?: string;
+      readonly ref?: string;
+    };
+  };
+}
+
+export type OpenCodeStreamEvent =
+  | OpenCodeStepStartEvent
+  | OpenCodeTextEvent
+  | OpenCodeToolUseEvent
+  | OpenCodeStepFinishEvent
+  | OpenCodeErrorEvent;
+
+// ---------------------------------------------------------------------------
 // Parse / narrow helpers
 // ---------------------------------------------------------------------------
 
@@ -226,6 +334,14 @@ const CODEX_EVENT_TYPES: ReadonlySet<string> = new Set([
   'error',
 ]);
 
+const OPENCODE_EVENT_TYPES: ReadonlySet<string> = new Set([
+  'step_start',
+  'text',
+  'tool_use',
+  'step_finish',
+  'error',
+]);
+
 /** Narrow a pre-parsed JSON object to a Claude Code vendor event. */
 export function narrowClaudeCodeEvent(raw: Record<string, unknown>): ClaudeCodeStreamEvent | null {
   const type = raw['type'];
@@ -250,6 +366,14 @@ function narrowCodexEvent(raw: Record<string, unknown>): CodexStreamEvent | null
     return null;
   }
   return raw as unknown as CodexStreamEvent;
+}
+
+function narrowOpenCodeEvent(raw: Record<string, unknown>): OpenCodeStreamEvent | null {
+  const type = raw['type'];
+  if (typeof type !== 'string' || !OPENCODE_EVENT_TYPES.has(type)) {
+    return null;
+  }
+  return raw as unknown as OpenCodeStreamEvent;
 }
 
 /** Parse a raw JSON line into a typed Claude Code stream event. */
@@ -290,6 +414,19 @@ export function parseCodexEvent(line: string): CodexStreamEvent | null {
   }
   try {
     return narrowCodexEvent(JSON.parse(trimmed) as Record<string, unknown>);
+  } catch {
+    return null;
+  }
+}
+
+/** Parse a raw JSON line emitted by `opencode run --format json`. */
+export function parseOpenCodeEvent(line: string): OpenCodeStreamEvent | null {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith('{')) {
+    return null;
+  }
+  try {
+    return narrowOpenCodeEvent(JSON.parse(trimmed) as Record<string, unknown>);
   } catch {
     return null;
   }

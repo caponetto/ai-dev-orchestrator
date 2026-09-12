@@ -21,7 +21,7 @@ required_capabilities:
   - code_review
   - reasoning
   - structured_output
-model: cursor-grok-4.6-medium
+model: opencode/nemotron-3.5-lightning-free
 max_tokens: null
 dispatch_type: agent
-runner: cursor
+runner: opencode

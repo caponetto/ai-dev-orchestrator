@@ -160,6 +160,27 @@ describe('CliAgentRunner', () => {
     expect(result.error).toContain('timed out');
   }, 15000);
 
+  it('salvages an output artifact already written to disk when the agent times out', async () => {
+    const task = makeTask({
+      constraints: {
+        timeout: 500,
+        requiredOutputType: 'implementation',
+      },
+    });
+    await preWriteOutput(task, { summary: 'finished just before the timeout' });
+
+    const runner = new CliAgentRunner({
+      command: 'bash',
+      args: ['-c', 'sleep 30'],
+      handshakeTimeoutMs: 200,
+    });
+
+    const result = await runner.dispatch(task);
+
+    expect(result.status).toBe('success');
+    expect(result.artifactContent).toContain('finished just before the timeout');
+  }, 15000);
+
   it('handles output without tokenUsage field', async () => {
     const task = makeTask();
     await preWriteOutput(task, { summary: 'done' });
@@ -728,6 +749,46 @@ PY`,
       const modelIdx = args.indexOf('--model');
       expect(modelIdx).toBeGreaterThanOrEqual(0);
       expect(args[modelIdx + 1]).toBe('claude-opus-4-20250514');
+    });
+
+    it('passes prompt and model for opencode adapter', async () => {
+      const task = makeTask({ modelHint: 'opencode/mimo-v2.5-free' });
+      await preWriteOutput(task, { summary: 'done' });
+      const capturedArgsPath = join(tempDir, 'opencode-args.json');
+      const adapter: AgentAdapter = {
+        name: 'opencode',
+        command: 'bash',
+        args: [
+          '-c',
+          `python3 - <<'PY' "$0" "$@"
+import json
+import sys
+
+with open(${JSON.stringify(capturedArgsPath)}, "w", encoding="utf-8") as handle:
+    json.dump(sys.argv[1:], handle)
+PY`,
+        ],
+        supportsProtocolHandshake: false,
+      };
+
+      const runner = new CliAgentRunner({
+        command: 'bash',
+        args: ['run', '--format', 'json', '--auto'],
+        adapter,
+        handshakeTimeoutMs: 300,
+      });
+
+      const result = await runner.dispatch(task);
+      expect(result.status).toBe('success');
+
+      const serializedArgs = await readFile(capturedArgsPath, 'utf-8');
+      const args = JSON.parse(serializedArgs) as string[];
+      expect(args).not.toContain('--task-file');
+      const modelIdx = args.indexOf('--model');
+      expect(modelIdx).toBeGreaterThanOrEqual(0);
+      expect(args[modelIdx + 1]).toBe('opencode/mimo-v2.5-free');
+      const taskFilePath = join(tempDir, 'run-dir', 'agent-tasks', 'task-1.json');
+      expect(args.some((arg) => arg.includes(taskFilePath))).toBe(true);
     });
 
     it('injects codex permission hook args when bridge is configured', async () => {
@@ -1345,6 +1406,29 @@ describe('extractUsageFromRawLine', () => {
     expect(usage?.inputTokens).toBe(2000);
     expect(usage?.outputTokens).toBe(800);
     // Cursor-style events without input_tokens/cache fields should NOT have cumulative
+    expect(usage?.cumulative).toBeUndefined();
+  });
+
+  it('extracts OpenCode usage from step_finish event via parseOpenCodeEvent', () => {
+    const line = JSON.stringify({
+      type: 'step_finish',
+      part: {
+        id: 'prt_1',
+        reason: 'tool-calls',
+        tokens: {
+          total: 9670,
+          input: 7851,
+          output: 27,
+          reasoning: 0,
+          cache: { write: 0, read: 1792 },
+        },
+      },
+    });
+    const usage = extractUsageFromRawLine(line);
+    expect(usage).toBeDefined();
+    expect(usage?.inputTokens).toBe(7851 + 1792);
+    expect(usage?.outputTokens).toBe(27);
+    expect(usage?.isFinal).toBeUndefined();
     expect(usage?.cumulative).toBeUndefined();
   });
 });

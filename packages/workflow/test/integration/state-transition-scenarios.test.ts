@@ -913,6 +913,24 @@ describe('State Transition Scenarios', () => {
 
         // Implementation artifact should exist from the saved results
         expect(artifactStore.stored.has('implementation')).toBe(true);
+
+        const reader = new DefaultJournalReader(journalPath);
+        const events = reader.readAll();
+        const approvalEvent = events.find(
+          (event) => event.type === 'human_approval' && event.data.stateId === 'WAITING_FOR_HUMAN',
+        );
+        expect(approvalEvent).toBeDefined();
+
+        const resumeTransition = events.find(
+          (event) =>
+            event.type === 'state_transition' &&
+            event.data.trigger === 'human_approved' &&
+            event.data.from === 'WAITING_FOR_HUMAN' &&
+            event.data.to === 'IMPLEMENTATION',
+        );
+        expect(resumeTransition).toBeDefined();
+        expect(resumeTransition?.data.guardsEvaluated).toBe(1);
+        expect(resumeTransition?.data.guardsPassed).toBe(1);
       });
     });
   });

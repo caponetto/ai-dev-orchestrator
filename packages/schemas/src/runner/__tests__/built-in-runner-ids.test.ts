@@ -8,6 +8,7 @@ describe('built-in coding runner IDs', () => {
       BUILT_IN_CODING_RUNNER_ID.CLAUDE_CODE,
       BUILT_IN_CODING_RUNNER_ID.CODEX,
       BUILT_IN_CODING_RUNNER_ID.CURSOR,
+      BUILT_IN_CODING_RUNNER_ID.OPENCODE,
     ]);
     expect(new Set(BUILT_IN_CODING_RUNNER_IDS)).toHaveLength(BUILT_IN_CODING_RUNNER_IDS.length);
   });

@@ -471,6 +471,17 @@ export class LifecycleController implements WorkflowEngine {
       savedWaitingContext?.reason === 'token_budget_exceeded' &&
       savedWaitingContext.requestingState
     ) {
+      const requestingState = savedWaitingContext.requestingState;
+      const hasRequestingState = Object.prototype.hasOwnProperty.call(
+        this.config.workflowDefinition.states,
+        requestingState,
+      );
+      if (!hasRequestingState || requestingState === 'WAITING_FOR_HUMAN') {
+        throw new Error(
+          `Cannot resume budget escalation: invalid requesting state '${requestingState}'`,
+        );
+      }
+
       if (!this.lockHandle) {
         this.lockHandle = this.statePersistence.acquireLock(this.runId);
       }
@@ -483,12 +494,13 @@ export class LifecycleController implements WorkflowEngine {
           kind: 'human',
           action: 'approval',
           stateId: this.currentState,
+          reason: savedWaitingContext.reason,
           inputType: 'approval',
           ...(input.content ? { message: input.content } : {}),
         },
       });
 
-      const targetState = savedWaitingContext.requestingState;
+      const targetState = requestingState;
       this.recordStateExit();
       const fromState = this.currentState;
       this.previousState = this.currentState;
@@ -496,7 +508,10 @@ export class LifecycleController implements WorkflowEngine {
       this.stateEnteredAt = new Date().toISOString();
       this.transitionCount += 1;
       this.stateHistory.record(this.currentState);
-      this.recordTransition(fromState, this.currentState, 'human_approved');
+      this.recordTransition(fromState, this.currentState, 'human_approved', undefined, {
+        guardsEvaluated: 1,
+        guardsPassed: 1,
+      });
 
       this.logger.info(
         `[LifecycleController] Budget escalation approved — resuming state '${targetState}'`,
@@ -1501,6 +1516,10 @@ export class LifecycleController implements WorkflowEngine {
       governanceOutcome?: GovernanceOutcome;
       contractId?: string;
     },
+    validationOpts?: {
+      guardsEvaluated: number;
+      guardsPassed: number;
+    },
   ): void {
     const durationMs = this.stateEnteredAt
       ? Date.now() - new Date(this.stateEnteredAt).getTime()
@@ -1517,8 +1536,8 @@ export class LifecycleController implements WorkflowEngine {
         to,
         trigger,
         durationMs,
-        guardsEvaluated: 0,
-        guardsPassed: 0,
+        guardsEvaluated: validationOpts?.guardsEvaluated ?? 0,
+        guardsPassed: validationOpts?.guardsPassed ?? 0,
         governanceRequired: governanceOpts?.governanceRequired ?? false,
         governanceOutcome: governanceOpts?.governanceOutcome,
         contractId: governanceOpts?.contractId ?? targetContract?.id,

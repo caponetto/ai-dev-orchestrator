@@ -24,6 +24,7 @@ const mockProbes = vi.hoisted(() => ({
   probeClaudeCode: vi.fn(),
   probeCursor: vi.fn(),
   probeCodex: vi.fn(),
+  probeOpencode: vi.fn(),
 }));
 
 vi.mock('../workspace-paths', async (importOriginal) => {
@@ -45,6 +46,7 @@ vi.mock('@ai-dev-orchestrator/agent-adapters', async (importOriginal) => {
     probeClaudeCodeCapabilities: mockProbes.probeClaudeCode,
     probeCursorCliCapabilities: mockProbes.probeCursor,
     probeCodexCliCapabilities: mockProbes.probeCodex,
+    probeOpencodeCliCapabilities: mockProbes.probeOpencode,
   };
 });
 
@@ -102,6 +104,19 @@ describe('composition-root orchestrator creation', () => {
         stdinResponses: false,
       },
       rawVersion: 'codex-cli 0.146.0',
+      authenticated: true,
+      notes: ['mock'],
+    });
+    mockProbes.probeOpencode.mockResolvedValue({
+      adapterName: 'opencode',
+      probedAt: '2026-01-01T00:00:00Z',
+      capabilities: {
+        structuredIO: true,
+        permissionEvents: false,
+        clarificationEvents: false,
+        stdinResponses: false,
+      },
+      rawVersion: '1.18.30',
       authenticated: true,
       notes: ['mock'],
     });
@@ -192,6 +207,18 @@ describe('composition-root orchestrator creation', () => {
       rawVersion: null,
       notes: ['not found'],
     });
+    mockProbes.probeOpencode.mockResolvedValueOnce({
+      adapterName: 'opencode',
+      probedAt: '2026-01-01T00:00:00Z',
+      capabilities: {
+        structuredIO: false,
+        permissionEvents: false,
+        clarificationEvents: false,
+        stdinResponses: false,
+      },
+      rawVersion: null,
+      notes: ['not found'],
+    });
     writeFullAiConfig(baseDir);
 
     await expect(createOrchestrator(baseDir)).rejects.toThrow(/requires runner/u);
@@ -211,9 +238,16 @@ describe('composition-root orchestrator creation', () => {
       notes: ['current Claude Code CLI capabilities'],
     });
     writeFullAiConfig(baseDir);
+    const rolesPath = join(baseDir, AI_CONFIG_DIR_NAME, 'roles.yaml');
+    writeFileSync(
+      rolesPath,
+      readFileSync(rolesPath, 'utf8').replaceAll('runner: opencode', 'runner: claude-code'),
+      'utf8',
+    );
 
     const ctx = await createOrchestrator(baseDir);
     expect(ctx.runId).toBeTruthy();
+    expect(mockProbes.probeClaudeCode).toHaveBeenCalled();
   });
 
   it('registers Codex CLI for roles assigned to the codex runner', async () => {
@@ -221,13 +255,27 @@ describe('composition-root orchestrator creation', () => {
     const rolesPath = join(baseDir, AI_CONFIG_DIR_NAME, 'roles.yaml');
     writeFileSync(
       rolesPath,
-      readFileSync(rolesPath, 'utf8').replace('runner: claude-code', 'runner: codex'),
+      readFileSync(rolesPath, 'utf8').replaceAll('runner: opencode', 'runner: codex'),
       'utf8',
     );
 
     const ctx = await createOrchestrator(baseDir);
     expect(ctx.runId).toBeTruthy();
     expect(mockProbes.probeCodex).toHaveBeenCalled();
+  });
+
+  it('registers OpenCode CLI for roles assigned to the opencode runner', async () => {
+    writeFullAiConfig(baseDir);
+    const rolesPath = join(baseDir, AI_CONFIG_DIR_NAME, 'roles.yaml');
+    writeFileSync(
+      rolesPath,
+      readFileSync(rolesPath, 'utf8').replaceAll('runner: claude-code', 'runner: opencode'),
+      'utf8',
+    );
+
+    const ctx = await createOrchestrator(baseDir);
+    expect(ctx.runId).toBeTruthy();
+    expect(mockProbes.probeOpencode).toHaveBeenCalled();
   });
 
   it('writes effective agent dispatch types into the dashboard config snapshot', async () => {
@@ -245,6 +293,18 @@ describe('composition-root orchestrator creation', () => {
   it('fails in agent-only mode when runner probe fails', async () => {
     mockProbes.probeClaudeCode.mockResolvedValueOnce({
       adapterName: 'claude-code',
+      probedAt: '2026-01-01T00:00:00Z',
+      capabilities: {
+        structuredIO: false,
+        permissionEvents: false,
+        clarificationEvents: false,
+        stdinResponses: false,
+      },
+      rawVersion: null,
+      notes: ['not found'],
+    });
+    mockProbes.probeOpencode.mockResolvedValueOnce({
+      adapterName: 'opencode',
       probedAt: '2026-01-01T00:00:00Z',
       capabilities: {
         structuredIO: false,

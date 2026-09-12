@@ -18,7 +18,7 @@ required_capabilities:
   - reasoning
   - structured_output
   - long_context
-model: claude-opus-4-8
+model: opencode/big-pickle
 max_tokens: null
 dispatch_type: agent
-runner: claude-code
+runner: opencode
