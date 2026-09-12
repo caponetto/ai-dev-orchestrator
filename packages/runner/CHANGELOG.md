@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/caponetto/ai-dev-orchestrator/compare/runner-v0.1.1...runner-v0.1.2) (2026-09-12)
+
+
+### Features
+
+* add OpenCode CLI support and update related roles and tests ([#39](https://github.com/caponetto/ai-dev-orchestrator/issues/39)) ([ae2e50d](https://github.com/caponetto/ai-dev-orchestrator/commit/ae2e50d10af72b015686f24952ec9b1b8c918f33))
+
 ## [0.1.1](https://github.com/caponetto/ai-dev-orchestrator/compare/runner-v0.1.0...runner-v0.1.1) (2026-09-05)
 
 
