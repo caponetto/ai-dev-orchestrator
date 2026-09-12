@@ -67,9 +67,21 @@ vi.mock('@ai-dev-orchestrator/agent-adapters', async (importOriginal) => {
       authenticated: true,
       notes: [],
     }),
+    probeOpencodeCliCapabilities: vi.fn().mockResolvedValue({
+      capabilities: {
+        structuredIO: true,
+        permissionEvents: false,
+        clarificationEvents: false,
+        stdinResponses: false,
+      },
+      rawVersion: '1.18.30-mock',
+      authenticated: true,
+      notes: [],
+    }),
     normalizeProbeResult: vi.fn().mockReturnValue({ mode: 'available', summary: 'mock' }),
     normalizeCursorProbeResult: vi.fn().mockReturnValue({ mode: 'available', summary: 'mock' }),
     normalizeCodexProbeResult: vi.fn().mockReturnValue({ mode: 'streaming', summary: 'mock' }),
+    normalizeOpencodeProbeResult: vi.fn().mockReturnValue({ mode: 'streaming', summary: 'mock' }),
   };
 });
 

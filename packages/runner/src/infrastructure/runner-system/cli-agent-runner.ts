@@ -9,6 +9,7 @@ import {
   parseClaudeCodeEvent,
   parseCodexEvent,
   parseCursorEvent,
+  parseOpenCodeEvent,
 } from '@ai-dev-orchestrator/agent-adapters';
 import type {
   AgentToOrchestratorMessage,
@@ -369,12 +370,27 @@ export class CliAgentRunner implements SessionCapableRunner {
               sender: 'orchestrator',
             },
           });
-          protocolFinish({
-            taskId: task.taskId,
-            status: 'timeout',
-            error: timeoutMsg,
-            durationMs: Date.now() - startTime,
-            tokenUsage: getTokenUsage(),
+          // The agent may have already written its output artifact before the
+          // timeout fired (e.g. a slow final tool call after the write). Try to
+          // salvage it instead of discarding a completed review.
+          void this.readOutput(
+            task,
+            startTime,
+            getTokenUsage(),
+            onStreamEvent,
+            lastAgentArtifactJson,
+          ).then((result) => {
+            protocolFinish?.(
+              result.status === 'success'
+                ? result
+                : {
+                    taskId: task.taskId,
+                    status: 'timeout',
+                    error: timeoutMsg,
+                    durationMs: Date.now() - startTime,
+                    tokenUsage: getTokenUsage(),
+                  },
+            );
           });
         }
         try {
@@ -659,6 +675,12 @@ export class CliAgentRunner implements SessionCapableRunner {
             sender: 'orchestrator',
           },
         });
+        // The process may have already written its output artifact before
+        // execa's own timeout killed it — try to salvage it.
+        const salvaged = await this.readOutput(task, startTime, undefined, onStreamEvent);
+        if (salvaged.status === 'success') {
+          return salvaged;
+        }
         return {
           taskId: task.taskId,
           status: 'timeout',
@@ -1186,6 +1208,7 @@ const PROMPT_BASED_ADAPTERS = new Set<string>([
   BUILT_IN_CODING_RUNNER_ID.CLAUDE_CODE,
   BUILT_IN_CODING_RUNNER_ID.CODEX,
   BUILT_IN_CODING_RUNNER_ID.CURSOR,
+  BUILT_IN_CODING_RUNNER_ID.OPENCODE,
 ]);
 
 /**
@@ -1455,6 +1478,13 @@ function parseVendorUsage(u: VendorTokenUsage): {
 } {
   const num = (v: number | undefined): number => v ?? 0;
 
+  if (isOpenCodeUsageShape(u)) {
+    return {
+      inputTokens: num(u.input) + num(u.cache?.read),
+      outputTokens: num(u.output) + num(u.reasoning),
+    };
+  }
+
   if (isCodexUsageShape(u)) {
     // Codex reports cached_input_tokens as a subset of input_tokens — do not add them.
     return {
@@ -1472,6 +1502,13 @@ function parseVendorUsage(u: VendorTokenUsage): {
     inputTokens: Math.max(anthropicInput, cursorInput),
     outputTokens: Math.max(anthropicOutput, cursorOutput),
   };
+}
+
+function isOpenCodeUsageShape(usage: VendorTokenUsage): boolean {
+  return (
+    ('cache' in usage && typeof (usage as Record<string, unknown>).cache === 'object') ||
+    ('reasoning' in usage && typeof (usage as Record<string, unknown>).reasoning === 'number')
+  );
 }
 
 function isCodexUsageShape(usage: VendorTokenUsage): boolean {
@@ -1515,6 +1552,11 @@ export function extractUsageFromRawLine(line: string): ExtractedUsage | null {
   const codexEvent = parseCodexEvent(line);
   if (codexEvent?.type === 'turn.completed' && codexEvent.usage) {
     return { ...parseVendorUsage(codexEvent.usage), isFinal: true };
+  }
+
+  const opencodeEvent = parseOpenCodeEvent(line);
+  if (opencodeEvent?.type === 'step_finish' && opencodeEvent.part?.tokens) {
+    return parseVendorUsage(opencodeEvent.part.tokens);
   }
 
   return null;

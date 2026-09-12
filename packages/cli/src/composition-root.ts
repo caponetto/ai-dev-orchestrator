@@ -6,12 +6,15 @@ import {
   createClaudeCodeAdapter,
   createCodexCliAdapter,
   createCursorCliAdapter,
+  createOpencodeCliAdapter,
   normalizeCodexProbeResult,
   normalizeCursorProbeResult,
+  normalizeOpencodeProbeResult,
   normalizeProbeResult,
   probeClaudeCodeCapabilities,
   probeCodexCliCapabilities,
   probeCursorCliCapabilities,
+  probeOpencodeCliCapabilities,
 } from '@ai-dev-orchestrator/agent-adapters';
 import {
   buildOwnershipOverrides,
@@ -337,6 +340,33 @@ async function buildRunnerRegistry(
   } catch {
     skippedAssignments.push(
       'codex runner skipped: capability probe failed — Codex CLI adapter unavailable',
+    );
+  }
+
+  try {
+    const opencodeProbe = await probeOpencodeCliCapabilities();
+    const { mode: opencodeMode, summary: opencodeSummary } =
+      normalizeOpencodeProbeResult(opencodeProbe);
+    if (opencodeMode === 'unavailable' || opencodeMode === 'unauthenticated') {
+      skippedAssignments.push(
+        `${BUILT_IN_CODING_RUNNER_ID.OPENCODE} runner skipped: ${opencodeSummary}`,
+      );
+    } else {
+      const opencodeRunner = new CliAgentRunner({
+        command: 'opencode',
+        args: ['run', '--format', 'json', '--auto'],
+        adapter: createOpencodeCliAdapter(),
+      });
+      opencodeRunner.setPermissionPolicy(policy);
+      opencodeRunner.setApprovalStore(approvalStore);
+      if (liveRequestStore) {
+        opencodeRunner.setLiveRequestStore(liveRequestStore);
+      }
+      registry.set(BUILT_IN_CODING_RUNNER_ID.OPENCODE, opencodeRunner);
+    }
+  } catch {
+    skippedAssignments.push(
+      'opencode runner skipped: capability probe failed — OpenCode CLI adapter unavailable',
     );
   }
 

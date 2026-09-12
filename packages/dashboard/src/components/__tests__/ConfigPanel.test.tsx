@@ -54,6 +54,15 @@ describe('ConfigPanel', () => {
     expect(await screen.findByText('Codex')).toBeInTheDocument();
   });
 
+  it('renders OpenCode runner labels', async () => {
+    setupConfigHandler({
+      ...baseConfig,
+      roles: [{ role: 'implementer', model: 'opencode/mimo-v2.5-free', runner: 'opencode' }],
+    });
+    renderWithRouter(<ConfigPanel runId="run-1" roleUsage={[]} />);
+    expect(await screen.findByText('OpenCode')).toBeInTheDocument();
+  });
+
   it('renders timeout, max turns, and max tokens columns', async () => {
     server.use(
       http.get('/api/runs/run-1/config', () =>

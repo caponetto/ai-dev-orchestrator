@@ -6,7 +6,7 @@ This guide reflects the current implementation in `packages/cli`, `packages/core
 
 - Node.js 22 or later
 - pnpm 11 or later
-- At least one supported local runner environment that the CLI can probe successfully, currently `claude-code`, `cursor`, `codex`, or `gh-cli`
+- At least one supported local runner environment that the CLI can probe successfully, currently `claude-code`, `cursor`, `codex`, `opencode`, or `gh-cli`
 
 ## Build the Monorepo
 

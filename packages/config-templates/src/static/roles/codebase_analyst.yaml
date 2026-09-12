@@ -15,7 +15,7 @@ agreement_participation: []
 required_capabilities:
   - reasoning
   - code_review
-model: claude-sonnet-5
+model: opencode/mimo-v2.5-free
 max_tokens: null
 dispatch_type: agent
-runner: claude-code
+runner: opencode

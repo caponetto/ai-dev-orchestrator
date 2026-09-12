@@ -3,6 +3,7 @@ export const BUILT_IN_CODING_RUNNER_ID = {
   CLAUDE_CODE: 'claude-code',
   CODEX: 'codex',
   CURSOR: 'cursor',
+  OPENCODE: 'opencode',
 } as const;
 
 export type BuiltInCodingRunnerId =
@@ -12,4 +13,5 @@ export const BUILT_IN_CODING_RUNNER_IDS: readonly BuiltInCodingRunnerId[] = [
   BUILT_IN_CODING_RUNNER_ID.CLAUDE_CODE,
   BUILT_IN_CODING_RUNNER_ID.CODEX,
   BUILT_IN_CODING_RUNNER_ID.CURSOR,
+  BUILT_IN_CODING_RUNNER_ID.OPENCODE,
 ];

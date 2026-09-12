@@ -20,7 +20,7 @@ agreement_participation:
 required_capabilities:
   - reasoning
   - structured_output
-model: claude-opus-4-8
+model: opencode/nemotron-3-ultra-free
 max_tokens: null
 dispatch_type: agent
-runner: claude-code
+runner: opencode

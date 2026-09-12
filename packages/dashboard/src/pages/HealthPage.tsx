@@ -30,6 +30,7 @@ const subsystemDisplayNames: Record<string, string> = {
   [`runner:${BUILT_IN_CODING_RUNNER_ID.CLAUDE_CODE}`]: 'Claude Code',
   [`runner:${BUILT_IN_CODING_RUNNER_ID.CURSOR}`]: 'Cursor',
   [`runner:${BUILT_IN_CODING_RUNNER_ID.CODEX}`]: 'Codex',
+  [`runner:${BUILT_IN_CODING_RUNNER_ID.OPENCODE}`]: 'OpenCode',
   'runner:gh-cli': 'GitHub CLI',
 };
 

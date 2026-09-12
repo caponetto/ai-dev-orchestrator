@@ -77,12 +77,12 @@ describe('roles-generator', () => {
     expect(ids).toContain('verifier');
   });
 
-  it('verifier role has dispatch_type agent and runner claude-code', () => {
+  it('verifier role has dispatch_type agent and runner opencode', () => {
     const parsed = parseYaml(generateRolesYaml()) as { roles: RoleEntry[] };
     const verifier = parsed.roles.find((r) => r.id === 'verifier');
     expect(verifier).toBeDefined();
     expect(verifier?.dispatch_type).toBe('agent');
-    expect(verifier?.runner).toBe('claude-code');
+    expect(verifier?.runner).toBe('opencode');
   });
 
   it('generated YAML uses runner key (not agent_runner)', () => {

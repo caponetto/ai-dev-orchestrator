@@ -7,11 +7,13 @@ import {
   normalizeCursorProbeResult,
   normalizeCodexProbeResult,
   normalizeGhCliProbeResult,
+  normalizeOpencodeProbeResult,
   normalizeProbeResult,
   probeClaudeCodeCapabilities,
   probeCodexCliCapabilities,
   probeCursorCliCapabilities,
   probeGhCliCapabilities,
+  probeOpencodeCliCapabilities,
 } from '@ai-dev-orchestrator/agent-adapters';
 import { loadRunnerRegistry } from '@ai-dev-orchestrator/config-templates';
 import { createLogger } from '@ai-dev-orchestrator/core';
@@ -178,6 +180,25 @@ export async function dashboardCommand(
       available: false,
       status: 'degraded',
       summary: 'Probe failed — cursor CLI adapter unavailable',
+    });
+  }
+  try {
+    const opencodeProbe = await probeOpencodeCliCapabilities();
+    const { mode, summary } = normalizeOpencodeProbeResult(opencodeProbe);
+    const available = mode !== 'unavailable' && mode !== 'unauthenticated';
+    runnerHealthEntries.push({
+      id: BUILT_IN_CODING_RUNNER_ID.OPENCODE,
+      available,
+      status: mode === 'unauthenticated' ? 'unhealthy' : available ? 'healthy' : 'degraded',
+      summary,
+      version: opencodeProbe.rawVersion ?? undefined,
+    });
+  } catch {
+    runnerHealthEntries.push({
+      id: BUILT_IN_CODING_RUNNER_ID.OPENCODE,
+      available: false,
+      status: 'degraded',
+      summary: 'Probe failed — OpenCode CLI adapter unavailable',
     });
   }
   try {

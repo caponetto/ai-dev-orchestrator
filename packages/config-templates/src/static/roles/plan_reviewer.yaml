@@ -18,7 +18,7 @@ agreement_participation:
 required_capabilities:
   - reasoning
   - code_review
-model: claude-sonnet-5-thinking-high
+model: opencode/nemotron-3-ultra-free
 max_tokens: null
 dispatch_type: agent
-runner: cursor
+runner: opencode

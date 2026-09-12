@@ -770,6 +770,22 @@ describe('Budget Enforcement', () => {
         (c: unknown[]) => (c[0] as { type: string }).type === 'human_approval',
       );
       expect(approvalEvent).toBeDefined();
+      expect((approvalEvent?.[0] as { data: { reason?: string } }).data.reason).toBe(
+        'token_budget_exceeded',
+      );
+
+      const transitionEvent = appendCalls.find(
+        (c: unknown[]) =>
+          (c[0] as { type: string }).type === 'state_transition' &&
+          (c[0] as { data: { trigger?: string } }).data.trigger === 'human_approved',
+      );
+      expect(transitionEvent).toBeDefined();
+      expect(
+        (transitionEvent?.[0] as { data: { guardsEvaluated?: number } }).data.guardsEvaluated,
+      ).toBe(1);
+      expect((transitionEvent?.[0] as { data: { guardsPassed?: number } }).data.guardsPassed).toBe(
+        1,
+      );
     });
   });
 

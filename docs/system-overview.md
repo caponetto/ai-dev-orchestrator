@@ -19,7 +19,7 @@ The monorepo has twenty-seven packages:
 | Contracts      | `test-utils`          | Test fixtures and mock port implementations                      |
 | Domain         | `artifacts`           | Artifact system, ownership, agreements                           |
 | Contracts      | `agent-protocol`      | Agent-orchestrator protocol messages                             |
-| Domain         | `agent-adapters`      | CLI adapters for Claude Code, Cursor, Codex, gh-cli              |
+| Domain         | `agent-adapters`      | CLI adapters for Claude Code, Cursor, Codex, OpenCode, gh-cli    |
 | Domain         | `dependency-graph`    | Artifact dependency graph, impact analysis, staleness detection  |
 | Domain         | `execution-analytics` | Adaptive execution loop, statistical profiling, config tuning    |
 | Domain         | `governance`          | Governance engine, iteration contracts, collaboration model      |

@@ -33,6 +33,7 @@ describe('runner-registry', () => {
       expect(ids).toContain('cursor');
       expect(ids).toContain('claude-code');
       expect(ids).toContain('codex');
+      expect(ids).toContain('opencode');
     });
 
     it('cursor runner has at least one model', () => {
@@ -45,6 +46,11 @@ describe('runner-registry', () => {
     it('codex runner advertises Codex models', () => {
       const codex = loadRunnerRegistry().find((runner) => runner.id === 'codex');
       expect(codex?.models).toContain('gpt-5.6-sol');
+    });
+
+    it('opencode runner advertises OpenCode models', () => {
+      const opencode = loadRunnerRegistry().find((runner) => runner.id === 'opencode');
+      expect(opencode?.models).toContain('opencode/mimo-v2.5-free');
     });
 
     it('returns same data on consecutive calls', () => {
