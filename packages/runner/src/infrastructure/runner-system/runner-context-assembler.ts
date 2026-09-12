@@ -72,7 +72,7 @@ export class RunnerContextAssembler {
 
     if (this.executionAnalytics && !request.overrides?.model) {
       try {
-        const defaultTimeout = 600_000;
+        const defaultTimeout = 1_800_000;
         const adaptiveConfig = await this.executionAnalytics.getAdaptiveConfig(
           request.role,
           modelAssignment.model,
@@ -97,7 +97,7 @@ export class RunnerContextAssembler {
     const inputArtifacts = await this.resolveArtifacts(request);
     this.verifyAccess(role, inputArtifacts);
 
-    const defaultTimeout = 600_000;
+    const defaultTimeout = 1_800_000;
     const constraints: WorkerConstraints = {
       maxOutputTokens: modelAssignment.maxTokens ?? 4096,
       timeout: request.overrides?.timeout ?? defaultTimeout,

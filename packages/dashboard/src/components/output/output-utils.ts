@@ -12,6 +12,74 @@ export const ACTION_LABELS: Record<string, string> = {
   custom: 'Tool Call',
 };
 
+export function isToolCall(line: DashboardAgentStreamEvent): boolean {
+  const phase =
+    (line.structuredData?.['phase'] as string | undefined) ??
+    (line.protocolMessage?.payload['phase'] as string | undefined);
+  return phase === 'tool_call' || phase === 'tool_result';
+}
+
+export function isMetadataNoise(line: DashboardAgentStreamEvent): boolean {
+  const phase = line.structuredData?.['phase'];
+  const messageType =
+    (line.structuredData?.['messageType'] as string | undefined) ??
+    line.protocolMessage?.messageType;
+  return (
+    phase === 'init' ||
+    phase === 'usage_update' ||
+    phase === 'artifact_produced' ||
+    messageType === 'artifact_produced' ||
+    messageType === 'cli_prompt'
+  );
+}
+
+export interface ExtractedToolCall {
+  readonly name: string;
+  readonly timestamp: string;
+  readonly phase: 'tool_call' | 'tool_result';
+  readonly detail?: string;
+}
+
+export function extractToolCallInfo(
+  line: DashboardAgentStreamEvent,
+): ExtractedToolCall | undefined {
+  if (!isToolCall(line)) {
+    return undefined;
+  }
+  const phase = (line.structuredData?.['phase'] ?? line.protocolMessage?.payload['phase']) as
+    'tool_call' | 'tool_result';
+  const fullDetail = str(
+    line.protocolMessage?.payload['detail'] ?? line.structuredData?.['detail'] ?? line.content,
+  ).trim();
+
+  let name = fullDetail || 'tool';
+  let targetDetail: string | undefined;
+
+  const colonIdx = fullDetail.indexOf(':');
+  const spaceIdx = fullDetail.indexOf(' ');
+
+  if (colonIdx > 0 && (spaceIdx === -1 || colonIdx < spaceIdx)) {
+    name = fullDetail.slice(0, colonIdx).trim();
+    const rest = fullDetail.slice(colonIdx + 1).trim();
+    if (rest) {
+      targetDetail = rest;
+    }
+  } else if (spaceIdx > 0) {
+    name = fullDetail.slice(0, spaceIdx).trim();
+    const rest = fullDetail.slice(spaceIdx + 1).trim();
+    if (rest) {
+      targetDetail = rest;
+    }
+  }
+
+  return {
+    name,
+    timestamp: line.timestamp,
+    phase,
+    detail: targetDetail,
+  };
+}
+
 export function isToolCallNoise(line: DashboardAgentStreamEvent): boolean {
   const phase = line.structuredData?.['phase'];
   const messageType = line.structuredData?.['messageType'];
@@ -180,6 +248,7 @@ export interface MessageGroup {
   readonly sender: MessageSender;
   readonly senderLabel: string;
   readonly stateId?: string;
+  readonly isToolActivity?: boolean;
   readonly lines: readonly DashboardAgentStreamEvent[];
 }
 
@@ -188,6 +257,7 @@ export function flushGroup(
     sender: MessageSender;
     label: string;
     stateId?: string;
+    isToolActivity?: boolean;
     lines: DashboardAgentStreamEvent[];
   } | null,
 ): MessageGroup | undefined {
@@ -198,6 +268,7 @@ export function flushGroup(
     sender: current.sender,
     senderLabel: current.label,
     stateId: current.stateId,
+    isToolActivity: current.isToolActivity,
     lines: current.lines,
   };
 }
@@ -211,12 +282,14 @@ export function groupMessages(
     label: string;
     dispatchId?: string;
     stateId?: string;
+    isToolActivity?: boolean;
     lines: DashboardAgentStreamEvent[];
   } | null = null;
 
   for (const line of lines) {
     const sender = classifySender(line);
     const label = senderLabel(line);
+    const lineIsTool = isToolCall(line);
 
     if (sender === 'system') {
       const flushed = flushGroup(current);
@@ -229,7 +302,8 @@ export function groupMessages(
       current &&
       current.sender === sender &&
       current.label === label &&
-      current.dispatchId === line.dispatchId
+      current.dispatchId === line.dispatchId &&
+      Boolean(current.isToolActivity) === lineIsTool
     ) {
       current.lines.push(line);
       if (!current.stateId && line.stateId) {
@@ -245,6 +319,7 @@ export function groupMessages(
         label,
         dispatchId: line.dispatchId,
         stateId: line.stateId,
+        isToolActivity: lineIsTool,
         lines: [line],
       };
     }

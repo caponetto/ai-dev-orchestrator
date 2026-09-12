@@ -21,6 +21,7 @@ import {
   str,
 } from './output-utils';
 import { PromptButton } from './PromptModal';
+import { ToolActivityBlock } from './ToolActivityBlock';
 
 export function SystemMessage({
   line,
@@ -370,6 +371,10 @@ export const ChatBubble = React.memo(function ChatBubble({
         dispatchLabelMap={dispatchLabelMap}
       />
     );
+  }
+
+  if (group.isToolActivity) {
+    return <ToolActivityBlock group={group} dispatchLabelMap={dispatchLabelMap} />;
   }
 
   const isTaskPrompt = group.lines.some((l) => l.protocolMessage?.messageType === 'task_prompt');

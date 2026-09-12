@@ -130,22 +130,49 @@ function mapAssistantEvent(event: CursorAssistantEvent): ProtocolMessage | null 
 
 function mapToolCallEvent(event: CursorToolCallEvent): ProtocolMessage | null {
   if (event.subtype === 'started') {
-    const toolName = extractToolName(event.tool_call);
+    const detail = extractToolDetail(event.tool_call);
     return createProtocolMessage('progress', {
       phase: 'tool_call',
-      detail: toolName,
+      detail,
     });
   }
 
   if (event.subtype === 'completed') {
-    const toolName = extractToolName(event.tool_call);
+    const detail = extractToolDetail(event.tool_call);
     return createProtocolMessage('progress', {
       phase: 'tool_result',
-      detail: toolName,
+      detail,
     });
   }
 
   return null;
+}
+
+function extractToolDetail(toolCall: CursorToolCallPayload | undefined): string {
+  if (!toolCall) {
+    return 'unknown';
+  }
+  const toolName = extractToolName(toolCall);
+  for (const [key, val] of Object.entries(toolCall)) {
+    if (key.endsWith('ToolCall') && typeof val === 'object' && val !== null) {
+      const args = (val as { args?: Record<string, unknown> }).args;
+      if (args && typeof args === 'object') {
+        const target =
+          args['path'] ??
+          args['filePath'] ??
+          args['file_path'] ??
+          args['file'] ??
+          args['pattern'] ??
+          args['query'] ??
+          args['command'] ??
+          args['url'];
+        if (typeof target === 'string' && target.trim()) {
+          return `${toolName} ${target.trim()}`;
+        }
+      }
+    }
+  }
+  return toolName;
 }
 
 function extractToolName(toolCall: CursorToolCallPayload | undefined): string {
