@@ -247,10 +247,36 @@ function mapErrorEvent(event: ClaudeErrorEvent): ProtocolMessage {
 
 function mapToolEvent(event: ClaudeToolUseEvent | ClaudeToolResultEvent): ProtocolMessage {
   const toolName = event.name ?? event.tool ?? 'unknown';
+  const detail = formatClaudeToolDetail(
+    toolName,
+    (event as { input?: Record<string, unknown> }).input,
+  );
   return createProtocolMessage('progress', {
     phase: event.type === 'tool_use' ? 'tool_call' : 'tool_result',
-    detail: toolName,
+    detail,
   });
+}
+
+function formatClaudeToolDetail(toolName: string, input?: Record<string, unknown>): string {
+  if (!input || typeof input !== 'object') {
+    return toolName;
+  }
+  const target =
+    input['file_path'] ??
+    input['filePath'] ??
+    input['path'] ??
+    input['file'] ??
+    input['pattern'] ??
+    input['query'] ??
+    input['command'] ??
+    input['description'] ??
+    input['directory'] ??
+    input['dir'] ??
+    input['url'];
+  if (typeof target === 'string' && target.trim()) {
+    return `${toolName} ${target.trim()}`;
+  }
+  return toolName;
 }
 
 function mapPermissionEvent(event: ClaudePermissionEvent): ProtocolMessage {

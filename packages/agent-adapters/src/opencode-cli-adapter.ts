@@ -9,6 +9,7 @@ import type {
   OpenCodeStepStartEvent,
   OpenCodeStreamEvent,
   OpenCodeTextEvent,
+  OpenCodeToolPart,
   OpenCodeToolUseEvent,
 } from './external-event-types';
 import { parseOpenCodeEvent } from './external-event-types';
@@ -70,12 +71,41 @@ function mapTextEvent(event: OpenCodeTextEvent): ProtocolMessage | null {
 }
 
 function mapToolUseEvent(event: OpenCodeToolUseEvent): ProtocolMessage | null {
-  const toolName = event.part?.tool ?? 'unknown';
   const isCompleted = event.part?.state?.status === 'completed';
+  const detail = formatOpenCodeToolDetail(event.part);
   return createProtocolMessage('progress', {
     phase: isCompleted ? 'tool_result' : 'tool_call',
-    detail: toolName,
+    detail,
   });
+}
+
+function formatOpenCodeToolDetail(part?: OpenCodeToolPart): string {
+  if (!part) {
+    return 'unknown';
+  }
+  const toolName = part.tool ?? 'unknown';
+  if (part.title && part.title.trim() && part.title.trim() !== toolName) {
+    return part.title.trim();
+  }
+  const input = part.state?.input;
+  if (input && typeof input === 'object') {
+    const target =
+      input['filePath'] ??
+      input['file_path'] ??
+      input['path'] ??
+      input['file'] ??
+      input['pattern'] ??
+      input['query'] ??
+      input['command'] ??
+      input['description'] ??
+      input['directory'] ??
+      input['dir'] ??
+      input['url'];
+    if (typeof target === 'string' && target.trim()) {
+      return `${toolName} ${target.trim()}`;
+    }
+  }
+  return toolName;
 }
 
 function mapStepFinishEvent(event: OpenCodeStepFinishEvent): ProtocolMessage | null {

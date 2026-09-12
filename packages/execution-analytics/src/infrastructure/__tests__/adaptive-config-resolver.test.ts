@@ -198,12 +198,12 @@ describe('AdaptiveConfigResolver', () => {
     it('should clamp to MAX_TIMEOUT_MS', () => {
       const profile = makeProfile({
         timing: {
-          durationMs: { p50: 300000, p75: 400000, p90: 500000, max: 550000, ema: 350000 },
+          durationMs: { p50: 1000000, p75: 1200000, p90: 1500000, max: 2000000, ema: 1100000 },
         },
       });
       const config = resolver.resolve(profile, DEFAULT_BASELINE);
 
-      expect(config.recommendedTimeoutMs).toBe(600000);
+      expect(config.recommendedTimeoutMs).toBe(1800000);
     });
   });
 

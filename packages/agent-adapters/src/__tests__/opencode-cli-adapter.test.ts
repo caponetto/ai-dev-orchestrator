@@ -85,6 +85,40 @@ describe('OpencodeCliAdapter', () => {
     expect(toolCompleted.type).toBe('progress');
     expect(toolCompleted.payload).toMatchObject({ phase: 'tool_result', detail: 'read' });
 
+    const toolWithInput = assertMessage(
+      adapter.translateOutput(
+        JSON.stringify({
+          type: 'tool_use',
+          part: {
+            type: 'tool',
+            tool: 'read',
+            state: { status: 'completed', input: { filePath: 'src/index.ts' } },
+          },
+        }),
+      ),
+    );
+    expect(toolWithInput.payload).toMatchObject({
+      phase: 'tool_result',
+      detail: 'read src/index.ts',
+    });
+
+    const toolWithTitle = assertMessage(
+      adapter.translateOutput(
+        JSON.stringify({
+          type: 'tool_use',
+          part: {
+            type: 'tool',
+            tool: 'grep',
+            title: 'grep "SearchTerm"',
+          },
+        }),
+      ),
+    );
+    expect(toolWithTitle.payload).toMatchObject({
+      phase: 'tool_call',
+      detail: 'grep "SearchTerm"',
+    });
+
     const intermediateStepFinish = adapter.translateOutput(
       JSON.stringify({
         type: 'step_finish',

@@ -65,7 +65,7 @@ interface CliAgentRunnerConfig {
   readonly adapter?: AgentAdapter;
 }
 
-const DEFAULT_TIMEOUT_MS = 600_000; // 10 minutes
+const DEFAULT_TIMEOUT_MS = 1_800_000; // 30 minutes
 const DEFAULT_HANDSHAKE_TIMEOUT_MS = 5_000;
 const DEFAULT_LIVE_REQUEST_TIMEOUT_MS = 300_000; // 5 minutes
 const KILL_GRACE_MS = 5_000;

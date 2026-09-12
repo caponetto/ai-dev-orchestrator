@@ -100,7 +100,7 @@ describe('CursorCliAdapter', () => {
       const msg = assertMessage(adapter.translateOutput(line));
       expect(msg.type).toBe('progress');
       expect((msg.payload as { phase: string }).phase).toBe('tool_call');
-      expect((msg.payload as { detail: string }).detail).toBe('write');
+      expect((msg.payload as { detail: string }).detail).toBe('write foo.ts');
     });
 
     it('maps tool_call completed event', () => {

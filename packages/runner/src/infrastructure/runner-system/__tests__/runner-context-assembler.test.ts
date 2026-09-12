@@ -381,7 +381,7 @@ describe('RunnerContextAssembler', () => {
     });
 
     expect(context.modelAssignment.model).toBe('claude-code');
-    expect(context.constraints.timeout).toBe(600_000);
+    expect(context.constraints.timeout).toBe(1_800_000);
   });
 
   it('falls back to synthetic model assignment when no model assignment exists', async () => {

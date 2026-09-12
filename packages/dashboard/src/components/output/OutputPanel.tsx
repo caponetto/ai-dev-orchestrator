@@ -28,8 +28,8 @@ import {
   buildRoleMetaMap,
   groupMessages,
   humanizeRole,
+  isMetadataNoise,
   isStderrWarning,
-  isToolCallNoise,
   mergeAllLines,
   senderBorderColor,
   senderLabelColor,
@@ -38,6 +38,7 @@ import type { ParallelPhase } from './parallel-phases';
 import { detectParallelPhases } from './parallel-phases';
 import { ParallelPhaseBlock } from './ParallelPhaseBlock';
 import { ScriptOutputBlock } from './ScriptOutputBlock';
+import { ToolActivityBlock } from './ToolActivityBlock';
 import { TypingIndicator } from './TypingIndicator';
 
 function resolveAbortPresentation(
@@ -233,7 +234,7 @@ export function AgentOutputPanel({
     ) {
       return false;
     }
-    if (isToolCallNoise(l)) {
+    if (isMetadataNoise(l)) {
       return false;
     }
     if (isStderrWarning(l)) {
@@ -499,6 +500,21 @@ function renderMessageFlow(
           <CollapsedPermissions
             key={`perms-${String(i)}`}
             groups={nonPhaseBatch}
+            dispatchLabelMap={dispatchLabelMap}
+          />,
+        );
+      }
+      continue;
+    }
+
+    if (mg.isToolActivity) {
+      const nonPhaseTool =
+        !mg.lines[0]?.dispatchId || !phaseDispatchIds.has(mg.lines[0].dispatchId);
+      if (nonPhaseTool) {
+        rendered.push(
+          <ToolActivityBlock
+            key={`tool-activity-${String(i)}`}
+            group={mg}
             dispatchLabelMap={dispatchLabelMap}
           />,
         );

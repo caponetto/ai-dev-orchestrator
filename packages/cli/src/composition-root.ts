@@ -868,7 +868,7 @@ function sanitizeConfigForDashboard(
   roleRegistry: DefaultRoleRegistry,
   repoRoot: string,
 ): ConfigSnapshot {
-  const DEFAULT_TIMEOUT_MS = 600_000;
+  const DEFAULT_TIMEOUT_MS = 1_800_000;
   const effectiveAssignments = Object.fromEntries(
     roleRegistry.listRoles().map((role) => {
       const model = roleRegistry.getModelAssignment(role.id);

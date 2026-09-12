@@ -11,13 +11,16 @@ import {
   buildRoleMetaMap,
   classifySender,
   deduplicateRefs,
+  extractToolCallInfo,
   extractUsageUpdate,
   flushGroup,
   formatArtifactLabel,
   formatTime,
   groupMessages,
   humanizeRole,
+  isMetadataNoise,
   isStderrWarning,
+  isToolCall,
   isToolCallNoise,
   latestUsageForLines,
   logLevelIcons,
@@ -107,8 +110,62 @@ describe('isStderrWarning', () => {
 });
 
 // ---------------------------------------------------------------------------
-// isToolCallNoise
+// isToolCallNoise / isMetadataNoise / isToolCall
 // ---------------------------------------------------------------------------
+
+describe('isToolCall', () => {
+  it('returns true when phase is tool_call', () => {
+    const line = makeLine({ structuredData: { phase: 'tool_call' } });
+    expect(isToolCall(line)).toBe(true);
+  });
+
+  it('returns true when phase is tool_result', () => {
+    const line = makeLine({ structuredData: { phase: 'tool_result' } });
+    expect(isToolCall(line)).toBe(true);
+  });
+
+  it('returns false for non-tool phases', () => {
+    const line = makeLine({ structuredData: { phase: 'init' } });
+    expect(isToolCall(line)).toBe(false);
+  });
+});
+
+describe('isMetadataNoise', () => {
+  it('returns true for init, usage_update, artifact_produced, cli_prompt', () => {
+    expect(isMetadataNoise(makeLine({ structuredData: { phase: 'init' } }))).toBe(true);
+    expect(isMetadataNoise(makeLine({ structuredData: { phase: 'usage_update' } }))).toBe(true);
+    expect(isMetadataNoise(makeLine({ structuredData: { phase: 'artifact_produced' } }))).toBe(
+      true,
+    );
+    expect(isMetadataNoise(makeLine({ structuredData: { messageType: 'cli_prompt' } }))).toBe(true);
+  });
+
+  it('returns false for tool_call and tool_result', () => {
+    expect(isMetadataNoise(makeLine({ structuredData: { phase: 'tool_call' } }))).toBe(false);
+    expect(isMetadataNoise(makeLine({ structuredData: { phase: 'tool_result' } }))).toBe(false);
+  });
+});
+
+describe('extractToolCallInfo', () => {
+  it('extracts tool info from line', () => {
+    const line = makeLine({
+      timestamp: '2026-09-12T16:05:00.000Z',
+      structuredData: { phase: 'tool_result', detail: 'grep' },
+    });
+    const info = extractToolCallInfo(line);
+    expect(info).toEqual({
+      name: 'grep',
+      timestamp: '2026-09-12T16:05:00.000Z',
+      phase: 'tool_result',
+      detail: undefined,
+    });
+  });
+
+  it('returns undefined for non-tool line', () => {
+    const line = makeLine({ structuredData: { phase: 'generating' } });
+    expect(extractToolCallInfo(line)).toBeUndefined();
+  });
+});
 
 describe('isToolCallNoise', () => {
   it('returns true when phase is tool_call', () => {
@@ -740,6 +797,28 @@ describe('groupMessages', () => {
     expect(groups).toHaveLength(1);
     // stateId is set from the group constructor using line1, so it stays INTAKE
     expect(groups[0]?.stateId).toBe('INTAKE');
+  });
+
+  it('groups consecutive tool calls together and separates them from text messages', () => {
+    const textLine1 = makeLine({ roleId: 'developer', content: 'Starting work' });
+    const toolLine1 = makeLine({
+      roleId: 'developer',
+      structuredData: { phase: 'tool_call', detail: 'read' },
+    });
+    const toolLine2 = makeLine({
+      roleId: 'developer',
+      structuredData: { phase: 'tool_result', detail: 'read' },
+    });
+    const textLine2 = makeLine({ roleId: 'developer', content: 'Done reading' });
+
+    const groups = groupMessages([textLine1, toolLine1, toolLine2, textLine2]);
+    expect(groups).toHaveLength(3);
+    expect(groups[0]?.isToolActivity).toBeFalsy();
+    expect(groups[0]?.lines).toHaveLength(1);
+    expect(groups[1]?.isToolActivity).toBe(true);
+    expect(groups[1]?.lines).toHaveLength(2);
+    expect(groups[2]?.isToolActivity).toBeFalsy();
+    expect(groups[2]?.lines).toHaveLength(1);
   });
 
   it('handles multiple system messages creating separate groups each', () => {

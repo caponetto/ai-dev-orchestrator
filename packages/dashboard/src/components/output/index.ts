@@ -23,3 +23,5 @@ export type { MutableDispatch } from './parallel-phases';
 export { PromptButton, PromptModal } from './PromptModal';
 export { ScriptOutputBlock } from './ScriptOutputBlock';
 export type { ScriptOutputBlockProps } from './ScriptOutputBlock';
+export { consolidateToolCalls, ToolActivityBlock } from './ToolActivityBlock';
+export type { ToolActivityItem } from './ToolActivityBlock';
