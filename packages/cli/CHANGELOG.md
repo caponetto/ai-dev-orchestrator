@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/caponetto/ai-dev-orchestrator/compare/cli-v0.1.4...cli-v0.1.5) (2026-09-12)
+
+
+### Features
+
+* enhance tool activity tracking and timeout configurations ([#41](https://github.com/caponetto/ai-dev-orchestrator/issues/41)) ([bdb24de](https://github.com/caponetto/ai-dev-orchestrator/commit/bdb24deacb76cc58741bb32e921a3caf678e2d1f))
+
 ## [0.1.4](https://github.com/caponetto/ai-dev-orchestrator/compare/cli-v0.1.3...cli-v0.1.4) (2026-09-12)
 
 
