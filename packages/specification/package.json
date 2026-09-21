@@ -32,8 +32,8 @@
   "dependencies": {
     "@ai-dev-orchestrator/ports": "workspace:*",
     "@ai-dev-orchestrator/schemas": "workspace:*",
-    "yaml": "^2.9.0",
-    "zod": "^4.5.4"
+    "yaml": "^2.9.1",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@ai-dev-orchestrator/build-config": "workspace:*",

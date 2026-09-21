@@ -38,9 +38,9 @@
     "@ai-dev-orchestrator/schemas": "workspace:*",
     "@ai-dev-orchestrator/utils": "workspace:*",
     "@hono/node-server": "^2.1.1",
-    "hono": "^4.13.5",
-    "yaml": "^2.9.0",
-    "zod": "^4.5.4"
+    "hono": "^4.13.8",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@ai-dev-orchestrator/build-config": "workspace:*",
