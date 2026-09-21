@@ -35,7 +35,7 @@
   },
   "devDependencies": {
     "@ai-dev-orchestrator/build-config": "workspace:*",
-    "fast-check": "^4.9.0",
+    "fast-check": "^4.10.1",
     "vitest": "^4.1.11"
   }
 }
