@@ -58,8 +58,9 @@ Keep the final artifact concise and source-grounded: include only fetched or syn
 Before producing output, perform this internal analysis. Do not include private reasoning in the artifact; output only the required JSON fields:
 
 1. **Parse the input.** Identify references to issue tracker tickets (IDs, URLs) and pull request references (URLs, branch names, PR numbers).
-2. **Fetch issue/ticket details.** Use available tools (MCP tools, CLI commands, or API calls) to retrieve the full issue description, acceptance criteria, priority, linked issues, and any discussion/comments.
-3. **Fetch PR details.** Retrieve the PR title, description, list of changed files, the diff, review comments/discussions, **branch metadata**, and **disposition signals** (draft status, labels such as `do-not-merge`/`work-in-progress`, and any author statement of intent such as "conversation starter" or "RFC").
+2. **Fetch explicitly supplied supporting URLs.** Fetch URLs in the original user prompt that provide context beyond the PR or issue, such as a Gist or raw document. Include relevant fetched content in the output `sources` array. If a URL cannot be fetched, record the failure instead of silently ignoring it.
+3. **Fetch issue/ticket details.** Use available tools (MCP tools, CLI commands, or API calls) to retrieve the full issue description, acceptance criteria, priority, linked issues, and any discussion/comments.
+4. **Fetch PR details.** Retrieve the PR title, description, list of changed files, the diff, review comments/discussions, **branch metadata**, and **disposition signals** (draft status, labels such as `do-not-merge`/`work-in-progress`, and any author statement of intent such as "conversation starter" or "RFC").
    - **Branch metadata (critical):** Always fetch the PR's base and head branch names. Use `gh pr view <PR_NUMBER> --json baseRefName,headRefName,url` or equivalent MCP tools. These must be included in the output `prMetadata` field so downstream reviewers know exactly which branches to diff and read files from. Do NOT assume `main` or `master` — the target branch could be `develop`, `release/*`, or any other branch.
    - **PR disposition (critical):** Capture draft/WIP labels and author intent in `prDisposition` so downstream synthesis can calibrate verdict tone. Use `gh pr view <PR_NUMBER> --json isDraft,labels,body,title` or equivalent.
    - **Diff retrieval strategy (try in order):**
@@ -68,7 +69,7 @@ Before producing output, perform this internal analysis. Do not include private 
      3. Otherwise, use remote tools (MCP servers such as GitHub, GitLab, or `gh pr diff <PR_NUMBER> --repo <owner>/<repo>`) to fetch the diff via API.
      4. If neither strategy succeeds, produce a limited-scope review noting which files you could NOT review due to inaccessible diff.
    - **PR metadata and comments:** Use remote tools (`gh pr view`, MCP servers) to fetch the PR title, description, and review comments/discussions — these are not available locally. PR comments often contain prior review feedback, approach decisions, and design rationale that downstream reviewers need.
-4. **Correlate intent with changes.** Map each acceptance criterion or stated goal from the ticket to specific code changes in the PR. Identify:
+5. **Correlate intent with changes.** Map each acceptance criterion or stated goal from the ticket to specific code changes in the PR. Identify:
    - Ticket items fully addressed by the PR
    - Ticket items partially addressed or not addressed
    - Code changes not covered by any ticket item (scope creep or implicit requirements)
@@ -77,9 +78,9 @@ Before producing output, perform this internal analysis. Do not include private 
      - **Reconnect / retry UX** — not automatic degradation to an alternate data path
      - **Documented intent** — not implemented behavior
        When intent and implementation diverge, use `partiallyAddressed` with a note explaining the gap.
-5. **Classify change type.** When classifying `extensions.changeType`, set `"refactor"` only when ALL of: (1) the PR description or ticket describes a structural/organizational change, (2) no new public API surface is introduced, (3) no behavioral logic is added or modified, (4) the diff consists of import changes, file moves, re-exports, and/or package boundary adjustments. When uncertain, default to `"code"`.
-6. **Identify risks.** Flag changes that touch critical paths, security-sensitive code, or shared infrastructure without explicit ticket coverage.
-7. **Synthesize.** Combine findings into a unified context document that gives reviewers everything they need to evaluate the PR.
+6. **Classify change type.** When classifying `extensions.changeType`, set `"refactor"` only when ALL of: (1) the PR description or ticket describes a structural/organizational change, (2) no new public API surface is introduced, (3) no behavioral logic is added or modified, (4) the diff consists of import changes, file moves, re-exports, and/or package boundary adjustments. When uncertain, default to `"code"`.
+7. **Identify risks.** Flag changes that touch critical paths, security-sensitive code, or shared infrastructure without explicit ticket coverage.
+8. **Synthesize.** Combine findings into a unified context document that gives reviewers everything they need to evaluate the PR.
 
 ## Input
 

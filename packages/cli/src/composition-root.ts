@@ -124,7 +124,7 @@ import {
 import { LifecycleController } from '@ai-dev-orchestrator/workflow';
 
 import type { ConfigSnapshot } from './config-snapshot';
-import { configSnapshotSchema } from './config-snapshot';
+import { configSnapshotSchema, resolveRunModelAssignments } from './config-snapshot';
 import { loadDefaultWorkflow, loadProjectConfig } from './project-config';
 import {
   getAiDir,
@@ -356,6 +356,7 @@ async function buildRunnerRegistry(
         command: 'opencode',
         args: ['run', '--format', 'json', '--auto'],
         adapter: createOpencodeCliAdapter(),
+        availableModels: opencodeProbe.availableModels,
       });
       opencodeRunner.setPermissionPolicy(policy);
       opencodeRunner.setApprovalStore(approvalStore);
@@ -486,11 +487,15 @@ async function buildOrchestratorInfra(params: InfraParams): Promise<InfraResult>
   const {
     isFixture,
     configDispatchOverrides,
-    configModelAssignments,
+    configModelAssignments: currentModelAssignments,
     warnings,
     permissionPolicyConfig,
     mergedConfig: config,
   } = loadConfiguration();
+  const configModelAssignments = resolveRunModelAssignments(
+    currentModelAssignments,
+    readPersistedConfigSnapshot(runDir),
+  );
 
   const statePersistence = new DefaultStatePersistence(runsDir);
   const manifestProducer = new DefaultManifestProducer();
@@ -783,15 +788,19 @@ export function loadAllWorkflows(): WorkflowDefinition[] {
 }
 
 function readPersistedSources(runDir: string): readonly string[] {
+  return readPersistedConfigSnapshot(runDir)?.sources ?? [];
+}
+
+function readPersistedConfigSnapshot(runDir: string): ConfigSnapshot | null {
   const snapshotPath = getConfigSnapshotPath(runDir);
   if (!existsSync(snapshotPath)) {
-    return [];
+    return null;
   }
   try {
     const result = safeJsonParse(readFileSync(snapshotPath, 'utf-8'), configSnapshotSchema);
-    return result.success ? (result.data.sources ?? []) : [];
+    return result.success ? result.data : null;
   } catch {
-    return [];
+    return null;
   }
 }
 

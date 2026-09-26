@@ -63,7 +63,17 @@ describe('CodexCliAdapter', () => {
         JSON.stringify({ type: 'turn.failed', error: { message: 'rate limited' } }),
       ),
     );
-    expect(error.payload).toMatchObject({ code: 'CODEX_CLI_ERROR', message: 'rate limited' });
+    expect(error.payload).toMatchObject({
+      code: 'CODEX_CLI_ERROR',
+      message: 'rate limited',
+      recoverable: true,
+    });
+    const permissionError = assertMessage(
+      adapter.translateOutput(
+        JSON.stringify({ type: 'turn.failed', error: { message: 'Permission denied' } }),
+      ),
+    );
+    expect(permissionError.payload).toMatchObject({ recoverable: false });
   });
 
   it('ignores malformed and unsupported output', () => {

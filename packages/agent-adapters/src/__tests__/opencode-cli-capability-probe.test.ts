@@ -16,12 +16,13 @@ describe('probeOpencodeCliCapabilities', () => {
       execFn: mockExec({
         '--version': { stdout: '1.18.30\n', exitCode: 0 },
         'run --help': { stdout: '--format --auto --model -m, --model', exitCode: 0 },
-        models: { stdout: 'opencode/mimo-v2.5-free\n', exitCode: 0 },
+        models: { stdout: 'opencode/mimo-v2.6-flash-free\n', exitCode: 0 },
       }),
     });
     expect(result.adapterName).toBe('opencode');
     expect(result.rawVersion).toBe('1.18.30');
     expect(result.authenticated).toBe(true);
+    expect(result.availableModels).toEqual(['opencode/mimo-v2.6-flash-free']);
     expect(result.capabilities.structuredIO).toBe(true);
     expect(normalizeOpencodeProbeResult(result)).toMatchObject({ mode: 'streaming' });
   });
@@ -51,7 +52,7 @@ describe('probeOpencodeCliCapabilities', () => {
       execFn: mockExec({
         '--version': { stdout: '1.18.30', exitCode: 0 },
         'run --help': { stdout: 'basic help', exitCode: 0 },
-        models: { stdout: 'opencode/mimo-v2.5-free', exitCode: 0 },
+        models: { stdout: 'opencode/mimo-v2.6-flash-free', exitCode: 0 },
       }),
     });
     expect(result.capabilities.structuredIO).toBe(false);

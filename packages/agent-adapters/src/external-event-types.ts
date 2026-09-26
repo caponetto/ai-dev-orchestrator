@@ -13,6 +13,7 @@
 interface VendorContentBlock {
   readonly type: string;
   readonly text?: string;
+  readonly name?: string;
 }
 
 export interface VendorAssistantMessage {
@@ -65,6 +66,7 @@ export interface ClaudeAssistantEvent {
 export interface ClaudeResultEvent {
   readonly type: 'result';
   readonly result?: string;
+  readonly is_error?: boolean;
   readonly usage?: VendorTokenUsage;
 }
 
@@ -154,6 +156,9 @@ export interface CursorToolCallEvent {
 
 export interface CursorResultEvent {
   readonly type: 'result';
+  readonly subtype?: string;
+  readonly is_error?: boolean;
+  readonly result?: string;
   readonly duration_ms?: number;
   readonly usage?: VendorTokenUsage;
 }

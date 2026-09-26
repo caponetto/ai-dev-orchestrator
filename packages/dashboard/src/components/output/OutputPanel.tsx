@@ -47,7 +47,9 @@ function resolveAbortPresentation(
   systemFailureReason: string | null,
 ): { variant: AbortVariant; reason: string; timestamp?: string } | null {
   if (runStatus !== 'aborted' && runStatus !== 'interrupted') {
-    return null;
+    return runStatus === 'failed'
+      ? { variant: 'run-failed', reason: systemFailureReason ?? 'A workflow step failed' }
+      : null;
   }
 
   if (runStatus === 'interrupted') {
@@ -156,6 +158,7 @@ export function AgentOutputPanel({
   const systemFailureReason = useMemo(() => {
     let pendingStderr = '';
     let lastFailure: string | null = null;
+    let modelFailure: string | null = null;
 
     for (const group of groups.values()) {
       for (const line of group.lines) {
@@ -165,6 +168,12 @@ export function AgentOutputPanel({
         }
         if (line.roleId === 'script' && line.type === 'stderr' && line.content.trim()) {
           pendingStderr += (pendingStderr ? '\n' : '') + line.content.trim();
+        }
+        if (line.type === 'stderr' && sd?.phase === 'error' && line.content.trim()) {
+          lastFailure = line.content.trim();
+          if (sd.code === 'model_unavailable') {
+            modelFailure = lastFailure;
+          }
         }
         if (
           sd?.messageType === 'script_completed' &&
@@ -179,7 +188,7 @@ export function AgentOutputPanel({
       }
     }
 
-    return lastFailure;
+    return modelFailure ?? lastFailure;
   }, [groups]);
 
   const abortPresentation = useMemo(

@@ -18,6 +18,13 @@ describe('parseGitHubPrSource', () => {
     expect(result).toEqual({ owner: 'opendatahub-io', repo: 'elyra', prNumber: 179 });
   });
 
+  it('extracts a PR URL from a prompt and ignores other URLs', () => {
+    const result = parseGitHubPrSource(
+      'Review https://github.com/opendatahub-io/odh-dashboard/pull/9863 considering https://gist.githubusercontent.com/user/id/raw/review.md',
+    );
+    expect(result).toEqual({ owner: 'opendatahub-io', repo: 'odh-dashboard', prNumber: 9863 });
+  });
+
   it('parses GitHub PR URL with trailing slash', () => {
     const result = parseGitHubPrSource('https://github.com/acme/widgets/pull/42/');
     expect(result).toEqual({ owner: 'acme', repo: 'widgets', prNumber: 42 });

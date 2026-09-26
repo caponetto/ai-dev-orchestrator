@@ -318,6 +318,7 @@ export const agentResultSchema = z.object({
   status: z.enum(['success', 'failure', 'timeout']),
   artifactContent: z.string().optional(),
   error: z.string().optional(),
+  recoverable: z.boolean().optional(),
   durationMs: z.number(),
   tokenUsage: agentTokenUsageSchema.optional(),
 });

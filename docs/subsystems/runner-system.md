@@ -30,6 +30,10 @@ The CLI composition root probes supported local environments and currently wires
 
 The OpenCode runner invokes `opencode run --format json --auto`, forwarding the configured role model through `--model`. It records token usage per message/step from `step_finish` events. Like Codex, OpenCode does not speak the orchestrator handshake protocol, so the prompt is passed via argv with `stdin: ignore`.
 
+At startup, the OpenCode capability probe records the models reported by `opencode models`. Before dispatch, the runner rejects a configured model missing from that list and emits an actionable error in the run stream. The dashboard shows the failure reason in the run's Chat tab. If model discovery returns no usable list, dispatch proceeds and OpenCode reports its own errors.
+
+Claude Code, Codex, Cursor, and OpenCode use a shared retry policy for transient service errors. The CLI runner retries once after a short delay only when the agent has not used a tool or reported token usage. Both attempts share the task's original timeout, and the retry appears in the run stream. Cursor can report a service failure by exiting without a final result event; the runner also checks stderr from a nonzero exit in that case. Errors after tool work begins are returned without an automatic retry to avoid repeating side effects.
+
 Codex approval prompts are bridged to the orchestrator dashboard through a Codex `PermissionRequest` hook. Before each Codex dispatch, the runner writes a per-run hook launcher under `.ai/runs/<run-id>/` and passes a `-c hooks.PermissionRequest=...` override plus `--dangerously-bypass-hook-trust`. The hook invokes `ai codex-permission-hook`, which maps Codex approval requests into the same `DefaultPermissionPolicy` and `FileBackedLiveRequestStore` flow used by Claude Code and Cursor. Writes under `~/.ai/` are auto-granted; other operations surface as dashboard permission prompts.
 
 ## Protocol and Sessions

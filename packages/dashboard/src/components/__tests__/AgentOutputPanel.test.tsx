@@ -132,6 +132,35 @@ describe('AgentOutputPanel', () => {
     expect(screen.queryByText('Aborted the run')).not.toBeInTheDocument();
   });
 
+  it('shows the agent failure reason for a failed run', () => {
+    const reason =
+      'OpenCode model "opencode/mimo-v2.5-free" is unavailable. Run "opencode models" to list available models.';
+    const groups = makeGroups([
+      makeLine({
+        type: 'stderr',
+        content: reason,
+        structuredData: { messageType: 'error', phase: 'error', code: 'model_unavailable' },
+      }),
+      makeLine({
+        roleId: 'script',
+        type: 'stderr',
+        content: 'Missing agent output',
+        structuredData: { messageType: 'error', phase: 'error', code: 'script_failure' },
+      }),
+    ]);
+    renderWithRouter(
+      <AgentOutputPanel
+        groups={groups}
+        status="connected"
+        isRunActive={false}
+        runStatus="failed"
+      />,
+    );
+
+    expect(screen.getByText('Run failed')).toBeInTheDocument();
+    expect(screen.getAllByText(reason)).toHaveLength(2);
+  });
+
   it('shows interrupted message for interrupted run', () => {
     const lines = [makeLine()];
     const groups = makeGroups(lines);

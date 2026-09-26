@@ -10,6 +10,7 @@ import type {
   CodexTurnFailedEvent,
 } from './external-event-types';
 import { parseCodexEvent } from './external-event-types';
+import { isTransientCliError } from './transient-cli-error';
 
 /** Enable outbound network in workspace-write so tools like `gh` can reach api.github.com. */
 export const CODEX_WORKSPACE_WRITE_NETWORK_CONFIG =
@@ -91,10 +92,11 @@ function mapTurnCompletedEvent(_event: CodexTurnCompletedEvent): ProtocolMessage
 }
 
 function mapErrorEvent(event: CodexTurnFailedEvent): ProtocolMessage {
+  const message = event.error?.message ?? event.message ?? 'Codex CLI failed';
   return createProtocolMessage('error', {
     code: 'CODEX_CLI_ERROR',
-    message: event.error?.message ?? event.message ?? 'Codex CLI failed',
-    recoverable: false,
+    message,
+    recoverable: isTransientCliError(message),
   });
 }
 

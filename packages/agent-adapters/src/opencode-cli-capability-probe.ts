@@ -4,6 +4,7 @@ import type { AgentAdapterCapabilities, CapabilityProbeResult } from './adapter-
 
 export interface OpencodeProbeResult extends CapabilityProbeResult {
   readonly authenticated: boolean | null;
+  readonly availableModels?: readonly string[];
 }
 
 interface OpencodeProbeOptions {
@@ -19,6 +20,7 @@ export async function probeOpencodeCliCapabilities(
   const notes: string[] = [];
   let rawVersion: string | null = null;
   let authenticated: boolean | null = null;
+  let availableModels: readonly string[] | undefined;
   let capabilities: AgentAdapterCapabilities = {
     structuredIO: false,
     permissionEvents: false,
@@ -65,6 +67,12 @@ export async function probeOpencodeCliCapabilities(
   try {
     const models = await exec(command, ['models']);
     authenticated = models.exitCode === 0;
+    if (authenticated) {
+      availableModels = models.stdout
+        .split(/\r?\n/u)
+        .map((model) => model.trim())
+        .filter((model) => /^[^\s/]+\/[^\s/]+$/u.test(model));
+    }
     notes.push(
       authenticated ? 'Models available (including free providers)' : 'Models check failed',
     );
@@ -78,6 +86,7 @@ export async function probeOpencodeCliCapabilities(
     capabilities,
     rawVersion,
     authenticated,
+    availableModels,
     notes,
   };
 }
