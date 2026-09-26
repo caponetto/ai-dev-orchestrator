@@ -5,7 +5,7 @@ import { cn } from '../../lib/utils';
 import { Timestamp } from './line-renderers';
 import { senderBorderColor, senderLabelColor } from './output-utils';
 
-export type AbortVariant = 'aborted' | 'interrupted' | 'failed';
+export type AbortVariant = 'aborted' | 'interrupted' | 'failed' | 'run-failed';
 
 const VARIANT_COPY: Record<
   AbortVariant,
@@ -26,6 +26,11 @@ const VARIANT_COPY: Record<
     title: 'Run aborted',
     colorClass: 'text-red-400',
   },
+  'run-failed': {
+    sender: 'orchestrator',
+    title: 'Run failed',
+    colorClass: 'text-red-400',
+  },
 };
 
 export function AbortMessage({
@@ -33,7 +38,7 @@ export function AbortMessage({
   reason,
   variant = 'aborted',
 }: Readonly<{ timestamp?: string; reason: string; variant?: AbortVariant }>) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(variant === 'failed' || variant === 'run-failed');
   const { sender, title, colorClass } = VARIANT_COPY[variant];
   return (
     <div className="mb-3">

@@ -50,7 +50,7 @@ describe('runner-registry', () => {
 
     it('opencode runner advertises OpenCode models', () => {
       const opencode = loadRunnerRegistry().find((runner) => runner.id === 'opencode');
-      expect(opencode?.models).toContain('opencode/mimo-v2.5-free');
+      expect(opencode?.models).toContain('opencode/mimo-v2.6-flash-free');
     });
 
     it('returns same data on consecutive calls', () => {

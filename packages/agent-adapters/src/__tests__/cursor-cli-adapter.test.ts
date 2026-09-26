@@ -124,6 +124,16 @@ describe('CursorCliAdapter', () => {
       expect((msg.payload as { summary: string }).summary).toContain('5432');
     });
 
+    it('maps an error result to a recoverable failure when the service is unavailable', () => {
+      const msg = assertMessage(
+        adapter.translateOutput(
+          JSON.stringify({ type: 'result', is_error: true, result: 'Service unavailable' }),
+        ),
+      );
+      expect(msg.type).toBe('error');
+      expect(msg.payload).toMatchObject({ recoverable: true });
+    });
+
     it('ignores unknown event types', () => {
       const line = JSON.stringify({ type: 'unknown_event' });
       expect(adapter.translateOutput(line)).toBeNull();

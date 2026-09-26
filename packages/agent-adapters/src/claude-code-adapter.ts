@@ -21,6 +21,7 @@ import type {
   VendorAssistantMessage,
 } from './external-event-types';
 import { narrowClaudeCodeEvent } from './external-event-types';
+import { isTransientCliError } from './transient-cli-error';
 
 type ClaudeCodeMode = 'native' | 'experimental' | 'text-only';
 
@@ -220,17 +221,35 @@ function mapAssistantEvent(event: ClaudeAssistantEvent): ProtocolMessage | null 
   if (!event.message) {
     return null;
   }
-  const content = extractAssistantContent(event.message);
-  if (!content) {
+  const content = event.message.content;
+  if (content && typeof content !== 'string') {
+    const tool = content.find((block) => block.type === 'tool_use');
+    if (tool) {
+      return createProtocolMessage('progress', {
+        phase: 'tool_call',
+        detail: tool.name ?? 'tool_use',
+      });
+    }
+  }
+  const text = extractAssistantContent(event.message);
+  if (!text) {
     return null;
   }
   return createProtocolMessage('progress', {
     phase: 'generating',
-    detail: content,
+    detail: text,
   });
 }
 
 function mapResultEvent(event: ClaudeResultEvent): ProtocolMessage {
+  if (event.is_error) {
+    const message = event.result ?? 'Claude Code failed';
+    return createProtocolMessage('error', {
+      code: 'CLAUDE_CODE_ERROR',
+      message,
+      recoverable: isTransientCliError(message),
+    });
+  }
   return createProtocolMessage('done', {
     summary: event.result ?? 'completed',
   });
@@ -241,7 +260,7 @@ function mapErrorEvent(event: ClaudeErrorEvent): ProtocolMessage {
   return createProtocolMessage('error', {
     code: 'CLAUDE_CODE_ERROR',
     message: errorMsg,
-    recoverable: false,
+    recoverable: isTransientCliError(errorMsg),
   });
 }
 

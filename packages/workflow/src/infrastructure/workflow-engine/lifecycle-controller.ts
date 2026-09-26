@@ -193,6 +193,7 @@ export class LifecycleController implements WorkflowEngine {
     this.transitionCount = state.transitionCount;
     this.stateHistory = new StateHistory(state.stateHistory);
     this.waitingContext = state.waitingContext ?? null;
+    this.interruptedActionResults = state.interruptedActionResults ?? null;
     this.startedAt = Date.now();
 
     this.dispatcher.setUserPrompt(config.sources[0]);
@@ -1671,6 +1672,7 @@ export class LifecycleController implements WorkflowEngine {
         Object.entries(this.workerMetricsByRole).map(([k, v]) => [k, { ...v }]),
       ),
       stateTimestamps: this.stateTimestamps.map((e) => ({ ...e })),
+      interruptedActionResults: this.interruptedActionResults ?? undefined,
     };
     await this.statePersistence.save(state);
     await this.writeInterimManifest();

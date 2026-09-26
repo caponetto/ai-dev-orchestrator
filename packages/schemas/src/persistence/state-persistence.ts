@@ -3,6 +3,7 @@ import { z } from 'zod/v4';
 import { artifactRefSchema } from '../artifacts/artifact-system';
 import { runIdSchema } from '../shared/shared';
 import { liveRequestKindSchema, sessionTransportSchema } from '../shared/string-enums';
+import type { ActionResult } from '../workflow/workflow-engine';
 
 export const budgetExhaustionContextSchema = z.object({
   limitType: z.literal('token'),
@@ -79,6 +80,8 @@ export const persistedStateSchema = z.object({
     )
     .readonly()
     .optional(),
+  /** Action results completed before a post-action budget pause. */
+  interruptedActionResults: z.array(z.custom<ActionResult>()).readonly().optional(),
 });
 export type PersistedState = z.infer<typeof persistedStateSchema>;
 

@@ -10,6 +10,7 @@ import {
   parseCodexEvent,
   parseCursorEvent,
   parseOpenCodeEvent,
+  isTransientCliError,
 } from '@ai-dev-orchestrator/agent-adapters';
 import type {
   AgentToOrchestratorMessage,
@@ -44,6 +45,7 @@ import {
 import { getErrorMessage } from '@ai-dev-orchestrator/utils';
 import { execa } from 'execa';
 
+import { dispatchWithTransientRetry } from './cli-retry-policy';
 import type { CodexPermissionBridgeConfig } from './codex-permission-hook';
 import {
   buildCodexPermissionHookArgs,
@@ -63,6 +65,7 @@ interface CliAgentRunnerConfig {
   readonly handshakeTimeoutMs?: number;
   readonly liveRequestTimeoutMs?: number;
   readonly adapter?: AgentAdapter;
+  readonly availableModels?: readonly string[];
 }
 
 const DEFAULT_TIMEOUT_MS = 1_800_000; // 30 minutes
@@ -232,9 +235,47 @@ export class CliAgentRunner implements SessionCapableRunner {
     task: AgentTask,
     onStreamEvent?: (event: AgentOutputStreamEvent) => void,
   ): Promise<AgentResult> {
-    const startTime = Date.now();
+    if (
+      this.config.adapter?.name === BUILT_IN_CODING_RUNNER_ID.OPENCODE &&
+      task.modelHint &&
+      this.config.availableModels?.length &&
+      !this.config.availableModels.includes(task.modelHint)
+    ) {
+      const message =
+        `OpenCode model "${task.modelHint}" is unavailable. ` +
+        'Choose an available model in the run configuration. Run "opencode models" to list available models.';
+      onStreamEvent?.({
+        timestamp: new Date().toISOString(),
+        type: 'stderr',
+        content: message,
+        structuredData: {
+          messageType: 'error',
+          phase: 'error',
+          code: 'model_unavailable',
+          sender: 'orchestrator',
+        },
+      });
+      return { taskId: task.taskId, status: 'failure', error: message, durationMs: 0 };
+    }
     const timeoutMs =
       task.constraints.timeout || this.config.defaultTimeoutMs || DEFAULT_TIMEOUT_MS;
+    return dispatchWithTransientRetry(
+      this.config.adapter?.name,
+      timeoutMs,
+      (remainingTimeoutMs, onEvent) => this.dispatchOnce(task, onEvent, remainingTimeoutMs),
+      onStreamEvent,
+    );
+  }
+
+  private async dispatchOnce(
+    task: AgentTask,
+    onStreamEvent?: (event: AgentOutputStreamEvent) => void,
+    timeoutOverrideMs?: number,
+  ): Promise<AgentResult> {
+    const startTime = Date.now();
+    const timeoutMs =
+      timeoutOverrideMs ??
+      (task.constraints.timeout || this.config.defaultTimeoutMs || DEFAULT_TIMEOUT_MS);
 
     const taskFilePath = `${task.runDir}/agent-tasks/${task.taskId}.json`;
     await mkdir(dirname(taskFilePath), { recursive: true });
@@ -321,6 +362,7 @@ export class CliAgentRunner implements SessionCapableRunner {
       let deltaOutputTokens = 0;
       let finalUsage: AgentTokenUsage | undefined;
       let lastAgentArtifactJson: string | undefined;
+      let processStderr = '';
       const getTokenUsage = (): AgentTokenUsage | undefined => {
         if (finalUsage) {
           return finalUsage;
@@ -492,6 +534,7 @@ export class CliAgentRunner implements SessionCapableRunner {
               taskId: task.taskId,
               status: 'failure',
               error: errorMsg,
+              recoverable: message.payload.recoverable,
               durationMs: Date.now() - startTime,
               tokenUsage: getTokenUsage(),
             });
@@ -556,6 +599,7 @@ export class CliAgentRunner implements SessionCapableRunner {
       });
 
       transport.onStderr((data: string) => {
+        processStderr = (processStderr + data).slice(-4096);
         onStreamEvent?.({
           timestamp: new Date().toISOString(),
           type: 'stderr',
@@ -578,7 +622,7 @@ export class CliAgentRunner implements SessionCapableRunner {
       // before deciding whether the agent produced output. The 'exit' event
       // fires before stdio streams are closed, so a late `result` event
       // sitting in the stdout buffer would be missed.
-      subprocess.nodeChildProcess.on('close', () => {
+      subprocess.nodeChildProcess.on('close', (code: number | null, signal: string | null) => {
         if (!protocolResolved && !doneHandled && protocolFinish) {
           if (finalArtifact) {
             protocolFinish({
@@ -598,7 +642,22 @@ export class CliAgentRunner implements SessionCapableRunner {
             ).then(
               (result) => {
                 if (protocolFinish) {
-                  protocolFinish(result);
+                  const stderr = processStderr.trim();
+                  if (
+                    result.status === 'failure' &&
+                    code !== null &&
+                    code !== 0 &&
+                    !signal &&
+                    isTransientCliError(stderr)
+                  ) {
+                    protocolFinish({
+                      ...result,
+                      error: `Agent process failed: ${stderr}`,
+                      recoverable: true,
+                    });
+                  } else {
+                    protocolFinish(result);
+                  }
                 }
               },
               (error: unknown) => {

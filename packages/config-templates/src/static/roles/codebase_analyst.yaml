@@ -15,7 +15,7 @@ agreement_participation: []
 required_capabilities:
   - reasoning
   - code_review
-model: opencode/mimo-v2.5-free
+model: opencode/mimo-v2.6-flash-free
 max_tokens: null
 dispatch_type: agent
 runner: opencode

@@ -153,8 +153,15 @@ describe('OpencodeCliAdapter', () => {
     expect(error.payload).toMatchObject({
       code: 'OPENCODE_CLI_ERROR',
       message: 'Unexpected server error',
-      recoverable: false,
+      recoverable: true,
     });
+
+    const permissionError = assertMessage(
+      adapter.translateOutput(
+        JSON.stringify({ type: 'error', error: { data: { message: 'Permission denied' } } }),
+      ),
+    );
+    expect(permissionError.payload).toMatchObject({ recoverable: false });
   });
 
   it('ignores malformed and unsupported output', () => {

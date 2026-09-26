@@ -69,6 +69,30 @@ describe('ClaudeCodeAdapter', () => {
       expect((result.payload as { message: string }).message).toBe('Something broke');
     });
 
+    it('classifies transient errors and failed result events', () => {
+      const adapter = new ClaudeCodeAdapter();
+      const error = adapter.translateOutput(
+        JSON.stringify({ type: 'error', error: 'Service unavailable' }),
+      );
+      expect(error?.payload).toMatchObject({ recoverable: true });
+
+      const failedResult = adapter.translateOutput(
+        JSON.stringify({ type: 'result', is_error: true, result: 'Permission denied' }),
+      );
+      expect(failedResult?.type).toBe('error');
+      expect(failedResult?.payload).toMatchObject({ recoverable: false });
+    });
+
+    it('reports tool use embedded in an assistant message', () => {
+      const adapter = new ClaudeCodeAdapter();
+      const event = {
+        type: 'assistant',
+        message: { content: [{ type: 'tool_use', name: 'Bash' }] },
+      };
+      const result = adapter.translateOutput(JSON.stringify(event));
+      expect(result?.payload).toMatchObject({ phase: 'tool_call', detail: 'Bash' });
+    });
+
     it('maps tool_use event to progress message', () => {
       const adapter = new ClaudeCodeAdapter();
       const event = { type: 'tool_use', name: 'Read' };

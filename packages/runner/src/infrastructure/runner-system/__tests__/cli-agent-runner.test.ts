@@ -3,6 +3,12 @@ import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import type { AgentAdapter } from '@ai-dev-orchestrator/agent-adapters';
+import {
+  ClaudeCodeAdapter,
+  CodexCliAdapter,
+  CursorCliAdapter,
+  createOpencodeCliAdapter,
+} from '@ai-dev-orchestrator/agent-adapters';
 import type { ProtocolMessage } from '@ai-dev-orchestrator/agent-protocol';
 import { createProtocolMessage } from '@ai-dev-orchestrator/agent-protocol';
 import type {
@@ -67,6 +73,29 @@ function protocolScript(messages: string[]): string {
 }
 
 describe('CliAgentRunner', () => {
+  it('reports an unavailable OpenCode model before starting the agent', async () => {
+    const task = makeTask({ modelHint: 'opencode/mimo-v2.5-free' });
+    const runner = new CliAgentRunner({
+      command: 'opencode',
+      adapter: createOpencodeCliAdapter(),
+      availableModels: ['opencode/mimo-v2.6-flash-free'],
+    });
+    const events: AgentOutputStreamEvent[] = [];
+
+    const result = await runner.dispatch(task, (event) => events.push(event));
+
+    expect(result).toMatchObject({
+      status: 'failure',
+    });
+    expect(result.recoverable).toBeUndefined();
+    expect(result.error).toContain('opencode/mimo-v2.5-free');
+    expect(result.error).toContain('opencode models');
+    expect(events).toHaveLength(1);
+    expect(events[0]?.type).toBe('stderr');
+    expect(events[0]?.structuredData?.['phase']).toBe('error');
+    expect(events[0]?.structuredData?.['code']).toBe('model_unavailable');
+  });
+
   it('dispatches a task and reads successful output', async () => {
     const task = makeTask();
     await preWriteOutput(task, {
@@ -752,7 +781,7 @@ PY`,
     });
 
     it('passes prompt and model for opencode adapter', async () => {
-      const task = makeTask({ modelHint: 'opencode/mimo-v2.5-free' });
+      const task = makeTask({ modelHint: 'opencode/mimo-v2.6-flash-free' });
       await preWriteOutput(task, { summary: 'done' });
       const capturedArgsPath = join(tempDir, 'opencode-args.json');
       const adapter: AgentAdapter = {
@@ -786,9 +815,140 @@ PY`,
       expect(args).not.toContain('--task-file');
       const modelIdx = args.indexOf('--model');
       expect(modelIdx).toBeGreaterThanOrEqual(0);
-      expect(args[modelIdx + 1]).toBe('opencode/mimo-v2.5-free');
+      expect(args[modelIdx + 1]).toBe('opencode/mimo-v2.6-flash-free');
       const taskFilePath = join(tempDir, 'run-dir', 'agent-tasks', 'task-1.json');
       expect(args.some((arg) => arg.includes(taskFilePath))).toBe(true);
+    });
+
+    it('retries an early OpenCode server error and completes on the second attempt', async () => {
+      const counterPath = join(tempDir, 'attempts');
+      const task = makeTask({
+        agentConfig: {
+          command: 'bash',
+          args: [
+            '-c',
+            `count=$(cat ${JSON.stringify(counterPath)} 2>/dev/null || echo 0)
+count=$((count + 1))
+echo "$count" > ${JSON.stringify(counterPath)}
+if [ "$count" -eq 1 ]; then
+  echo '{"type":"error","error":{"data":{"message":"Unexpected server error"}}}'
+else
+  echo '{"summary":"done"}' > ${JSON.stringify(join(tempDir, 'output', 'implementation-task-1.json'))}
+  echo '{"type":"step_finish","part":{"reason":"stop"}}'
+fi`,
+          ],
+        },
+      });
+      const events: AgentOutputStreamEvent[] = [];
+      const runner = new CliAgentRunner({
+        command: 'bash',
+        adapter: createOpencodeCliAdapter(),
+        handshakeTimeoutMs: 100,
+      });
+
+      const result = await runner.dispatch(task, (event) => events.push(event));
+
+      expect(result.status).toBe('success');
+      expect(await readFile(counterPath, 'utf-8')).toBe('2\n');
+      expect(events.some((event) => event.content.includes('Retrying transient opencode'))).toBe(
+        true,
+      );
+    });
+
+    it.each([
+      {
+        name: 'Claude Code',
+        adapter: new ClaudeCodeAdapter(),
+        failure: `echo '{"type":"error","error":"Service unavailable"}'`,
+        completion: `echo '{"type":"result","result":"completed"}'`,
+      },
+      {
+        name: 'Codex',
+        adapter: new CodexCliAdapter(),
+        failure: `echo '{"type":"turn.failed","error":{"message":"rate limited"}}'`,
+        completion: `echo '{"type":"turn.completed"}'`,
+      },
+      {
+        name: 'Cursor',
+        adapter: new CursorCliAdapter(),
+        failure: `echo 'Service unavailable' >&2; exit 1`,
+        completion: `echo '{"type":"result","subtype":"success","is_error":false}'`,
+      },
+    ])('retries an early $name service failure', async ({ adapter, failure, completion }) => {
+      const counterPath = join(tempDir, 'attempts');
+      const task = makeTask({
+        agentConfig: {
+          command: 'bash',
+          args: [
+            '-c',
+            `count=$(cat ${JSON.stringify(counterPath)} 2>/dev/null || echo 0)
+count=$((count + 1))
+echo "$count" > ${JSON.stringify(counterPath)}
+if [ "$count" -eq 1 ]; then
+  ${failure}
+else
+  echo '{"summary":"done"}' > ${JSON.stringify(join(tempDir, 'output', 'implementation-task-1.json'))}
+  ${completion}
+fi`,
+          ],
+        },
+      });
+      const runner = new CliAgentRunner({ command: 'bash', adapter, handshakeTimeoutMs: 100 });
+
+      const result = await runner.dispatch(task);
+
+      expect(result.status).toBe('success');
+      expect(await readFile(counterPath, 'utf-8')).toBe('2\n');
+    });
+
+    it('does not retry Claude Code after an embedded tool call', async () => {
+      const counterPath = join(tempDir, 'attempts');
+      const task = makeTask({
+        agentConfig: {
+          command: 'bash',
+          args: [
+            '-c',
+            `echo attempt >> ${JSON.stringify(counterPath)}
+echo '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash"}]}}'
+echo '{"type":"error","error":"Service unavailable"}'`,
+          ],
+        },
+      });
+      const runner = new CliAgentRunner({
+        command: 'bash',
+        adapter: new ClaudeCodeAdapter(),
+        handshakeTimeoutMs: 100,
+      });
+
+      const result = await runner.dispatch(task);
+
+      expect(result.status).toBe('failure');
+      expect(await readFile(counterPath, 'utf-8')).toBe('attempt\n');
+    });
+
+    it('does not retry an OpenCode server error after tool work has started', async () => {
+      const counterPath = join(tempDir, 'attempts');
+      const task = makeTask({
+        agentConfig: {
+          command: 'bash',
+          args: [
+            '-c',
+            `echo attempt >> ${JSON.stringify(counterPath)}
+echo '{"type":"tool_use","part":{"type":"tool","tool":"bash","state":{"status":"completed"}}}'
+echo '{"type":"error","error":{"data":{"message":"Unexpected server error"}}}'`,
+          ],
+        },
+      });
+      const runner = new CliAgentRunner({
+        command: 'bash',
+        adapter: createOpencodeCliAdapter(),
+        handshakeTimeoutMs: 100,
+      });
+
+      const result = await runner.dispatch(task);
+
+      expect(result.status).toBe('failure');
+      expect(await readFile(counterPath, 'utf-8')).toBe('attempt\n');
     });
 
     it('injects codex permission hook args when bridge is configured', async () => {

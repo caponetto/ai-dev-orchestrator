@@ -508,7 +508,7 @@ export class DefaultRunnerSystem implements RunnerSystem {
       const workerError = {
         type: errorType,
         message: agentResult.error ?? 'Agent dispatch failed',
-        retryable: false,
+        retryable: agentResult.recoverable ?? false,
       };
 
       onStreamEvent?.({

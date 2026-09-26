@@ -12,6 +12,7 @@ import type {
   CursorToolCallPayload,
 } from './external-event-types';
 import { parseCursorEvent } from './external-event-types';
+import { isTransientCliError } from './transient-cli-error';
 
 type CursorCliMode = 'streaming' | 'text-only';
 
@@ -188,6 +189,14 @@ function extractToolName(toolCall: CursorToolCallPayload | undefined): string {
 }
 
 function mapResultEvent(event: CursorResultEvent): ProtocolMessage {
+  if (event.is_error || (event.subtype !== undefined && event.subtype !== 'success')) {
+    const message = event.result ?? 'Cursor CLI failed';
+    return createProtocolMessage('error', {
+      code: 'CURSOR_CLI_ERROR',
+      message,
+      recoverable: isTransientCliError(message),
+    });
+  }
   const summary =
     event.duration_ms === undefined ? 'completed' : `completed in ${String(event.duration_ms)}ms`;
   return createProtocolMessage('done', { summary });

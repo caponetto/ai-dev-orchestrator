@@ -57,7 +57,7 @@ describe('ConfigPanel', () => {
   it('renders OpenCode runner labels', async () => {
     setupConfigHandler({
       ...baseConfig,
-      roles: [{ role: 'implementer', model: 'opencode/mimo-v2.5-free', runner: 'opencode' }],
+      roles: [{ role: 'implementer', model: 'opencode/mimo-v2.6-flash-free', runner: 'opencode' }],
     });
     renderWithRouter(<ConfigPanel runId="run-1" roleUsage={[]} />);
     expect(await screen.findByText('OpenCode')).toBeInTheDocument();

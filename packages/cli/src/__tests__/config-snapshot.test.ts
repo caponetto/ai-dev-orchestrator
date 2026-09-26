@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { configSnapshotSchema, configSnapshotWorkflowSchema } from '../config-snapshot';
+import {
+  configSnapshotSchema,
+  configSnapshotWorkflowSchema,
+  resolveRunModelAssignments,
+} from '../config-snapshot';
 
 describe('configSnapshotWorkflowSchema', () => {
   it('validates an empty object (all optional)', () => {
@@ -23,6 +27,39 @@ describe('configSnapshotWorkflowSchema', () => {
     expect(configSnapshotWorkflowSchema.safeParse({ globalTransitionLimit: 'ten' }).success).toBe(
       false,
     );
+  });
+});
+
+describe('resolveRunModelAssignments', () => {
+  const current = {
+    report_synthesizer: { model: 'opencode/mimo-v2.5-free', maxTokens: 1000 },
+    planner: { model: 'opencode/big-pickle' },
+  };
+
+  it('uses an edited run snapshot model when resuming', () => {
+    const resolved = resolveRunModelAssignments(current, {
+      roles: {
+        assignments: {
+          report_synthesizer: {
+            model: 'opencode/mimo-v2.6-flash-free',
+            maxTokens: null,
+            runner: 'opencode',
+          },
+        },
+      },
+    });
+
+    expect(resolved.report_synthesizer).toEqual({
+      model: 'opencode/mimo-v2.6-flash-free',
+      maxTokens: 1000,
+    });
+    expect(resolved.planner).toEqual(current.planner);
+    expect(current.report_synthesizer.model).toBe('opencode/mimo-v2.5-free');
+  });
+
+  it('keeps current assignments when the snapshot has no valid role assignments', () => {
+    expect(resolveRunModelAssignments(current, null)).toEqual(current);
+    expect(resolveRunModelAssignments(current, { roles: { assignments: {} } })).toEqual(current);
   });
 });
 

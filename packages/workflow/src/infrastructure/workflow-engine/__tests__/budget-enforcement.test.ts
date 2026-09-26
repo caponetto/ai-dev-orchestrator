@@ -683,6 +683,59 @@ describe('Budget Enforcement', () => {
   });
 
   describe('budget escalation approval resumes interrupted state', () => {
+    it('restores completed action results before approval after a process restart', async () => {
+      const governance = makeGovernance();
+      const usagePerCall = {
+        totalInputTokens: 3000,
+        totalOutputTokens: 3000,
+        byRole: { planner: { inputTokens: 3000, outputTokens: 3000, durationMs: 100 } },
+      };
+      const runner = makeRunner(usagePerCall);
+      const store = makeStore();
+      const persistence = makePersistence();
+      const firstController = new LifecycleController({
+        runner,
+        artifactStore: store,
+        governanceEngine: governance,
+        contractRegistry: makeContractRegistry(),
+        journalWriter: makeJournal(),
+        statePersistence: persistence,
+        manifestProducer: makeManifest(),
+      });
+
+      const config = makeConfig({ budgetMaxTokens: 5000, globalTransitionLimit: 50 });
+      await firstController.start(config);
+      expect(firstController.getState().waitingContext?.reason).toBe('token_budget_exceeded');
+
+      const checkpoint = vi.mocked(persistence).save.mock.calls.at(-1)?.[0];
+      expect(checkpoint?.interruptedActionResults).toHaveLength(1);
+
+      // A CLI approval creates a new controller. The completed action must be
+      // replayed into the transition evaluator instead of dispatching again.
+      const secondController = new LifecycleController({
+        runner,
+        artifactStore: store,
+        governanceEngine: governance,
+        contractRegistry: makeContractRegistry(),
+        journalWriter: makeJournal(),
+        statePersistence: persistence,
+        manifestProducer: makeManifest(),
+      });
+      if (checkpoint === undefined) {
+        throw new Error('expected persistence.save to capture a checkpoint');
+      }
+      secondController.restore(config, checkpoint);
+
+      const dispatchCountBeforeResume = (runner.dispatch as ReturnType<typeof vi.fn>).mock.calls
+        .length;
+      const result = await secondController.resume({ type: 'approval', content: 'continue' });
+
+      expect(result.finalState).toBe('DONE');
+      expect((runner.dispatch as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(
+        dispatchCountBeforeResume,
+      );
+    });
+
     it('resumes with saved action results after budget approval without re-dispatching', async () => {
       const governance = makeGovernance();
       const usagePerCall = {

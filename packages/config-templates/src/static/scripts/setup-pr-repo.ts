@@ -2,13 +2,14 @@
 /**
  * Clones a PR's repository and checks out the PR branch into a temp directory.
  *
- * Reads the source reference from ORCHESTRATOR_USER_PROMPT (e.g. github:owner/repo#123
- * or https://github.com/owner/repo/pull/123),
- * uses `gh` CLI to resolve the PR branch and clone the repo, then communicates the
- * temp directory path back to the engine via ORCHESTRATOR_SCRIPT_RESULT directives.
+ * Extracts a PR reference from ORCHESTRATOR_USER_PROMPT (e.g. github:owner/repo#123
+ * or an embedded https://github.com/owner/repo/pull/123 URL). The original prompt remains
+ * available to downstream workflow steps unchanged. It uses `gh` CLI to resolve the PR branch
+ * and clone the repo, then communicates the temp directory path back to the engine via
+ * ORCHESTRATOR_SCRIPT_RESULT directives.
  *
  * Expects:
- *   ORCHESTRATOR_USER_PROMPT — source reference (github:owner/repo#NNN or GitHub PR URL)
+ *   ORCHESTRATOR_USER_PROMPT — prompt containing a GitHub PR URL, or a shorthand source
  *   ORCHESTRATOR_SCRIPT_RESULT — path to write output JSON
  *
  * Requires: gh CLI authenticated, git, Node >= 22.6
@@ -22,7 +23,8 @@ import { join } from 'node:path';
 import { TEMP_DIR_PREFIX } from './pr-review-constants.ts';
 
 const GITHUB_PR_SHORTHAND = /^github:([^/]+)\/([^#]+)#(\d+)(?:@(.+))?$/;
-const GITHUB_PR_URL = /^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)\/?(?:[?#].*)?$/;
+const GITHUB_PR_URL =
+  /https?:\/\/github\.com\/([^/\s?#]+)\/([^/\s?#]+)\/pull\/(\d+)(?=$|[\s/?#),.;!])/;
 
 export interface GitHubPrSource {
   readonly owner: string;

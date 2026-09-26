@@ -95,7 +95,7 @@ export function isToolCallNoise(line: DashboardAgentStreamEvent): boolean {
 }
 
 export function isStderrWarning(line: DashboardAgentStreamEvent): boolean {
-  if (line.type !== 'stderr') {
+  if (line.type !== 'stderr' || line.structuredData?.['phase'] === 'error') {
     return false;
   }
   const lower = line.content.toLowerCase();

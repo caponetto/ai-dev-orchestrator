@@ -13,6 +13,7 @@ import type {
   OpenCodeToolUseEvent,
 } from './external-event-types';
 import { parseOpenCodeEvent } from './external-event-types';
+import { isTransientCliError } from './transient-cli-error';
 
 const OPENCODE_RUN_ARGS = ['run', '--format', 'json', '--auto'] as const;
 
@@ -116,10 +117,11 @@ function mapStepFinishEvent(event: OpenCodeStepFinishEvent): ProtocolMessage | n
 }
 
 function mapErrorEvent(event: OpenCodeErrorEvent): ProtocolMessage {
+  const message = event.error?.data?.message ?? event.error?.message ?? 'OpenCode CLI failed';
   return createProtocolMessage('error', {
     code: 'OPENCODE_CLI_ERROR',
-    message: event.error?.data?.message ?? event.error?.message ?? 'OpenCode CLI failed',
-    recoverable: false,
+    message,
+    recoverable: isTransientCliError(message),
   });
 }
 

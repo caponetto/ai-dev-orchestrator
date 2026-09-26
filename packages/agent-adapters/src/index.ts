@@ -16,6 +16,7 @@ export type { CodexProbeResult } from './codex-cli-capability-probe';
 export { normalizeCodexProbeResult, probeCodexCliCapabilities } from './codex-cli-capability-probe';
 
 export { OpencodeCliAdapter, createOpencodeCliAdapter } from './opencode-cli-adapter';
+export { isTransientCliError } from './transient-cli-error';
 export type { OpencodeProbeResult } from './opencode-cli-capability-probe';
 export {
   normalizeOpencodeProbeResult,
