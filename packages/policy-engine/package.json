@@ -33,7 +33,7 @@
     "@ai-dev-orchestrator/ports": "workspace:*",
     "@ai-dev-orchestrator/schemas": "workspace:*",
     "@ai-dev-orchestrator/utils": "workspace:*",
-    "yaml": "^2.9.0"
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@ai-dev-orchestrator/build-config": "workspace:*",
