@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/caponetto/ai-dev-orchestrator/compare/config-templates-v0.1.3...config-templates-v0.1.4) (2026-09-26)
+
+
+### Bug Fixes
+
+* **runner:** retry transient CLI errors and validate OpenCode models ([#48](https://github.com/caponetto/ai-dev-orchestrator/issues/48)) ([a4dd259](https://github.com/caponetto/ai-dev-orchestrator/commit/a4dd25914bf1ff8500eb81d84dff17694c1f1545))
+
 ## [0.1.3](https://github.com/caponetto/ai-dev-orchestrator/compare/config-templates-v0.1.2...config-templates-v0.1.3) (2026-09-12)
 
 
