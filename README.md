@@ -95,7 +95,7 @@ Hexagonal (ports & adapters) with strict layering enforced by Turborepo boundary
 | `pnpm syncpack:check`     | Check dependency version consistency |
 | `pnpm publint`            | Validate package.json exports        |
 
-Pre-commit hooks run eleven checks: lint-staged (ESLint + Prettier), typecheck, lint, format, syncpack, build, publint, knip, unit tests with coverage, integration tests, and e2e tests. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development workflow.
+Pre-commit hooks are tiered by staged file type. Commits touching only docs or CI config (`.md`, `docs/`, `.github/`, `.husky/`, `.vscode/`) run lint-staged (ESLint + Prettier) and `format:check`. Any other commit — including any change under a package's `src/`, even a `.md` or `.yaml` data file — runs all eleven checks: lint-staged, typecheck, lint, format, syncpack, build, publint, knip, unit tests with coverage, integration tests, and e2e tests. CI runs the full set on every push regardless. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development workflow.
 
 ## Documentation
 
