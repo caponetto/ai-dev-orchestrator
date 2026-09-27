@@ -1,15 +1,78 @@
-# Pre-commit quality gates for automated and agent-driven commits.
+# Pre-commit quality gates.
+#
+# Tiers, keyed off the staged file list:
+#   1. Docs/CI-only -> run_shared_prefix, then exit.
+#   2. Anything else -> run_shared_prefix + run_full_gate.
+# CI runs the full gate on every push regardless.
 
 set -e
 
-pnpm exec lint-staged
-pnpm typecheck
-pnpm lint
-pnpm format:check
-pnpm syncpack:check
-pnpm build:prod
-pnpm publint
-pnpm knip
-pnpm test:unit:coverage
-pnpm test:integration
-pnpm test:e2e
+# `set -e` alone is not enough: turbo catches SIGINT, stops its children, and
+# exits 0, so the hook would carry on to the next gate after Ctrl+C. This shell
+# receives the same SIGINT (same process group) and aborts regardless.
+trap 'echo "pre-commit: interrupted, skipping the remaining checks."; exit 130' INT TERM HUP
+
+# Inert paths: docs, CI, editor metadata. Toolchain-gating config (package.json,
+# pnpm-lock.yaml, turbo.json, tsconfig*.json, .npmrc, .nvmrc, .prettierignore)
+# is excluded deliberately, so editing it runs the full gate.
+NON_CODE_PATTERN='(^|/)(docs/|\.github/|\.husky/|\.vscode/)|\.md$|^\.gitignore$|^\.editorconfig$|^\.gitattributes$|^\.git-blame-ignore-revs$|^LICENSE$'
+
+# Overrides the allowlist: a package source tree is never inert, not even its
+# markdown or data files. config-templates/src/static/** is read at runtime,
+# copied into dist by copy:static, and validated by unit tests.
+SOURCE_TREE_PATTERN='^packages/[^/]+/src/'
+
+# Both tiers. lint-staged formats the staged files; format:check sweeps the repo.
+run_shared_prefix() {
+  pnpm exec lint-staged
+  pnpm format:check
+}
+
+run_full_gate() {
+  pnpm typecheck
+  pnpm lint
+  pnpm syncpack:check
+  pnpm build:prod
+  pnpm publint
+  pnpm knip
+  pnpm test:unit:coverage
+  pnpm test:integration
+  pnpm test:e2e
+}
+
+# Classify before running anything, so the decision reflects what was staged.
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACMR)
+RUN_FULL=0
+CODE_FILES=''
+
+# No usable file list (nothing staged, or no parent commit) -> full gate.
+if [ -z "$STAGED_FILES" ] || [ -z "$(git rev-parse --verify --quiet HEAD)" ]; then
+  RUN_FULL=1
+else
+  # grep exits 1 on no match, which `set -e` would treat as a failure.
+  CODE_FILES=$(
+    {
+      printf '%s\n' "$STAGED_FILES" | grep -Ev "$NON_CODE_PATTERN" || true
+      printf '%s\n' "$STAGED_FILES" | grep -E "$SOURCE_TREE_PATTERN" || true
+    } | sort -u
+  )
+  if [ -n "$CODE_FILES" ]; then
+    RUN_FULL=1
+  fi
+fi
+
+run_shared_prefix
+
+if [ "$RUN_FULL" -eq 0 ]; then
+  echo "pre-commit: docs/CI-only changes - skipping typecheck, lint, build, and tests."
+  exit 0
+fi
+
+if [ -n "$CODE_FILES" ]; then
+  echo "pre-commit: code changes detected, running full gate:"
+  printf '%s\n' "$CODE_FILES" | sed 's/^/  /'
+else
+  echo "pre-commit: no staged file list to classify, running full gate."
+fi
+
+run_full_gate

@@ -1,0 +1,109 @@
+name: 'Dependabot Auto-Merge'
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: dependabot-auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  automerge:
+    name: Evaluate Dependabot update
+    runs-on: ubuntu-latest
+
+    if: |
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.repository == 'caponetto/ai-dev-orchestrator' &&
+      github.event.pull_request.draft == false
+
+    steps:
+      - name: 'Fetch Dependabot metadata'
+        id: metadata
+        uses: dependabot/fetch-metadata@v3
+
+      - name: 'Summarize update'
+        env:
+          DEPENDENCY_NAMES: ${{ steps.metadata.outputs.dependency-names }}
+          UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
+          PACKAGE_ECOSYSTEM: ${{ steps.metadata.outputs.package-ecosystem }}
+          DEPENDENCY_TYPE: ${{ steps.metadata.outputs.dependency-type }}
+        run: |
+          {
+            echo "### Dependabot update"
+            echo "- Dependencies: ${DEPENDENCY_NAMES:-unknown}"
+            echo "- Update type: ${UPDATE_TYPE:-unknown}"
+            echo "- Ecosystem: ${PACKAGE_ECOSYSTEM:-unknown}"
+            echo "- Dependency type: ${DEPENDENCY_TYPE:-unknown}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 'Enable auto-merge for patch and minor updates'
+        if: contains(fromJSON('["version-update:semver-patch", "version-update:semver-minor"]'), steps.metadata.outputs.update-type)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          gh pr merge --auto --squash --match-head-commit "$PR_HEAD_SHA" "$PR_URL"
+
+          {
+            echo
+            echo "Auto-merge enabled for this patch/minor update."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 'Request review for major updates'
+        if: steps.metadata.outputs.update-type == 'version-update:semver-major'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+          DEPENDENCY_NAMES: ${{ steps.metadata.outputs.dependency-names }}
+          UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
+        run: |
+          marker="<!-- dependabot-major-update-review-needed -->"
+          body="$(cat <<EOF
+          ${marker}
+          @caponetto Dependabot opened a major version update, so auto-merge is intentionally disabled.
+
+          **Dependencies:** ${DEPENDENCY_NAMES:-unknown}
+          **Update type:** ${UPDATE_TYPE:-unknown}
+
+          Please review the changelog or release notes and merge manually once the breaking-change risk looks acceptable.
+          EOF
+          )"
+
+          existing_comment_id="$(
+            gh api "repos/${REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
+              --jq ".[] | select(.body | contains(\"${marker}\")) | .id" \
+              | tail -n 1
+          )"
+
+          if [ -n "$existing_comment_id" ]; then
+            gh api --method PATCH "repos/${REPOSITORY}/issues/comments/${existing_comment_id}" \
+              --field body="$body" >/dev/null
+          else
+            gh pr comment "$PR_NUMBER" --repo "$REPOSITORY" --body "$body"
+          fi
+
+          {
+            echo
+            echo "Auto-merge skipped for this major update."
+            echo "A review request comment was posted or refreshed for @caponetto."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 'Skip unsupported update types'
+        if: ${{ ! contains(fromJSON('["version-update:semver-patch", "version-update:semver-minor", "version-update:semver-major"]'), steps.metadata.outputs.update-type) }}
+        env:
+          UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
+        run: |
+          {
+            echo
+            echo "Auto-merge skipped because update type '${UPDATE_TYPE:-unknown}' is not covered by this policy."
+          } >> "$GITHUB_STEP_SUMMARY"

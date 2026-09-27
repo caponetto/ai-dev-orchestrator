@@ -38,7 +38,16 @@ Scope: subsystem name in kebab-case (e.g., `feat(artifact-system): add checksum 
 
 ### Pre-commit Hooks
 
-The project uses Husky with lint-staged. On every commit:
+The project uses Husky with lint-staged. The hook inspects the staged file list and picks one of two tiers.
+
+**Tier 1 — docs and CI only.** When every staged path is documentation or CI/editor metadata (any `.md` file, `docs/`, `.github/`, `.husky/`, `.vscode/`, `LICENSE`, `.gitignore`, `.editorconfig`, `.gitattributes`), the hook runs:
+
+- ESLint and Prettier on staged files via lint-staged
+- `pnpm format:check` for a repo-wide formatting sweep
+
+These paths cannot affect the TypeScript program, the package graph, or the test suites, and CI still runs the full gate on the push. Note that a package source tree is never treated as inert: `packages/*/src/**` is always tier 2, because data files there are real build inputs (`packages/config-templates/src/static/**` holds prompt templates, role definitions, and workflow YAML that are read at runtime, copied into `dist` by `copy:static`, and schema-validated by unit tests).
+
+**Tier 2 — code changes.** If any staged path falls outside that list, the hook runs the full gate:
 
 - ESLint and Prettier run on staged files via lint-staged
 - `pnpm typecheck` runs TypeScript type checking
@@ -51,6 +60,8 @@ The project uses Husky with lint-staged. On every commit:
 - `pnpm test:unit:coverage` runs unit tests with coverage
 - `pnpm test:integration` runs integration tests
 - `pnpm test:e2e` runs end-to-end tests
+
+To widen or narrow the tier-1 allowlist, edit `NON_CODE_PATTERN` and `SOURCE_TREE_PATTERN` in [`.husky/pre-commit`](.husky/pre-commit). Config files that gate the toolchain — `package.json`, `pnpm-lock.yaml`, `turbo.json`, `tsconfig*.json`, `.npmrc`, `.nvmrc`, `.prettierignore`, `.prettierrc`, `eslint.config.js` — are deliberately not on the allowlist, so editing them always runs the full gate.
 
 Commit messages are validated by [commitlint](https://commitlint.js.org/) via a `commit-msg` hook, enforcing the Conventional Commits format described above.
 
