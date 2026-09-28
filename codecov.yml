@@ -1,0 +1,53 @@
+flag_management:
+  default_rules:
+    carryforward: true
+  individual_flags:
+    - name: vitest
+      carryforward: true
+      statuses:
+        - name: unit-and-integration
+          # A Vitest report only lands when the merged blob pass succeeds, so its absence means the
+          # job never got that far. Treat it as a real error instead of a silently untested commit.
+          target: 80%
+    - name: playwright
+      carryforward: true
+      statuses:
+        - name: e2e
+          target: 80%
+
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1%
+    patch:
+      default:
+        target: 80%
+        threshold: 5%
+  comment:
+    layout: reach, diff, flags, files
+    behavior: default
+    require_changes: true
+
+ignore:
+  - 'packages/*/dist/**'
+  - 'packages/*/src/**/*.test.ts'
+  - 'packages/*/src/**/*.property.test.ts'
+  - 'packages/*/src/**/index.ts'
+  - 'scripts/**'
+  # Tooling config. These are loaded by the test/build/CI harness rather than exercised as product
+  # code, so they are never instrumented and would otherwise register as uncovered in patch status.
+  - '**/vitest.config.ts'
+  - '**/vitest.*.config.ts'
+  - '**/playwright.config.ts'
+  - '**/vite.config.ts'
+  - 'vitest.workspace.ts'
+  - 'eslint.config.js'
+  - 'commitlint.config.js'
+  - '.github/workflows/**'
+  # Shipped as opaque text to the user, never imported, and unmeasured by the V8 provider.
+  - 'packages/config-templates/src/static/scripts/**'
+  # Test-harness package: executed by other packages' suites but never itself instrumented, so
+  # reporting on it would surface as a permanent hole in patch status.
+  - 'packages/build-config/**'

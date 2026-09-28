@@ -3,12 +3,14 @@ import { resolve } from 'node:path';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
-import { NamedGithubActionsReporter } from '@ai-dev-orchestrator/build-config';
+import { NamedGithubActionsReporter, shouldEmitJunit } from '@ai-dev-orchestrator/build-config';
 
-const reporters: ('default' | NamedGithubActionsReporter)[] =
+const reporters: ('default' | 'junit' | 'blob' | NamedGithubActionsReporter)[] =
   process.env['GITHUB_ACTIONS'] === 'true'
-    ? ['default', new NamedGithubActionsReporter()]
-    : ['default'];
+    ? ['default', 'junit', 'blob', new NamedGithubActionsReporter()]
+    : shouldEmitJunit()
+      ? ['default', 'junit', 'blob']
+      : ['default'];
 
 export default defineConfig({
   define: {
@@ -23,6 +25,13 @@ export default defineConfig({
   test: {
     name: 'dashboard',
     reporters,
+    outputFile: shouldEmitJunit()
+      ? {
+          junit: 'test-report.unit.junit.xml',
+          // `pnpm coverage:merge` unions these blobs, so the filename must be unique per package.
+          blob: '.vitest-reports/dashboard-unit.json',
+        }
+      : undefined,
     environment: 'jsdom',
     setupFiles: ['src/test/setup.ts'],
     globals: false,

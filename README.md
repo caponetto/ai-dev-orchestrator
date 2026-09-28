@@ -81,21 +81,25 @@ Hexagonal (ports & adapters) with strict layering enforced by Turborepo boundary
 
 ## Development
 
-| Command                   | What it does                         |
-| ------------------------- | ------------------------------------ |
-| `pnpm lint`               | ESLint across all packages           |
-| `pnpm typecheck`          | TypeScript type checking             |
-| `pnpm test:unit`          | Unit tests                           |
-| `pnpm test:unit:coverage` | Tests with coverage report           |
-| `pnpm build:prod`         | Production build                     |
-| `pnpm build:dev`          | Development build (sourcemaps)       |
-| `pnpm format`             | Prettier formatting                  |
-| `pnpm format:check`       | Check formatting                     |
-| `pnpm knip`               | Detect unused files, deps, exports   |
-| `pnpm syncpack:check`     | Check dependency version consistency |
-| `pnpm publint`            | Validate package.json exports        |
+| Command                   | What it does                                                          |
+| ------------------------- | --------------------------------------------------------------------- |
+| `pnpm lint`               | ESLint across all packages                                            |
+| `pnpm typecheck`          | TypeScript type checking                                              |
+| `pnpm test:unit`          | Unit tests                                                            |
+| `pnpm test:unit:coverage` | Unit tests with coverage report                                       |
+| `pnpm test:integration`   | Integration tests                                                     |
+| `pnpm coverage:merge`     | Union per-package coverage blobs (unit + integration) into one report |
+| `pnpm test:scripts`       | Tests for the `scripts/` tooling                                      |
+| `pnpm test:results:merge` | Merge per-package JUnit into one report (needs `CI=true`)             |
+| `pnpm build:prod`         | Production build                                                      |
+| `pnpm build:dev`          | Development build (sourcemaps)                                        |
+| `pnpm format`             | Prettier formatting                                                   |
+| `pnpm format:check`       | Check formatting                                                      |
+| `pnpm knip`               | Detect unused files, deps, exports                                    |
+| `pnpm syncpack:check`     | Check dependency version consistency                                  |
+| `pnpm publint`            | Validate package.json exports                                         |
 
-Pre-commit hooks are tiered by staged file type. Commits touching only docs or CI config (`.md`, `docs/`, `.github/`, `.husky/`, `.vscode/`) run lint-staged (ESLint + Prettier) and `format:check`. Any other commit — including any change under a package's `src/`, even a `.md` or `.yaml` data file — runs all eleven checks: lint-staged, typecheck, lint, format, syncpack, build, publint, knip, unit tests with coverage, integration tests, and e2e tests. CI runs the full set on every push regardless. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development workflow.
+Pre-commit hooks are tiered by staged file type. Commits touching only docs or CI config (`.md`, `docs/`, `.github/`, `.husky/`, `.vscode/`) run lint-staged (ESLint + Prettier) and `format:check`. Any other commit — including any change under a package's `src/`, even a `.md` or `.yaml` data file — runs all twelve checks: lint-staged, typecheck, lint, format, syncpack, build, publint, knip, unit tests with coverage, script tests, integration tests, and e2e tests. CI runs the full set on every push regardless. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development workflow.
 
 ## Documentation
 

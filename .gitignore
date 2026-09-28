@@ -7,6 +7,9 @@ dist/
 
 # Coverage
 coverage/
+coverage-integration/
+coverage-scripts/
+.vitest-reports/
 
 # TypeScript
 *.tsbuildinfo
@@ -36,6 +39,9 @@ Thumbs.db
 playwright-report/
 test-results/
 blob-report/
+
+# JUnit test reports
+test-report.*.junit.xml
 
 # Turbo
 .turbo/

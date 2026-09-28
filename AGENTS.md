@@ -28,19 +28,20 @@ A local-first AI software engineering platform that orchestrates autonomous codi
 ## Development Commands
 
 ```bash
-pnpm install          # Install dependencies
-pnpm lint             # ESLint across all packages
-pnpm typecheck        # TypeScript type checking
-pnpm test:unit        # Unit tests
+pnpm install             # Install dependencies
+pnpm lint                # ESLint across all packages
+pnpm typecheck           # TypeScript type checking
+pnpm test:unit           # Unit tests
 pnpm test:unit:coverage  # Tests with coverage
-pnpm build:prod       # Production build
-pnpm build:dev        # Development build (sourcemaps)
-pnpm clean            # Remove all dist/ and tsbuildinfo across packages
-pnpm format           # Format with Prettier
-pnpm format:check     # Check formatting
-pnpm knip             # Detect unused files, deps, exports
-pnpm syncpack:check   # Check dependency version consistency
-pnpm publint          # Validate package.json exports
+pnpm test:results:merge  # Merge JUnit reports (requires CI=true)
+pnpm build:prod          # Production build
+pnpm build:dev           # Development build (sourcemaps)
+pnpm clean               # Remove all dist/ and tsbuildinfo across packages
+pnpm format              # Format with Prettier
+pnpm format:check        # Check formatting
+pnpm knip                # Detect unused files, deps, exports
+pnpm syncpack:check      # Check dependency version consistency
+pnpm publint             # Validate package.json exports
 ```
 
 ## Monorepo Layout

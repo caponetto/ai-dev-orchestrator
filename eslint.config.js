@@ -8,6 +8,7 @@ export default defineConfig(
     ignores: [
       '**/dist/**',
       '**/coverage/**',
+      '**/coverage-scripts/**',
       'docs/**',
       '**/node_modules/**',
       '**/vitest.config.ts',
@@ -15,6 +16,7 @@ export default defineConfig(
       'vitest.workspace.ts',
       'vitest.shared.ts',
       '**/vite.config.ts',
+      '**/playwright.config.ts',
       'eslint.config.js',
       '**/esbuild.config.js',
     ],
