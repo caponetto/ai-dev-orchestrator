@@ -104,15 +104,62 @@ jobs:
       - name: Unit tests
         run: pnpm test:unit:coverage
 
+      - name: Script tests
+        run: pnpm test:scripts:coverage
+
       - name: Integration tests
-        run: pnpm test:integration
+        run: pnpm test:integration:coverage
+
+      - name: Merge coverage
+        if: ${{ !cancelled() }}
+        run: pnpm coverage:merge
+
+      - name: Merge test results
+        if: ${{ !cancelled() }}
+        run: pnpm test:results:merge -- --suites=unit,integration,scripts
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          report_type: test_results
+          files: test-results/junit.xml
+          flags: vitest
+          disable_search: true
+          fail_ci_if_error: true
+
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage/lcov.info
+          disable_search: true
+          fail_ci_if_error: true
 
       - name: Upload coverage
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: coverage-report
-          path: packages/**/coverage/
+          path: |
+            coverage/
+            coverage-scripts/
+            packages/**/coverage/
+            packages/**/coverage-integration/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload test results artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-report
+          path: |
+            test-results/
+            packages/**/test-report.*.junit.xml
+            test-report.scripts.junit.xml
           if-no-files-found: ignore
           retention-days: 7
 
@@ -134,6 +181,21 @@ jobs:
 
       - name: E2E tests
         run: pnpm test:e2e
+
+      - name: Merge e2e test results
+        if: ${{ !cancelled() }}
+        run: pnpm test:results:merge -- --suites=e2e
+
+      - name: Upload e2e test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          report_type: test_results
+          files: test-results/junit.xml
+          flags: playwright
+          disable_search: true
+          fail_ci_if_error: true
 
       - name: Upload Playwright report
         if: failure()

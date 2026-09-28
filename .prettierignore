@@ -1,6 +1,11 @@
 dist/
 node_modules/
 coverage/
+coverage-integration/
+coverage-scripts/
+.vitest-reports/
+test-results/
+test-report.*.junit.xml
 .turbo/
 pnpm-lock.yaml
 .remember/

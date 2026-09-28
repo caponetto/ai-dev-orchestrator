@@ -36,6 +36,7 @@ run_full_gate() {
   pnpm publint
   pnpm knip
   pnpm test:unit:coverage
+  pnpm test:scripts
   pnpm test:integration
   pnpm test:e2e
 }

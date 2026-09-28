@@ -63,6 +63,24 @@
       "inputs": ["$TURBO_DEFAULT$"],
       "outputs": []
     },
+    "//#typecheck:scripts:run": {
+      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json", "tsconfig.base.json", "scripts/**/*.ts"],
+      "outputs": []
+    },
+    "//#test:scripts:run": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "tsconfig.json",
+        "tsconfig.base.json",
+        "vitest.scripts.config.ts",
+        "scripts/**/*.ts"
+      ],
+      "outputs": ["coverage-scripts/**", "test-report.scripts.junit.xml"]
+    },
+    "//#lint:scripts:run": {
+      "inputs": ["$TURBO_DEFAULT$", "eslint.config.*", "scripts/**/*.ts"],
+      "outputs": []
+    },
     "lint": {
       "dependsOn": ["build:dev"],
       "inputs": ["$TURBO_DEFAULT$", "eslint.config.*", "../../eslint.config.*"],
@@ -75,7 +93,7 @@
     },
     "test:unit": {
       "dependsOn": ["typecheck"],
-      "outputs": ["coverage/**"],
+      "outputs": ["coverage/**", "test-report.unit.junit.xml", ".vitest-reports/**"],
       "inputs": ["src/**", "test/**", "vitest.config.*"]
     },
     "test:e2e": {
@@ -86,7 +104,11 @@
     "test:integration": {
       "dependsOn": ["typecheck"],
       "inputs": ["src/**", "test/**", "vitest.*.config.*"],
-      "outputs": []
+      "outputs": [
+        "test-report.integration.junit.xml",
+        "coverage-integration/**",
+        ".vitest-reports/**"
+      ]
     },
     "build:dev": {
       "dependsOn": ["^build:dev", "typecheck"],
