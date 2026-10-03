@@ -19,7 +19,7 @@ jobs:
     name: Detect changes
     runs-on: ubuntu-latest
     outputs:
-      code: ${{ steps.filter.outputs.code == 'true' }}
+      code: ${{ steps.filter.outputs.code == 'true' || steps.filter.outputs.runtime == 'true' }}
       global: ${{ steps.filter.outputs.global == 'true' }}
       manifests: ${{ steps.filter.outputs.manifests == 'true' }}
       base: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
@@ -34,6 +34,7 @@ jobs:
         id: filter
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         with:
+          predicate-quantifier: some-with-excludes
           filters: |
             code:
               - '**'
@@ -41,7 +42,6 @@ jobs:
               - '!**/*.md'
               - '!release-please-config.json'
               - '!.release-please-manifest.json'
-              - 'packages/**/src/**/*.md'
             global:
               - '**'
               - '!packages/**'
@@ -49,6 +49,8 @@ jobs:
               - '!**/*.md'
               - '!release-please-config.json'
               - '!.release-please-manifest.json'
+            runtime:
+              - 'packages/**/src/**/*.md'
             manifests:
               - 'packages/**/package.json'
 

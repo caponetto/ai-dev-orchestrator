@@ -18,7 +18,7 @@ agreement_participation:
 required_capabilities:
   - reasoning
   - code_review
-model: opencode/nemotron-3-ultra-free
+model: opencode/big-pickle
 max_tokens: null
 dispatch_type: agent
 runner: opencode

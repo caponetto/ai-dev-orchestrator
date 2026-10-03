@@ -164,6 +164,14 @@ describe('OpencodeCliAdapter', () => {
     expect(permissionError.payload).toMatchObject({ recoverable: false });
   });
 
+  it('strips terminal OSC notification sequences prefixed to JSON lines', () => {
+    const adapter = createOpencodeCliAdapter();
+    const osc = '\u001b]777;notify;warp://cli-agent;{"v":1,"event":"tool_complete"}\u0007';
+    const msg = assertMessage(adapter.translateOutput(`${osc}{"type":"step_start"}`));
+    expect(msg.type).toBe('progress');
+    expect(adapter.translateOutput(osc)).toBeNull();
+  });
+
   it('ignores malformed and unsupported output', () => {
     const adapter = createOpencodeCliAdapter();
     expect(adapter.translateOutput('not json')).toBeNull();

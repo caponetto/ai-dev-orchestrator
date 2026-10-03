@@ -1370,6 +1370,15 @@ describe('buildAgentTaskPrompt', () => {
     expect(prompt).toContain('If stream-json mode is enabled');
   });
 
+  it('instructs the agent to open with a short greeting', () => {
+    const task = makeTask();
+    const prompt = buildAgentTaskPrompt(task, '/tmp/task.json');
+    expect(prompt).toContain(
+      'MANDATORY FIRST STEP — before reading the task file or calling any tool, write ONE short greeting',
+    );
+    expect(prompt).toContain(`Your role: ${task.role} — ${task.description}`);
+  });
+
   it('injects rendered role prompt when present', () => {
     const task = makeTask({
       rolePrompt: 'You are the implementer. Follow these steps...',

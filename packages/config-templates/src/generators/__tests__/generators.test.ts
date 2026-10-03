@@ -225,7 +225,7 @@ describe('roles-generator', () => {
     expect(analyst?.owned_artifacts).toContain('canonical_specification');
     expect(analyst?.readable_artifacts).toContain('canonical_specification');
     expect(analyst?.readable_artifacts).toContain('intake_requirements');
-    expect(analyst?.model).toBe('opencode/nemotron-3-ultra-free');
+    expect(analyst?.model).toBe('opencode/big-pickle');
     expect(analyst?.runner).toBe('opencode');
 
     const contextAnalyst = parsed.roles.find((r) => r.id === 'context_analyst');
