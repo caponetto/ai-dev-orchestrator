@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/caponetto/ai-dev-orchestrator/compare/agent-adapters-v0.1.4...agent-adapters-v0.1.5) (2026-10-03)
+
+
+### Features
+
+* add agent greeting prompt ([#62](https://github.com/caponetto/ai-dev-orchestrator/issues/62)) ([eed4027](https://github.com/caponetto/ai-dev-orchestrator/commit/eed4027ee0c67abdba40fb5b013cadd53fccb12f))
+
 ## [0.1.4](https://github.com/caponetto/ai-dev-orchestrator/compare/agent-adapters-v0.1.3...agent-adapters-v0.1.4) (2026-09-26)
 
 

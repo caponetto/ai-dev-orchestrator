@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.4](https://github.com/caponetto/ai-dev-orchestrator/compare/workflow-v0.1.3...workflow-v0.1.4) (2026-10-03)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * devDependencies
+    * @ai-dev-orchestrator/runner bumped to 0.1.5
+
 ## [0.1.3](https://github.com/caponetto/ai-dev-orchestrator/compare/workflow-v0.1.2...workflow-v0.1.3) (2026-09-26)
 
 
