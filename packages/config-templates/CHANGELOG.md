@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/caponetto/ai-dev-orchestrator/compare/config-templates-v0.1.4...config-templates-v0.1.5) (2026-10-03)
+
+
+### Bug Fixes
+
+* update model references to use mimo-v2.6-flash-free across roles ([#56](https://github.com/caponetto/ai-dev-orchestrator/issues/56)) ([d510c86](https://github.com/caponetto/ai-dev-orchestrator/commit/d510c86b08990af7090ec1104be5bc7a22c2cc30))
+
 ## [0.1.4](https://github.com/caponetto/ai-dev-orchestrator/compare/config-templates-v0.1.3...config-templates-v0.1.4) (2026-09-26)
 
 
