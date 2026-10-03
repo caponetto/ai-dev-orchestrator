@@ -97,7 +97,7 @@
       "inputs": ["src/**", "test/**", "vitest.config.*"]
     },
     "test:e2e": {
-      "dependsOn": ["test:unit"],
+      "dependsOn": ["^build:dev"],
       "inputs": ["src/**", "e2e/**", "playwright.config.*"],
       "outputs": ["playwright-report/**", "test-results/**"]
     },

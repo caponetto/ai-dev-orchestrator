@@ -640,8 +640,37 @@ export class CliAgentRunner implements SessionCapableRunner {
               onStreamEvent,
               lastAgentArtifactJson,
             ).then(
-              (result) => {
+              async (result) => {
                 if (protocolFinish) {
+                  // execa's own timeout can kill the process before overallTimer fires;
+                  // wait for the subprocess to settle so that case is reported as a timeout.
+                  await subprocess.catch(() => undefined);
+                  if (
+                    result.status !== 'success' &&
+                    isExecaError(subprocessError) &&
+                    subprocessError.timedOut
+                  ) {
+                    const timeoutMsg = `Agent timed out after ${String(timeoutMs)}ms`;
+                    onStreamEvent?.({
+                      timestamp: new Date().toISOString(),
+                      type: 'stderr',
+                      content: timeoutMsg,
+                      structuredData: {
+                        messageType: 'error',
+                        phase: 'error',
+                        code: 'timeout',
+                        sender: 'orchestrator',
+                      },
+                    });
+                    protocolFinish({
+                      taskId: task.taskId,
+                      status: 'timeout',
+                      error: timeoutMsg,
+                      durationMs: Date.now() - startTime,
+                      tokenUsage: getTokenUsage(),
+                    });
+                    return;
+                  }
                   const stderr = processStderr.trim();
                   if (
                     result.status === 'failure' &&

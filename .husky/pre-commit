@@ -15,7 +15,7 @@ trap 'echo "pre-commit: interrupted, skipping the remaining checks."; exit 130' 
 # Inert paths: docs, CI, editor metadata. Toolchain-gating config (package.json,
 # pnpm-lock.yaml, turbo.json, tsconfig*.json, .npmrc, .nvmrc, .prettierignore)
 # is excluded deliberately, so editing it runs the full gate.
-NON_CODE_PATTERN='(^|/)(docs/|\.github/|\.husky/|\.vscode/)|\.md$|^\.gitignore$|^\.editorconfig$|^\.gitattributes$|^\.git-blame-ignore-revs$|^LICENSE$'
+NON_CODE_PATTERN='(^|/)(docs/|\.github/|\.husky/|\.vscode/)|\.md$|^\.gitignore$|^\.editorconfig$|^\.gitattributes$|^\.git-blame-ignore-revs$|^LICENSE$|^release-please-config\.json$|^\.release-please-manifest\.json$'
 
 # Overrides the allowlist: a package source tree is never inert, not even its
 # markdown or data files. config-templates/src/static/** is read at runtime,

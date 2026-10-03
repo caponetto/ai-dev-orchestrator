@@ -270,4 +270,43 @@ describe('WorkflowParser', () => {
     const parsed = parser.parse(yaml);
     expect(parsed.states['A'].label).toBe('Final State');
   });
+
+  describe('error formatting edge cases', () => {
+    const base = {
+      name: 'x',
+      version: '1.0.0',
+      initialState: 'A',
+      terminalStates: ['A'],
+      states: { A: { type: 'terminal', description: 'd', transitions: [] } },
+    };
+
+    it('reports a wrongly typed scalar field as missing', () => {
+      expect(() => parser.parse(stringify({ ...base, name: 42 }))).toThrow(
+        'Missing required field "name"',
+      );
+    });
+
+    it('reports a wrongly typed states field as missing', () => {
+      expect(() => parser.parse(stringify({ ...base, states: 'nope' }))).toThrow(
+        'Missing required field "states"',
+      );
+    });
+
+    it('reports an empty string field as missing', () => {
+      expect(() => parser.parse(stringify({ ...base, name: '' }))).toThrow(
+        'Missing required field "name"',
+      );
+    });
+
+    it('falls back to the schema message for nested non-type issues', () => {
+      const bad = { ...base, states: { A: { ...base.states.A, label: 5 } } };
+      expect(() => parser.parse(stringify(bad))).toThrow(WorkflowParseError);
+    });
+
+    it('rejects unquoted null state values', () => {
+      expect(() => parser.parse('name: x\nversion: 1\nstates:\n  A:\n')).toThrow(
+        WorkflowParseError,
+      );
+    });
+  });
 });
