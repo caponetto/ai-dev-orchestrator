@@ -151,7 +151,7 @@ packages/
 
 ## CI/CD
 
-- **On push/PR** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): `quality` (formatting, boundaries, typecheck, syncpack, build, lint, publint, knip — all checks run via `continue-on-error` to surface every failure), `test` (unit tests with coverage, integration tests, Codecov coverage and test-results upload — runs after quality), `e2e` (Playwright plus its own Codecov test-results upload — runs after test)
+- **On push/PR** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): package-level Turbo checks use `*` for shared/root changes, or changed packages plus their downstream dependents for package changes. Repository-level script, boundary, and unused-code checks also run on code changes; Syncpack, Publint, and the dependency audit run for shared/root or package-manifest changes. The dashboard E2E suite runs for every code change. Docs-only changes skip CI checks.
 - **On merge to main** ([`.github/workflows/release.yml`](.github/workflows/release.yml)): release-please opens a version PR from conventional commits; merging it publishes packages
 - **Dependency updates**: Dependabot opens weekly PRs for npm and GitHub Actions ([`.github/dependabot.yml`](.github/dependabot.yml))
 
