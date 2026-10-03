@@ -1475,6 +1475,10 @@ export function buildAgentTaskPrompt(task: AgentTask, taskFilePath: string): str
     `Repository root: ${task.repoRoot}`,
     `Required output artifact path: ${task.outputArtifactPath}`,
     `Required output format: ${formatLabel}`,
+    '',
+    `Your role: ${task.role} — ${task.description}`,
+    '',
+    'MANDATORY FIRST STEP — before reading the task file or calling any tool, write ONE short greeting line (max 20 words) in your own words, in the form "Hi, I\'m the <role name> — I\'ll <what you will do in this task>." Use a readable role name derived from your role above and describe your actual task; do not reuse this template verbatim. Do this even if the role instructions below say nothing about it.',
   ];
 
   if (task.userPrompt) {
@@ -1528,8 +1532,9 @@ export function buildAgentTaskPrompt(task: AgentTask, taskFilePath: string): str
     'Output Verbosity — IMPORTANT:',
     '- Your stdout is streamed to a human dashboard. Keep progress updates minimal and high-signal.',
     '- DO: report key decisions, findings, and the final result.',
-    '- DO NOT: narrate what you are about to do ("I\'ll read the file..."), echo back the task, describe routine steps ("Let me verify..."), or explain intermediate validation results.',
-    '- Aim for 3-5 progress lines per task, not 10-20. Silence is fine while working.',
+    '- The opening greeting (see MANDATORY FIRST STEP) is required and is the only exception to the no-narration rule.',
+    '- DO NOT: otherwise narrate what you are about to do ("I\'ll read the file..."), echo back the task, describe routine steps ("Let me verify..."), or explain intermediate validation results.',
+    '- Aim for 3-5 progress lines per task after the greeting, not 10-20. Silence is fine while working.',
     '- If stream-json mode is enabled, emit progress and completion events on stdout while working.',
   );
 

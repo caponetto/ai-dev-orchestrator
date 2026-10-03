@@ -21,7 +21,7 @@ required_capabilities:
   - reasoning
   - structured_output
   - external_data_fetch
-model: opencode/nemotron-3-ultra-free
+model: opencode/big-pickle
 max_tokens: null
 dispatch_type: agent
 runner: opencode

@@ -424,9 +424,13 @@ export function parseCodexEvent(line: string): CodexStreamEvent | null {
   }
 }
 
+// OSC terminal sequences (ESC ] ... BEL|ESC \\), e.g. the Warp `777;notify` the opencode plugin
+// prepends to JSON lines.
+const OSC_SEQUENCE = /\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)/g;
+
 /** Parse a raw JSON line emitted by `opencode run --format json`. */
 export function parseOpenCodeEvent(line: string): OpenCodeStreamEvent | null {
-  const trimmed = line.trim();
+  const trimmed = line.replace(OSC_SEQUENCE, '').trim();
   if (!trimmed.startsWith('{')) {
     return null;
   }
