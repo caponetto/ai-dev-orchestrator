@@ -139,7 +139,26 @@ jobs:
       - name: Publint
         id: publint
         if: needs.changes.outputs.global == 'true' || needs.changes.outputs.manifests == 'true'
-        run: pnpm publint
+        env:
+          BASE_SHA: ${{ needs.changes.outputs.base }}
+          GLOBAL_CHANGE: ${{ needs.changes.outputs.global }}
+        run: |
+          if [[ "$GLOBAL_CHANGE" == "true" ]]; then
+            pnpm publint
+            exit
+          fi
+
+          mapfile -t changed_manifests < <(
+            git diff --name-only --diff-filter=ACMR "$BASE_SHA...$GITHUB_SHA" -- 'packages/**/package.json'
+          )
+          filters=()
+          for manifest in "${changed_manifests[@]}"; do
+            package_dir=${manifest%/package.json}
+            [[ "$package_dir" == "packages/cli" || "$package_dir" == "packages/dashboard" ]] && continue
+            filters+=(--filter "./$package_dir")
+          done
+
+          if ((${#filters[@]})); then pnpm "${filters[@]}" exec publint; else echo "No changed published package manifests to lint."; fi
         continue-on-error: true
 
       - name: Knip
