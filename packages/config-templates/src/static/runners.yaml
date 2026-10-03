@@ -23,7 +23,6 @@ runners:
     name: OpenCode CLI
     models:
       - opencode/big-pickle
-      - opencode/ling-3.0-flash-fin-free
       - opencode/mimo-v2.6-flash-free
       - opencode/muse-spark-1.3-contributor-free
       - opencode/nemotron-3-ultra-free
