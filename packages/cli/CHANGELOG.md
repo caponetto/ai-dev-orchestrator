@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.8](https://github.com/caponetto/ai-dev-orchestrator/compare/cli-v0.1.7...cli-v0.1.8) (2026-10-03)
+
+
+### Bug Fixes
+
+* add build-time commit SHA and date to version info ([#59](https://github.com/caponetto/ai-dev-orchestrator/issues/59)) ([8544db9](https://github.com/caponetto/ai-dev-orchestrator/commit/8544db9481dfa63bccedf6e0463634da193e8ae3))
+
 ## [0.1.7](https://github.com/caponetto/ai-dev-orchestrator/compare/cli-v0.1.6...cli-v0.1.7) (2026-10-03)
 
 
