@@ -20,6 +20,7 @@
     "format": "prettier --write .",
     "format:check": "turbo run //#format:check:run",
     "format:check:run": "prettier --check .",
+    "format:check:files": "prettier --check",
     "link:cli": "pnpm build:prod && pnpm add -g ./packages/cli",
     "lint": "turbo lint && turbo run //#lint:scripts:run",
     "prepare": "husky",
