@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.6](https://github.com/caponetto/ai-dev-orchestrator/compare/config-templates-v0.1.5...config-templates-v0.1.6) (2026-10-03)
+
+
+### Features
+
+* add agent greeting prompt ([#62](https://github.com/caponetto/ai-dev-orchestrator/issues/62)) ([eed4027](https://github.com/caponetto/ai-dev-orchestrator/commit/eed4027ee0c67abdba40fb5b013cadd53fccb12f))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @ai-dev-orchestrator/workflow bumped to 0.1.4
+
 ## [0.1.5](https://github.com/caponetto/ai-dev-orchestrator/compare/config-templates-v0.1.4...config-templates-v0.1.5) (2026-10-03)
 
 

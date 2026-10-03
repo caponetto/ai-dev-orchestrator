@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.3](https://github.com/caponetto/ai-dev-orchestrator/compare/dashboard-server-v0.1.2...dashboard-server-v0.1.3) (2026-10-03)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @ai-dev-orchestrator/runner bumped to 0.1.5
+
 ## [0.1.2](https://github.com/caponetto/ai-dev-orchestrator/compare/dashboard-server-v0.1.1...dashboard-server-v0.1.2) (2026-09-05)
 
 
