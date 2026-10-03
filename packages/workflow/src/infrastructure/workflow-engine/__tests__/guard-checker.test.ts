@@ -1815,4 +1815,33 @@ describe('GuardChecker', () => {
       expect(results[0].detail).toContain('No project context store');
     });
   });
+
+  describe('non-Error rejections from artifact reads', () => {
+    const guardTypes = [
+      'verification_failures_are_fixable',
+      'verification_passed',
+      'synthesis_approved',
+      'has_clarification_needs',
+      'findings_indicate_plan_issue',
+      'plan_structure_valid',
+    ] as const;
+
+    it.each(guardTypes)('%s degrades gracefully when get() rejects with a string', async (type) => {
+      const ref = (t: string) => ({ type: t, name: t, version: 1, checksum: 'x' });
+      const store = makeArtifactStore({
+        getLatest: vi.fn().mockResolvedValue(ref('canonical_specification')),
+        list: vi
+          .fn()
+          .mockImplementation((query: { type: string }) => Promise.resolve([ref(query.type)])),
+        get: vi.fn().mockRejectedValue('boom'),
+      });
+      const checker = new GuardChecker(store, makeContractRegistry());
+      const guard = { type, params: {} } as Guard;
+      const results = await checker.evaluateAll(
+        [guard],
+        makeContext({ artifactRefs: [ref('static_review')] as never }),
+      );
+      expect(results).toHaveLength(1);
+    });
+  });
 });

@@ -385,6 +385,45 @@ describe('WorkflowValidator', () => {
     expect(result.errors.some((e) => e.rule === 'parallel_well_formed')).toBe(false);
   });
 
+  function forkWorkflow(waitForAll: boolean | undefined): WorkflowDefinition {
+    const def = minimal();
+    const start = def.states['START'];
+    return {
+      ...def,
+      states: {
+        ...def.states,
+        START: {
+          ...start,
+          entryActions: [{ type: 'dispatch_worker', params: { parallel: true } }],
+          transitions: [
+            {
+              ...start.transitions[0],
+              guards:
+                waitForAll === undefined
+                  ? []
+                  : [{ type: 'artifact_exists', params: { waitForAll } }],
+            },
+          ],
+        },
+      },
+    } as WorkflowDefinition;
+  }
+
+  it('parallel_well_formed — errors when a parallel fork has no join guard', () => {
+    const result = validator.validate(forkWorkflow(undefined));
+    expect(result.errors.some((e) => e.rule === 'parallel_well_formed')).toBe(true);
+  });
+
+  it('parallel_well_formed — errors when join guard does not wait for all', () => {
+    const result = validator.validate(forkWorkflow(false));
+    expect(result.errors.some((e) => e.rule === 'parallel_well_formed')).toBe(true);
+  });
+
+  it('parallel_well_formed — passes when a fork has a waitForAll join guard', () => {
+    const result = validator.validate(forkWorkflow(true));
+    expect(result.errors.some((e) => e.rule === 'parallel_well_formed')).toBe(false);
+  });
+
   it('no_infinite_loops — warns on cycles without exit transitions', () => {
     const def: WorkflowDefinition = {
       name: 'test',

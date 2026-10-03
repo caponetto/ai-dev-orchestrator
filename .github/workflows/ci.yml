@@ -15,6 +15,27 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Filter paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            code:
+              - '**'
+              - '!docs/**'
+              - '!**/*.md'
+              - '!release-please-config.json'
+              - '!.release-please-manifest.json'
+
   quality:
     name: Quality checks
     runs-on: ubuntu-latest
@@ -90,7 +111,8 @@ jobs:
 
   test:
     name: Unit and integration tests
-    needs: [quality]
+    needs: [quality, changes]
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -165,7 +187,8 @@ jobs:
 
   e2e:
     name: End-to-end tests
-    needs: [test]
+    needs: [test, changes]
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

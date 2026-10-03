@@ -235,3 +235,24 @@ describe('evaluateKnownFailurePatternGuard', () => {
     expect(result.detail).toContain('No known failure pattern matching "timeout"');
   });
 });
+
+describe('context guard defaults', () => {
+  it('treats a run history without runs as empty and uses a default threshold of 1', async () => {
+    const store = createMockStore({ category: 'run_history', content: {}, lastUpdated: '' });
+    const result = await evaluatePreviousRunPatternGuard(
+      { type: 'previous_run_pattern', params: { outcome: 'failed' } },
+      store,
+    );
+    expect(result.passed).toBe(false);
+    expect(result.detail).toContain('need 1');
+  });
+
+  it('treats preferences without failure patterns as empty', async () => {
+    const store = createMockStore({ category: 'preferences', content: {}, lastUpdated: '' });
+    const result = await evaluateKnownFailurePatternGuard(
+      { type: 'known_failure_pattern', params: { patternSubstring: 'timeout' } },
+      store,
+    );
+    expect(result.passed).toBe(false);
+  });
+});
