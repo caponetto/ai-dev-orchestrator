@@ -161,3 +161,21 @@ describe('collectVersionInfo error handling', () => {
     expect(info.version).toBe('0.0.0');
   });
 });
+
+describe('collectVersionInfo with build-time values', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('uses embedded commit and build date instead of git/runtime clock', async () => {
+    const { execSync } = await import('node:child_process');
+    vi.mocked(execSync).mockClear();
+    vi.stubGlobal('__BUILD_COMMIT__', 'abc1234');
+    vi.stubGlobal('__BUILD_DATE__', '2020-01-02');
+
+    const info = collectVersionInfo();
+    expect(info.commitSha).toBe('abc1234');
+    expect(info.buildDate).toBe('2020-01-02');
+    expect(execSync).not.toHaveBeenCalled();
+  });
+});
