@@ -22,7 +22,14 @@ interface VersionInfo {
   readonly arch: string;
 }
 
+// Injected by esbuild at build time; undefined when running from source (dev/tests).
+declare const __BUILD_COMMIT__: string | undefined;
+declare const __BUILD_DATE__: string | undefined;
+
 function getCommitSha(): string {
+  if (typeof __BUILD_COMMIT__ !== 'undefined') {
+    return __BUILD_COMMIT__;
+  }
   try {
     return execSync('git rev-parse --short HEAD', {
       encoding: 'utf8',
@@ -60,7 +67,10 @@ export function collectVersionInfo(): VersionInfo {
     name: pkg.name,
     version: pkg.version,
     commitSha: getCommitSha(),
-    buildDate: new Date().toISOString().split('T')[0] ?? 'unknown',
+    buildDate:
+      typeof __BUILD_DATE__ !== 'undefined'
+        ? __BUILD_DATE__
+        : (new Date().toISOString().split('T')[0] ?? 'unknown'),
     nodeVersion: process.version,
     platform: process.platform,
     arch: process.arch,
