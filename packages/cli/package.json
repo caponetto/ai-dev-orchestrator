@@ -46,7 +46,7 @@
   "devDependencies": {
     "@ai-dev-orchestrator/build-config": "workspace:*",
     "@ai-dev-orchestrator/dashboard": "workspace:*",
-    "@types/node": "^26.6.2",
+    "@types/node": "^26.6.4",
     "esbuild": "^0.28.2",
     "tsx": "^4.23.15",
     "vitest": "^4.1.11"
