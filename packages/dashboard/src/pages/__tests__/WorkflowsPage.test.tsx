@@ -77,7 +77,7 @@ const server = setupServer(
 
 beforeAll(() => {
   vi.stubGlobal('EventSource', MockEventSource);
-  server.listen({ onUnhandledRequest: 'bypass' });
+  server.listen({ onUnhandledFrame: 'bypass' });
 });
 
 afterEach(() => {

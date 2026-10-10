@@ -67,7 +67,7 @@ const server = setupServer(
 beforeAll(() => {
   vi.stubGlobal('EventSource', MockEventSource);
   Element.prototype.scrollIntoView = vi.fn();
-  server.listen({ onUnhandledRequest: 'bypass' });
+  server.listen({ onUnhandledFrame: 'bypass' });
 });
 
 beforeEach(() => {
@@ -419,7 +419,7 @@ describe('NewRunPage', () => {
     let capturedBody: Record<string, unknown> | undefined;
     server.use(
       http.post('/api/runs', async ({ request }) => {
-        capturedBody = (await request.json()) as Record<string, unknown>;
+        capturedBody = (await request.clone().json()) as Record<string, unknown>;
         return HttpResponse.json({ success: true, runId: 'new-run-1' });
       }),
     );
