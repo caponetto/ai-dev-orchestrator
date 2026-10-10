@@ -82,7 +82,7 @@ const server = setupServer(http.get('/api/health', () => HttpResponse.json(healt
 
 beforeAll(() => {
   vi.stubGlobal('EventSource', MockEventSource);
-  server.listen({ onUnhandledRequest: 'bypass' });
+  server.listen({ onUnhandledFrame: 'bypass' });
 });
 
 beforeEach(() => {

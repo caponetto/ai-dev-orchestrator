@@ -160,7 +160,7 @@ const server = setupServer(
 const originalConsoleError = console.error;
 
 beforeAll(() => {
-  server.listen({ onUnhandledRequest: 'bypass' });
+  server.listen({ onUnhandledFrame: 'bypass' });
   console.error = (...args: unknown[]) => {
     if (typeof args[0] === 'string' && args[0].includes('Received NaN')) {
       return;

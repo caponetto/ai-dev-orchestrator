@@ -126,13 +126,22 @@ export function NewRunPage() {
     }, 15_000);
 
     const timer = setInterval(() => {
-      void api.fetchRuns().then((runs) => {
-        const newRun = runs.find((r) => !knownRunIdsRef.current.has(r.runId));
-        if (newRun) {
+      void api
+        .fetchRuns()
+        .then((runs) => {
+          const newRun = runs.find((r) => !knownRunIdsRef.current.has(r.runId));
+          if (newRun) {
+            clearInterval(timer);
+            void Promise.resolve(navigate(`/runs/${newRun.runId}`, { replace: true }));
+          }
+        })
+        .catch((e: unknown) => {
           clearInterval(timer);
-          void Promise.resolve(navigate(`/runs/${newRun.runId}`, { replace: true }));
-        }
-      });
+          setStatus({
+            kind: 'error',
+            message: e instanceof Error ? e.message : 'Failed to check run status',
+          });
+        });
     }, 500);
 
     return () => {
@@ -149,6 +158,9 @@ export function NewRunPage() {
         const defaultWf = wfs.find((w) => w.name === 'pr-review');
         const name = defaultWf?.name || wfs[0]?.name || '';
         setSelectedWorkflow(name);
+      })
+      .catch((e: unknown) => {
+        showError(e instanceof Error ? e.message : 'Failed to load workflows');
       })
       .finally(() => {
         setLoadingWorkflows(false);

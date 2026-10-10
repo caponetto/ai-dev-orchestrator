@@ -67,7 +67,7 @@ const server = setupServer(
 beforeAll(() => {
   vi.stubGlobal('EventSource', MockEventSource);
   Element.prototype.scrollIntoView = vi.fn();
-  server.listen({ onUnhandledRequest: 'bypass' });
+  server.listen({ onUnhandledFrame: 'bypass' });
 });
 
 beforeEach(() => {
@@ -75,8 +75,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  vi.useRealTimers();
   cleanup();
+  vi.useRealTimers();
   server.resetHandlers();
 });
 
@@ -177,6 +177,35 @@ describe('NewRunPage', () => {
       expect(screen.getByText('Starting run...')).toBeTruthy();
     });
     expect(screen.getByText('Waiting for the orchestrator to initialize')).toBeTruthy();
+  });
+
+  it('shows an error when polling for a pending run fails', async () => {
+    let runRequestCount = 0;
+    server.use(
+      http.get('/api/runs', () => {
+        runRequestCount += 1;
+        return runRequestCount === 1
+          ? HttpResponse.json([])
+          : new HttpResponse(null, { status: 503 });
+      }),
+      http.post('/api/runs', () => HttpResponse.json({ success: true })),
+    );
+
+    renderWithRouter(<NewRunPage />);
+
+    const textarea = screen.getByPlaceholderText('Describe the task...');
+    fireEvent.change(textarea, { target: { value: 'Build a feature' } });
+    fireEvent.click(screen.getByText('Start Run'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Waiting for the orchestrator to initialize')).toBeTruthy();
+    });
+
+    await act(() => vi.advanceTimersByTimeAsync(500));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert').textContent).toContain('503');
+    });
   });
 
   it('shows error when createRun returns failure', async () => {
@@ -419,7 +448,7 @@ describe('NewRunPage', () => {
     let capturedBody: Record<string, unknown> | undefined;
     server.use(
       http.post('/api/runs', async ({ request }) => {
-        capturedBody = (await request.json()) as Record<string, unknown>;
+        capturedBody = (await request.clone().json()) as Record<string, unknown>;
         return HttpResponse.json({ success: true, runId: 'new-run-1' });
       }),
     );
