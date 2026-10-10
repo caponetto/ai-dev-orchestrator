@@ -45,7 +45,7 @@ describe('runner-registry', () => {
 
     it('codex runner advertises Codex models', () => {
       const codex = loadRunnerRegistry().find((runner) => runner.id === 'codex');
-      expect(codex?.models).toContain('gpt-5.6-sol');
+      expect(codex?.models).toContain('gpt-5.6-luna');
     });
 
     it('opencode runner advertises OpenCode models', () => {

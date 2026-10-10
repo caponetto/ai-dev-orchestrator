@@ -1,0 +1,85 @@
+name: 'Runner Models'
+
+on:
+  schedule:
+    - cron: '0 12 */2 * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'packages/config-templates/src/static/runners.yaml'
+      - 'packages/config-templates/src/static/roles/**'
+      - 'scripts/runner-models/**'
+      - '.github/workflows/runner-models.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  roles:
+    name: 'Roles use listed models'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Checkout'
+        uses: actions/checkout@v7
+
+      - name: 'Setup Node.js'
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: 'Check roles use models listed in runners.yaml'
+        run: node --experimental-strip-types scripts/runner-models/roles.ts
+
+  claude-code:
+    name: 'Claude Code models'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Checkout'
+        uses: actions/checkout@v7
+
+      - name: 'Setup Node.js'
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: 'Install Claude Code CLI'
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: 'Check Claude Code models'
+        run: node --experimental-strip-types scripts/runner-models/claude-code.ts
+
+  codex:
+    name: 'Codex models'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Checkout'
+        uses: actions/checkout@v7
+
+      - name: 'Setup Node.js'
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: 'Install Codex CLI'
+        run: npm install -g @openai/codex
+
+      - name: 'Check Codex models'
+        run: node --experimental-strip-types scripts/runner-models/codex.ts
+
+  opencode:
+    name: 'OpenCode models'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Checkout'
+        uses: actions/checkout@v7
+
+      - name: 'Setup Node.js'
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: 'Install OpenCode CLI'
+        run: npm install -g opencode-ai
+
+      - name: 'Check OpenCode models'
+        run: node --experimental-strip-types scripts/runner-models/opencode.ts

@@ -109,7 +109,7 @@ Tests use Vitest with `describe`/`it`/`expect` imported by name. Test files are 
 
 ## Testing Requirements
 
-All code changes must include corresponding tests. New features require tests covering the primary functionality. Bug fixes require regression tests that reproduce the original issue. Refactors must maintain or improve existing test coverage. Run `pnpm test:unit` before committing to verify nothing is broken.
+All code changes must include corresponding tests. New features require tests covering the primary functionality. Bug fixes require regression tests that reproduce the original issue. Refactors must maintain or improve existing test coverage. Coverage must stay at or above 80% for lines, functions, branches, and statements; the Vitest configs enforce this per package (shared via `build-config`) and for `scripts/` (`pnpm test:scripts:coverage`), and CI fails below it (only `test-utils` is exempt). Run `pnpm test:unit` before committing to verify nothing is broken.
 
 ## Documentation Requirements
 
