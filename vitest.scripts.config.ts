@@ -18,7 +18,12 @@ export default defineConfig({
       reporter: ['text', 'lcov'],
       reportsDirectory: 'coverage-scripts',
       include: ['scripts/**/*.ts'],
-      exclude: ['scripts/**/*.test.ts', 'scripts/**/__tests__/**'],
+      exclude: [
+        'scripts/**/*.test.ts',
+        'scripts/**/__tests__/**',
+        // Thin wrappers that shell out to the installed Claude Code, Codex and OpenCode CLIs and run on import.
+        'scripts/runner-models/{claude-code,codex,opencode}.ts',
+      ],
       thresholds: {
         lines: 80,
         functions: 80,
