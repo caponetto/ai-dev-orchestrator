@@ -17,7 +17,7 @@ required_capabilities:
   - reasoning
   - structured_output
   - long_context
-model: opencode/muse-spark-1.3-contributor-free
+model: opencode/deepseek-v4.1-flash-free
 max_tokens: null
 dispatch_type: agent
 runner: opencode
