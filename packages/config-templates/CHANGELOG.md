@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.7](https://github.com/caponetto/ai-dev-orchestrator/compare/config-templates-v0.1.6...config-templates-v0.1.7) (2026-10-17)
+
+
+### Bug Fixes
+
+* **runners:** update OpenCode models by removing outdated entries and adding new ones ([#72](https://github.com/caponetto/ai-dev-orchestrator/issues/72)) ([53942d0](https://github.com/caponetto/ai-dev-orchestrator/commit/53942d0b48be750459fa47ab9f3e0e739a2182db))
+
 ## [0.1.6](https://github.com/caponetto/ai-dev-orchestrator/compare/config-templates-v0.1.5...config-templates-v0.1.6) (2026-10-03)
 
 
