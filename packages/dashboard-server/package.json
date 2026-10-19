@@ -37,10 +37,10 @@
     "@ai-dev-orchestrator/runner": "workspace:*",
     "@ai-dev-orchestrator/schemas": "workspace:*",
     "@ai-dev-orchestrator/utils": "workspace:*",
-    "@hono/node-server": "^2.1.4",
+    "@hono/node-server": "^2.1.5",
     "hono": "^4.13.13",
     "yaml": "^2.9.1",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@ai-dev-orchestrator/build-config": "workspace:*",
