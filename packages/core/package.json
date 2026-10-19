@@ -37,7 +37,7 @@
     "ulidx": "^2.4.1",
     "write-file-atomic": "^8.0.0",
     "yaml": "^2.9.1",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@ai-dev-orchestrator/artifacts": "workspace:*",
