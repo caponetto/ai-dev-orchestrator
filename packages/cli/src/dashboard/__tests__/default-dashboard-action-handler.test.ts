@@ -10,7 +10,11 @@ import type { AgentSessionSupervisor, AgentStreamBus } from '@ai-dev-orchestrato
 import type { RunId } from '@ai-dev-orchestrator/schemas';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { loadAllWorkflows, loadWorkflowByName } from '../../composition-root';
+import {
+  loadAllWorkflows,
+  loadWorkflowByName,
+  preflightSelectedModels,
+} from '../../composition-root';
 import { getRunDir, getRunsDir } from '../../workspace-paths';
 import { DefaultDashboardActionHandler } from '../default-dashboard-action-handler';
 
@@ -44,6 +48,7 @@ vi.mock('../../workspace-paths', async (importOriginal) => {
 vi.mock('../../composition-root', () => ({
   loadWorkflowByName: vi.fn(),
   loadAllWorkflows: vi.fn(),
+  preflightSelectedModels: vi.fn().mockResolvedValue({ warnings: [], receipt: 'checked' }),
 }));
 
 vi.mock('@ai-dev-orchestrator/dashboard-server', () => ({
@@ -215,6 +220,31 @@ describe('DefaultDashboardActionHandler', () => {
       const result = await handler.retry('nonexistent-run');
       expect(result.success).toBe(false);
       expect(result.error).toContain('not found');
+    });
+
+    it('retries pending terminal cleanup without rewinding the source state or clearing its cursor', async () => {
+      await seedRunState('run-pending', {
+        currentState: 'WRAP_UP',
+        previousState: 'WRAP_UP',
+        pendingTerminalState: 'DONE',
+        terminalRecoveryState: 'WRAP_UP',
+        entryActionContinuation: {
+          stateId: 'DONE',
+          nextActionIndex: 1,
+          completedResults: [
+            {
+              action: { type: 'notify_human', params: { reason: 'completed first action' } },
+              success: true,
+            },
+          ],
+        },
+      });
+      const result = await new DefaultDashboardActionHandler().retry('run-pending');
+      expect(result.success).toBe(true);
+      const saved = new DefaultStatePersistence(getRunsDir()).load('run-pending' as RunId);
+      expect(saved?.currentState).toBe('WRAP_UP');
+      expect(saved?.pendingTerminalState).toBe('DONE');
+      expect(saved?.entryActionContinuation?.nextActionIndex).toBe(1);
     });
 
     it('returns error when run is not in a terminal state', async () => {
@@ -812,6 +842,17 @@ describe('DefaultDashboardActionHandler', () => {
   });
 
   describe('createRun', () => {
+    it('returns model failures without spawning a CLI process', async () => {
+      vi.mocked(spawn).mockClear();
+      vi.mocked(preflightSelectedModels).mockRejectedValueOnce(new Error('Model retired: planner'));
+      const handler = new DefaultDashboardActionHandler();
+
+      const result = await handler.createRun({ prompt: 'Build a feature' });
+
+      expect(result).toEqual({ success: false, error: 'Model retired: planner' });
+      expect(spawn).not.toHaveBeenCalled();
+    });
+
     it('returns error for empty prompt', async () => {
       const handler = new DefaultDashboardActionHandler();
       const result = await handler.createRun({ prompt: '   ' });
@@ -825,6 +866,8 @@ describe('DefaultDashboardActionHandler', () => {
       const result = await handler.createRun({ prompt: 'Build a feature' });
       expect(result.success).toBe(true);
       expect(vi.mocked(spawn)).toHaveBeenCalled();
+      const options = vi.mocked(spawn).mock.calls[0]?.[2];
+      expect(options.env?.['AI_ORCHESTRATOR_MODEL_PREFLIGHT']).toBe('checked');
     });
 
     it('returns error when spawn throws', async () => {

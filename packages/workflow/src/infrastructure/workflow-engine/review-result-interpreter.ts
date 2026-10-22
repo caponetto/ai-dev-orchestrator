@@ -62,7 +62,10 @@ export class ReviewResultInterpreter {
     if (hardFailures.length === 0) {
       return false;
     }
-    if (actionResults.some((r) => r.success)) {
+    if (
+      hardFailures.every((r) => r.action.type === 'dispatch_parallel_workers') &&
+      actionResults.some((r) => r.action.type === 'dispatch_parallel_workers' && r.success)
+    ) {
       for (const f of hardFailures) {
         this.logger.warn(
           `[ReviewInterpreter] worker failed but continuing with partial results: ${f.error ?? 'unknown error'}`,
@@ -244,7 +247,7 @@ export class ReviewResultInterpreter {
   private async readApprovalField(type: ArtifactType, name: string): Promise<boolean> {
     try {
       const artifact = await this.artifactStore.getLatest(type, name);
-      if (!artifact) {
+      if (!artifact || artifact.metadata?.validationFailed === true) {
         return false;
       }
 

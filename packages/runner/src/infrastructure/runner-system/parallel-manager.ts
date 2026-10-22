@@ -23,19 +23,25 @@ export class ParallelManager {
   async dispatchAll(
     requests: readonly DispatchRequest[],
     createStreamCallback?: (request: DispatchRequest) => StreamEventCallback | undefined,
+    signal?: AbortSignal,
   ): Promise<readonly DispatchResult[]> {
     if (this.maxConcurrency === Infinity || requests.length <= this.maxConcurrency) {
-      return this.dispatchUnbounded(requests, createStreamCallback);
+      return this.dispatchUnbounded(requests, createStreamCallback, signal);
     }
-    return this.dispatchBounded(requests, createStreamCallback);
+    return this.dispatchBounded(requests, createStreamCallback, signal);
   }
 
   private async dispatchUnbounded(
     requests: readonly DispatchRequest[],
     createStreamCallback?: (request: DispatchRequest) => StreamEventCallback | undefined,
+    signal?: AbortSignal,
   ): Promise<readonly DispatchResult[]> {
     const settled = await Promise.allSettled(
-      requests.map((r) => this.dispatchFn(r, createStreamCallback?.(r))),
+      requests.map((r, index) =>
+        signal?.aborted
+          ? Promise.resolve(this.errorResult(new Error('Worker dispatch cancelled'), r, index))
+          : this.dispatchFn(r, createStreamCallback?.(r)),
+      ),
     );
     return settled.map((outcome, index) => this.settledToResult(outcome, requests[index], index));
   }
@@ -43,6 +49,7 @@ export class ParallelManager {
   private async dispatchBounded(
     requests: readonly DispatchRequest[],
     createStreamCallback?: (request: DispatchRequest) => StreamEventCallback | undefined,
+    signal?: AbortSignal,
   ): Promise<readonly DispatchResult[]> {
     const results: DispatchResult[] = new Array<DispatchResult>(requests.length);
     let nextIndex = 0;
@@ -52,6 +59,7 @@ export class ParallelManager {
         const index = nextIndex;
         nextIndex += 1;
         try {
+          signal?.throwIfAborted();
           results[index] = await this.dispatchFn(
             requests[index],
             createStreamCallback?.(requests[index]),

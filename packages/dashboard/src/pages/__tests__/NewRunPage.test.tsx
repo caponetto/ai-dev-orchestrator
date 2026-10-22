@@ -226,6 +226,28 @@ describe('NewRunPage', () => {
     });
   });
 
+  it('shows model preflight failures with affected roles before a run starts', async () => {
+    const message =
+      'Model availability preflight failed. No run was started.\n- opencode / retired-model (roles: planner, implementer): Model retired';
+    server.use(
+      http.post('/api/runs', () =>
+        HttpResponse.json({ success: false, error: message }, { status: 400 }),
+      ),
+    );
+    renderWithRouter(<NewRunPage />);
+    fireEvent.change(screen.getByPlaceholderText('Describe the task...'), {
+      target: { value: 'Build a feature' },
+    });
+    fireEvent.click(screen.getByText('Start Run'));
+
+    await waitFor(() => {
+      const alert = screen.getByRole('alert');
+      expect(alert.textContent).toBe(message);
+      expect(alert.className).toContain('whitespace-pre-wrap');
+      expect(screen.getByText('Start Run')).toBeTruthy();
+    });
+  });
+
   it('shows error when createRun throws an exception', async () => {
     server.use(
       http.post('/api/runs', () =>
@@ -278,7 +300,7 @@ describe('NewRunPage', () => {
     });
   });
 
-  it('shows "Starting..." text while submitting', async () => {
+  it('shows "Checking models..." text while submitting', async () => {
     server.use(
       http.post('/api/runs', async () => {
         await new Promise((resolve) => setTimeout(resolve, 500));
@@ -295,7 +317,8 @@ describe('NewRunPage', () => {
     fireEvent.click(startButton);
 
     await waitFor(() => {
-      expect(screen.getByText('Starting...')).toBeTruthy();
+      expect(screen.getByText('Checking models...')).toBeTruthy();
+      expect(screen.getByText(/Small test requests may incur provider usage/u)).toBeTruthy();
     });
   });
 

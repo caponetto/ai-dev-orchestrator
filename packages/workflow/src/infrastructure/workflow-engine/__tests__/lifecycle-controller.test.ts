@@ -418,12 +418,17 @@ describe('LifecycleController', () => {
   });
 
   it('stays ABORTED when abort fires during action dispatch', async () => {
+    let signalStarted!: () => void;
+    const dispatchStarted = new Promise<void>((resolve) => {
+      signalStarted = resolve;
+    });
     let resolveDispatch!: (v: unknown) => void;
     const slowRunner: RunnerSystem = {
       dispatch: vi.fn().mockImplementation(
         () =>
           new Promise((resolve) => {
             resolveDispatch = resolve;
+            signalStarted();
           }),
       ),
       dispatchParallel: vi.fn().mockResolvedValue([]),
@@ -445,6 +450,7 @@ describe('LifecycleController', () => {
 
     const startPromise = controller.start(makeConfig({ globalTransitionLimit: 50 }));
 
+    await dispatchStarted;
     await controller.abort('user cancelled');
     expect(controller.getState().currentState).toBe('ABORTED');
 
@@ -1404,6 +1410,7 @@ describe('LifecycleController', () => {
       const streamBus = makeStreamBus();
 
       const reviewRunner = {
+        setWorkerCounter: vi.fn(),
         run: vi.fn().mockResolvedValueOnce({
           trigger: 'review_approved',
           artifacts: [],

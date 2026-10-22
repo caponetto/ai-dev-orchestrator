@@ -53,7 +53,8 @@ src/
 
 - `DefaultIterationContractRegistry` -- registry of iteration contract definitions
 - `buildContracts` -- factory for constructing contracts from configuration
-- `BUILT_IN_CONTRACTS` -- predefined contracts (plan review, implementation review, clarification, acceptance validation)
+- `BUILT_IN_CONTRACTS` -- predefined contracts (plan review, implementation review, clarification, acceptance validation, decomposition review)
+- `DECOMPOSITION_REVIEW_LOOP` -- task-breakdown review contract, limited to three rounds with abort on exhaustion
 
 ### Infrastructure -- Collaboration Model
 

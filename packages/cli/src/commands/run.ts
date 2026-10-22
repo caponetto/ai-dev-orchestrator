@@ -48,6 +48,7 @@ export async function runCommand(
   }
 
   formatter.info(`Starting run with source: ${options.sources[0]}`);
+  formatter.info('Checking selected model availability…');
 
   let ctx;
   try {

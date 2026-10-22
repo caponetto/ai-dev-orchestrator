@@ -102,6 +102,7 @@ export class ActionDispatcher {
     agentStreamBus?: AgentStreamBus,
     agreementGate?: AgreementGate,
     logger?: Logger,
+    private readonly canExecute: (stateId: string) => boolean = () => true,
   ) {
     this.runner = runner;
     this.artifactStore = artifactStore;
@@ -158,6 +159,9 @@ export class ActionDispatcher {
   ): Promise<readonly ActionResult[]> {
     const results: ActionResult[] = [];
     for (const action of actions) {
+      if (!this.canExecute(stateId)) {
+        break;
+      }
       const result = await this.execute(
         action,
         runId,
@@ -168,6 +172,9 @@ export class ActionDispatcher {
         iterationCount,
       );
       results.push(result);
+      if (!result.success || result.sessionOutcome === 'awaiting_human') {
+        break;
+      }
     }
     return results;
   }
@@ -256,11 +263,18 @@ export class ActionDispatcher {
           return { ...result, artifactRef: ref };
         } catch (error: unknown) {
           const message = getErrorMessage(error);
-          this.logger.warn(
-            `[ActionDispatcher] Failed to store script output as artifact: ${message}`,
-          );
+          return {
+            ...result,
+            success: false,
+            error: `Failed to store script output as artifact: ${message}`,
+          };
         }
       }
+      return {
+        ...result,
+        success: false,
+        error: 'Script output is empty despite configured storeOutput',
+      };
     }
 
     return result;
@@ -391,6 +405,9 @@ export class ActionDispatcher {
           errorType: result.status === 'success' ? undefined : result.error?.type,
           artifactRef,
           model: result.metrics.modelUsed || undefined,
+          sessionOutcome: result.sessionOutcome,
+          sessionRef: result.sessionRef,
+          pendingRequest: result.pendingRequest,
         };
       });
 
@@ -420,21 +437,9 @@ export class ActionDispatcher {
         byRole,
       };
 
-      // Only one session-per-wait is tracked; parallel dispatch takes the first awaiting_human.
-      // Multi-session wait support is deferred to a future plan.
+      // Present one request at a time; retain every worker's session for later resumes.
       const sessionResults = results.filter((r) => r.sessionOutcome && r.sessionRef);
       const awaitingHuman = sessionResults.find((r) => r.sessionOutcome === 'awaiting_human');
-
-      const droppedSessions = sessionResults.filter(
-        (r) => r.sessionOutcome === 'awaiting_human' && r !== awaitingHuman,
-      );
-      if (droppedSessions.length > 0) {
-        this.logger.warn(
-          `[action-dispatcher] ${String(droppedSessions.length)} additional awaiting_human ` +
-            `session(s) dropped — only one session per wait is tracked in v1.`,
-        );
-      }
-
       const firstSession = awaitingHuman ?? sessionResults.at(0);
 
       return {
@@ -532,12 +537,13 @@ export class ActionDispatcher {
 
       const results = await this.runner.dispatchParallel(requests, createStreamCallback);
 
-      const workerResults: WorkerResult[] = results.map((result) => {
+      const workerResults: WorkerResult[] = results.map((result, index) => {
         const artifactRef = result.outputArtifacts.at(0);
         if (artifactRef) {
           this.recordStaleness(artifactRef, runId);
         }
         return {
+          taskId: this.taskId(items[index], index),
           role: result.role,
           success: result.status === 'success',
           error:
@@ -547,6 +553,9 @@ export class ActionDispatcher {
           errorType: result.status === 'success' ? undefined : result.error?.type,
           artifactRef,
           model: result.metrics.modelUsed || undefined,
+          sessionOutcome: result.sessionOutcome,
+          sessionRef: result.sessionRef,
+          pendingRequest: result.pendingRequest,
         };
       });
 
@@ -577,49 +586,69 @@ export class ActionDispatcher {
         byRole,
       };
 
-      // Aggregate individual specifications into a single task_specifications artifact
-      const successfulSpecs = workerResults
-        .filter((w) => w.success && w.artifactRef)
-        .map((w, idx) => ({
-          taskId:
-            items[idx] && typeof items[idx] === 'object' && 'id' in (items[idx] as object)
-              ? (items[idx] as Record<string, unknown>)['id']
-              : `task-${String(idx).padStart(3, '0')}`,
-          specificationRef: w.artifactRef,
-        }));
-
-      if (successfulSpecs.length > 0) {
-        try {
-          const taskSpecsContent = JSON.stringify({
-            version: 1,
-            specifications: successfulSpecs.map((s) => s.specificationRef),
-            tasks: successfulSpecs,
-          });
-          const taskSpecsRef = await this.artifactStore.store({
-            type: 'task_specifications',
-            name: 'task_specifications',
-            content: taskSpecsContent,
-            producedBy: 'system',
-          });
-          artifactRefs.push(taskSpecsRef);
-        } catch (err: unknown) {
-          this.logger.warn(
-            `[action-dispatcher] Failed to store task_specifications aggregate: ${getErrorMessage(err)}`,
-          );
-        }
-      }
-
-      return {
+      const pending = workerResults.find((worker) => worker.sessionOutcome === 'awaiting_human');
+      return await this.finalizeDynamicResult({
         action,
-        success: workerResults.some((w) => w.success),
+        success: workerResults.some((worker) => worker.success),
         artifactRefs,
         workerResults,
         usageSnapshot,
-      };
+        sessionOutcome: pending?.sessionOutcome,
+        sessionRef: pending?.sessionRef,
+        pendingRequest: pending?.pendingRequest,
+      });
     } catch (error: unknown) {
       const message = getErrorMessage(error);
       return { action, success: false, error: message };
     }
+  }
+
+  /** Rebuild the dynamic aggregate after all task sessions have completed. */
+  async finalizeDynamicResult(result: ActionResult): Promise<ActionResult> {
+    if (
+      result.action.type !== 'dispatch_dynamic_workers' ||
+      result.sessionOutcome === 'awaiting_human'
+    ) {
+      return result;
+    }
+    const tasks = (result.workerResults ?? []).flatMap((worker, index) =>
+      worker.success && worker.artifactRef
+        ? [
+            {
+              taskId: worker.taskId ?? `task-${String(index).padStart(3, '0')}`,
+              specificationRef: worker.artifactRef,
+            },
+          ]
+        : [],
+    );
+    if (tasks.length === 0) {
+      return result;
+    }
+    try {
+      const ref = await this.artifactStore.store({
+        type: 'task_specifications',
+        name: 'task_specifications',
+        content: JSON.stringify({
+          version: 1,
+          specifications: tasks.map((task) => task.specificationRef),
+          tasks,
+        }),
+        producedBy: 'system',
+      });
+      return { ...result, artifactRefs: [...(result.artifactRefs ?? []), ref] };
+    } catch (error: unknown) {
+      this.logger.warn(
+        `[action-dispatcher] Failed to store task_specifications aggregate: ${getErrorMessage(error)}`,
+      );
+      return result;
+    }
+  }
+
+  private taskId(item: unknown, index: number): string {
+    if (item && typeof item === 'object' && 'id' in item && typeof item.id === 'string') {
+      return item.id;
+    }
+    return `task-${String(index).padStart(3, '0')}`;
   }
 
   private resolveItemsPath(data: Record<string, unknown>, path: string): unknown {

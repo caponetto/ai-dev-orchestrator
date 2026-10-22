@@ -5,13 +5,33 @@ import {
   buildContracts,
   BUILT_IN_CONTRACTS,
   CLARIFICATION_LOOP,
+  DECOMPOSITION_REVIEW_LOOP,
   IMPLEMENTATION_REVIEW_LOOP,
   PLAN_REVIEW_LOOP,
 } from '../built-in-contracts';
 
 describe('built-in iteration contracts', () => {
-  it('exports four built-in contracts', () => {
-    expect(BUILT_IN_CONTRACTS).toHaveLength(4);
+  it('limits decomposition review to three rounds and aborts on exhaustion', () => {
+    expect(DECOMPOSITION_REVIEW_LOOP).toMatchObject({
+      id: 'decomposition_review_loop',
+      producer: 'decomposer',
+      producerOutput: 'task_breakdown',
+      reviewers: [{ role: 'decomposition_reviewer', output: 'decomposition_review' }],
+      maxIterations: 3,
+      maxJudgeArbitrations: 0,
+      escalationPolicy: { action: 'abort' },
+    });
+    expect(
+      buildContracts({
+        maxReviewIterations: 10,
+        maxJudgeArbitrations: 4,
+        maxClarificationRounds: 5,
+        maxAcceptanceIterations: 6,
+      }).find((contract) => contract.id === 'decomposition_review_loop')?.maxIterations,
+    ).toBe(3);
+  });
+  it('exports five built-in contracts', () => {
+    expect(BUILT_IN_CONTRACTS).toHaveLength(5);
   });
 
   describe('plan_review_loop', () => {
@@ -165,9 +185,9 @@ describe('buildContracts', () => {
     expect(planReview?.completionAgreement).toBe('planning_agreement');
   });
 
-  it('returns four contracts', () => {
+  it('returns five contracts', () => {
     const contracts = buildContracts(customLimits);
-    expect(contracts).toHaveLength(4);
+    expect(contracts).toHaveLength(5);
   });
 
   it('applies acceptance limit to acceptance validation loop', () => {

@@ -8,11 +8,13 @@ import type {
   RunnerSystem,
   StatePersistence,
 } from '@ai-dev-orchestrator/ports';
+import { DefaultRoleRegistry } from '@ai-dev-orchestrator/role-system';
 import type {
   RunManifest,
   WorkflowDefinition,
   WorkflowRunConfig,
 } from '@ai-dev-orchestrator/schemas';
+import { TEST_ROLES } from '@ai-dev-orchestrator/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 
 import { LifecycleController } from '../lifecycle-controller';
@@ -93,6 +95,7 @@ function makeSessionRunner(dispatchResults: Array<ReturnType<typeof vi.fn>>): Ru
     getWorkerStatus: vi.fn().mockReturnValue(null),
     cancelWorker: vi.fn(),
     cancelAllWorkers: vi.fn().mockResolvedValue(undefined),
+    setWorkerCounter: vi.fn(),
   };
 }
 
@@ -289,6 +292,7 @@ describe('LifecycleController session integration', () => {
     const persistence = makePersistence();
 
     const controller = new LifecycleController({
+      roleRegistry: new DefaultRoleRegistry(TEST_ROLES, { assignments: {} }),
       runner,
       artifactStore: makeStore(),
       governanceEngine: makeGovernance(),
@@ -317,6 +321,7 @@ describe('LifecycleController session integration', () => {
     const journal = makeJournal();
 
     const controller = new LifecycleController({
+      roleRegistry: new DefaultRoleRegistry(TEST_ROLES, { assignments: {} }),
       runner: makeSessionRunner([sessionAwaitingResult()]),
       artifactStore: makeStore(),
       governanceEngine: makeGovernance(),
@@ -371,6 +376,7 @@ describe('LifecycleController session integration', () => {
 
     const persistence = makePersistence();
     const controller = new LifecycleController({
+      roleRegistry: new DefaultRoleRegistry(TEST_ROLES, { assignments: {} }),
       runner: makeSessionRunner([clarificationResult]),
       artifactStore: makeStore(),
       governanceEngine: makeGovernance(),
@@ -395,6 +401,7 @@ describe('LifecycleController session integration', () => {
     const supervisor = makeSupervisor();
 
     const controller = new LifecycleController({
+      roleRegistry: new DefaultRoleRegistry(TEST_ROLES, { assignments: {} }),
       runner,
       artifactStore: makeStore(),
       governanceEngine: makeGovernance(),
@@ -435,6 +442,7 @@ describe('LifecycleController session integration', () => {
     const persistence = makePersistence();
 
     const controller = new LifecycleController({
+      roleRegistry: new DefaultRoleRegistry(TEST_ROLES, { assignments: {} }),
       runner,
       artifactStore: makeStore(),
       governanceEngine: makeGovernance(),
@@ -479,6 +487,7 @@ describe('LifecycleController session integration', () => {
     });
 
     const controller = new LifecycleController({
+      roleRegistry: new DefaultRoleRegistry(TEST_ROLES, { assignments: {} }),
       runner: makeSessionRunner([activeResult]),
       artifactStore: makeStore(),
       governanceEngine: makeGovernance(),
@@ -500,6 +509,7 @@ describe('LifecycleController session integration', () => {
     });
 
     const controller = new LifecycleController({
+      roleRegistry: new DefaultRoleRegistry(TEST_ROLES, { assignments: {} }),
       runner,
       artifactStore: makeStore(),
       governanceEngine: makeGovernance(),
@@ -528,6 +538,7 @@ describe('LifecycleController session integration', () => {
     });
 
     const controller = new LifecycleController({
+      roleRegistry: new DefaultRoleRegistry(TEST_ROLES, { assignments: {} }),
       runner,
       artifactStore: makeStore(),
       governanceEngine: makeGovernance(),
@@ -566,6 +577,7 @@ describe('LifecycleController session integration', () => {
     });
 
     const controller = new LifecycleController({
+      roleRegistry: new DefaultRoleRegistry(TEST_ROLES, { assignments: {} }),
       runner,
       artifactStore: makeStore(),
       governanceEngine: makeGovernance(),
@@ -591,6 +603,7 @@ describe('LifecycleController session integration', () => {
     const runner = makeSessionRunner([sessionAwaitingResult()]);
 
     const controller = new LifecycleController({
+      roleRegistry: new DefaultRoleRegistry(TEST_ROLES, { assignments: {} }),
       runner,
       artifactStore: makeStore(),
       governanceEngine: makeGovernance(),
@@ -630,6 +643,7 @@ describe('LifecycleController session integration', () => {
     });
 
     const controller = new LifecycleController({
+      roleRegistry: new DefaultRoleRegistry(TEST_ROLES, { assignments: {} }),
       runner,
       artifactStore: makeStore(),
       governanceEngine: makeGovernance(),
@@ -710,6 +724,7 @@ describe('LifecycleController session integration', () => {
     });
 
     const controller = new LifecycleController({
+      roleRegistry: new DefaultRoleRegistry(TEST_ROLES, { assignments: {} }),
       runner: makeSessionRunner([clarificationResult]),
       artifactStore: makeStore(),
       governanceEngine: makeGovernance(),
@@ -740,6 +755,7 @@ describe('LifecycleController session integration', () => {
 
   it('non-session action results follow normal workflow path', async () => {
     const controller = new LifecycleController({
+      roleRegistry: new DefaultRoleRegistry(TEST_ROLES, { assignments: {} }),
       runner: makeSessionRunner([successResult()]),
       artifactStore: makeStore(),
       governanceEngine: makeGovernance(),

@@ -49,6 +49,7 @@ These paths cannot affect the TypeScript program, the package graph, or the test
 
 **Tier 2 — code changes.** If any staged path falls outside that list, the hook runs the full gate:
 
+- `pnpm typecheck` first refreshes workspace dependency declarations so typed ESLint can resolve package exports before lint-staged runs; the full gate checks types again after staged-file fixes
 - ESLint and Prettier run on staged files via lint-staged
 - `pnpm typecheck` runs TypeScript type checking
 - `pnpm lint` runs ESLint across all packages

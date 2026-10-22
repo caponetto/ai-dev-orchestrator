@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -125,7 +126,9 @@ import { LifecycleController } from '@ai-dev-orchestrator/workflow';
 
 import type { ConfigSnapshot } from './config-snapshot';
 import { configSnapshotSchema, resolveRunModelAssignments } from './config-snapshot';
+import { validateSelectedModels } from './model-preflight';
 import { loadDefaultWorkflow, loadProjectConfig } from './project-config';
+import { loadLatestRunState } from './run-state-recovery';
 import {
   getAiDir,
   getConfigSnapshotPath,
@@ -390,6 +393,46 @@ function validateRunnerAvailability(
   }
 }
 
+function buildRoleRegistry(
+  roleContracts: readonly RoleContract[],
+  modelAssignments: Readonly<Record<string, { model: string; maxTokens?: number }>>,
+  dispatchOverrides?: Readonly<Record<string, DispatchOverride>>,
+): DefaultRoleRegistry {
+  const defaultModel = loadRunnerRegistry()[0]?.models[0];
+  if (!defaultModel) {
+    throw new Error('Runner registry is empty — no default model available');
+  }
+  return new DefaultRoleRegistry(
+    roleContracts,
+    { assignments: modelAssignments, defaultAssignment: { model: defaultModel } },
+    dispatchOverrides,
+  );
+}
+
+/** Verify configured models before allocating a run or spawning a detached CLI. */
+export async function preflightSelectedModels(
+  repoRoot: string,
+): Promise<{ warnings: string[]; receipt?: string }> {
+  const config = loadConfiguration();
+  if (config.isFixture) {
+    return { warnings: [] };
+  }
+  const registry = buildRoleRegistry(
+    loadRoleContracts(),
+    config.configModelAssignments,
+    config.configDispatchOverrides,
+  );
+  const fingerprint = createHash('sha256')
+    .update(JSON.stringify({ repoRoot, config: config.mergedConfig, roles: registry.listRoles() }))
+    .digest('hex');
+  const [verifiedFingerprint, checkedAt] =
+    process.env['AI_ORCHESTRATOR_MODEL_PREFLIGHT']?.split(':') ?? [];
+  const age = Date.now() - Number(checkedAt);
+  const verified = verifiedFingerprint === fingerprint && age >= 0 && age < 60_000;
+  const warnings = await validateSelectedModels(registry, repoRoot, verified);
+  return { warnings, receipt: `${fingerprint}:${String(Date.now())}` };
+}
+
 function loadRoleContracts(): RoleContract[] {
   const rolesPath = join(getAiDir(), 'roles.yaml');
   if (existsSync(rolesPath)) {
@@ -517,19 +560,7 @@ async function buildOrchestratorInfra(params: InfraParams): Promise<InfraResult>
     : Object.keys(configDispatchOverrides).length > 0
       ? configDispatchOverrides
       : undefined;
-  const runnerRegistryEntries = loadRunnerRegistry();
-  const defaultModel = runnerRegistryEntries[0]?.models[0];
-  if (!defaultModel) {
-    throw new Error('Runner registry is empty — no default model available');
-  }
-  const roleRegistry = new DefaultRoleRegistry(
-    roleContracts,
-    {
-      assignments: configModelAssignments,
-      defaultAssignment: { model: defaultModel },
-    },
-    dispatchOverrides,
-  );
+  const roleRegistry = buildRoleRegistry(roleContracts, configModelAssignments, dispatchOverrides);
 
   const templateRegistry = new DefaultTemplateRegistry();
   for (const t of loadPromptTemplates()) {
@@ -669,6 +700,7 @@ async function buildOrchestratorInfra(params: InfraParams): Promise<InfraResult>
 
 /** Wire all infrastructure and create a fresh orchestrator context for a new run. */
 export async function createOrchestrator(repoRoot: string): Promise<OrchestratorContext> {
+  const { warnings: modelWarnings } = await preflightSelectedModels(repoRoot);
   const runId = createRunId();
   const runDir = getRunDir(runId);
   mkdirSync(runDir, { recursive: true });
@@ -695,7 +727,7 @@ export async function createOrchestrator(repoRoot: string): Promise<Orchestrator
     artifactStore: infra.artifactStore,
     runId,
     runDir,
-    warnings: infra.warnings,
+    warnings: [...modelWarnings, ...infra.warnings],
     budgetConfig: infra.config.governance.budget,
     reportOutputPath: infra.config.runtime.reportOutputPath,
     shutdownCoordinator: infra.shutdownCoordinator,
@@ -716,6 +748,12 @@ export async function resumeOrchestrator(
 
   const journalWriter = new DefaultJournalWriter(journalPath, runId, startSequence);
 
+  const { state: checkpoint } = loadLatestRunState(
+    new DefaultStatePersistence(getRunsDir()),
+    runId as RunId,
+    existingEvents,
+  );
+  repoRoot = checkpoint?.repoRoot ?? repoRoot;
   const infra = await buildOrchestratorInfra({ runId, runDir, repoRoot, journalWriter });
 
   await infra.sessionRegistry.rebuild();
@@ -730,11 +768,6 @@ export async function resumeOrchestrator(
     /* best-effort orphan cleanup */
   });
 
-  let checkpoint = infra.statePersistence.load(runId as RunId);
-  checkpoint ??= infra.statePersistence.reconstructFromJournal(
-    runId as RunId,
-    journalReader.readAll(),
-  );
   if (checkpoint) {
     const workflow = resolveWorkflowForResume(runDir, checkpoint);
     const sources = readPersistedSources(runDir);

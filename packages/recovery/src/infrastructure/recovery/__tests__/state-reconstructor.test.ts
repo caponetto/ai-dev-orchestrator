@@ -147,7 +147,7 @@ describe('StateReconstructor', () => {
     expect(r1?.stateHistory).toEqual(r2?.stateHistory);
   });
 
-  it('deduplicates stateHistory and tracks transitionCount on revisits', () => {
+  it('preserves ordered stateHistory and tracks transitionCount on revisits', () => {
     const events = [
       makeEvent(1, 'run_started', {
         kind: 'run_lifecycle',
@@ -191,7 +191,7 @@ describe('StateReconstructor', () => {
     );
 
     expect(result?.transitionCount).toBe(3);
-    expect(result?.stateHistory).toEqual(['INTAKE', 'PLANNING', 'IMPLEMENTATION']);
+    expect(result?.stateHistory).toEqual(['INTAKE', 'PLANNING', 'IMPLEMENTATION', 'PLANNING']);
     expect(result?.iterationCounts).toEqual({});
   });
 

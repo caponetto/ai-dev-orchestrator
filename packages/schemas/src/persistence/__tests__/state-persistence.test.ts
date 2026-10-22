@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   budgetExhaustionContextSchema,
+  entryActionContinuationSchema,
   lockHandleSchema,
   persistedStateSchema,
   persistedWaitingContextSchema,
@@ -9,6 +10,51 @@ import {
 } from '../state-persistence';
 
 const validRef = { type: 'plan', name: 'main-plan', version: 1, checksum: 'sha256-abc' };
+
+describe('entryActionContinuationSchema', () => {
+  it('preserves completed actions and dispatch context for a resumed state', () => {
+    const continuation = {
+      stateId: 'PLAN_REVIEW',
+      nextActionIndex: 1,
+      completedResults: [
+        {
+          action: { type: 'dispatch_worker', params: { role: 'plan_reviewer' } },
+          success: true,
+          sessionOutcome: 'awaiting_human',
+          sessionRef: { sessionId: 's1' },
+        },
+      ],
+      completedExitResults: [
+        { action: { type: 'record_journal', params: { event: 'run_resumed' } }, success: true },
+      ],
+      humanFeedback: 'Check transactions',
+      previousReviewContent: 'Earlier findings',
+      iterationCount: 2,
+      resumeInput: { type: 'text', content: 'Use PostgreSQL' },
+      resumeWaitingContext: {
+        reason: 'clarification_needed',
+        requiredInput: 'text',
+        requestingState: 'REFINEMENT',
+        autoResumeSafe: false,
+        presentedArtifacts: [],
+        waitingSince: '2026-01-01T00:00:00Z',
+      },
+    };
+    expect(entryActionContinuationSchema.parse(JSON.parse(JSON.stringify(continuation)))).toEqual(
+      continuation,
+    );
+  });
+
+  it.each([-1, 0.5])('rejects invalid action cursor %s', (nextActionIndex) => {
+    expect(
+      entryActionContinuationSchema.safeParse({
+        stateId: 'PLAN_REVIEW',
+        completedResults: [],
+        nextActionIndex,
+      }).success,
+    ).toBe(false);
+  });
+});
 
 describe('budgetExhaustionContextSchema', () => {
   it('validates a budget exhaustion context', () => {
@@ -118,6 +164,10 @@ describe('persistedStateSchema', () => {
       cumulativeInputTokens: 10000,
       cumulativeOutputTokens: 5000,
       hasReceivedUsage: true,
+      budgetApproved: true,
+      executionPaused: true,
+      pendingTerminalState: 'DONE',
+      terminalRecoveryState: 'CODE_REVIEW',
       governanceDecisionCount: 3,
       escalationCount: 1,
       workerMetricsByRole: {
@@ -137,7 +187,7 @@ describe('persistedStateSchema', () => {
         { stateId: 'SPEC', enteredAt: '2026-01-01T00:00:00Z', exitedAt: '2026-01-01T00:00:30Z' },
       ],
     };
-    expect(persistedStateSchema.safeParse(data).success).toBe(true);
+    expect(persistedStateSchema.parse(data)).toEqual(data);
   });
 
   it('rejects missing required fields', () => {

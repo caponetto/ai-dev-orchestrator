@@ -379,6 +379,31 @@ describe('workerResultSchema', () => {
   });
 });
 
+describe('worker session identity', () => {
+  it('preserves task identity and pending session metadata through serialization', () => {
+    const result = {
+      role: 'task_spec_writer',
+      success: true,
+      taskId: 'A',
+      sessionOutcome: 'awaiting_human',
+      sessionRef: {
+        sessionId: 'session-A',
+        runId: 'run',
+        stateId: 'SPEC',
+        role: 'task_spec_writer',
+        transport: 'remote',
+      },
+      pendingRequest: {
+        requestId: 'request-A',
+        kind: 'permission',
+        createdAt: '',
+        payload: { action: 'read', resource: '.' },
+      },
+    };
+    expect(workerResultSchema.parse(JSON.parse(JSON.stringify(result)))).toEqual(result);
+  });
+});
+
 describe('transitionRecordSchema', () => {
   it('validates a transition record', () => {
     const data = {

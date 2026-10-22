@@ -22,7 +22,7 @@ import type {
 } from '@ai-dev-orchestrator/schemas';
 
 import { TERMINAL_STATES, buildAbortedState, writeAbortJournalEntries } from '../abort-run';
-import { loadAllWorkflows, loadWorkflowByName } from '../composition-root';
+import { loadAllWorkflows, loadWorkflowByName, preflightSelectedModels } from '../composition-root';
 import { readLockMetadata, recoverRunState, terminateRunFromLock } from '../run-state-recovery';
 import { getJournalPath, getRunsDir, getStatePath } from '../workspace-paths';
 
@@ -32,7 +32,12 @@ function getCliEntryPath(): string {
   return process.argv[1];
 }
 
-function spawnDetachedCli(baseDir: string, args: string[], logPath?: string): void {
+function spawnDetachedCli(
+  baseDir: string,
+  args: string[],
+  logPath?: string,
+  modelPreflightReceipt?: string,
+): void {
   const entry = getCliEntryPath();
   const cwd = existsSync(baseDir) ? baseDir : tmpdir();
   let stderrFd: number | undefined;
@@ -43,6 +48,9 @@ function spawnDetachedCli(baseDir: string, args: string[], logPath?: string): vo
     cwd,
     detached: true,
     stdio: ['ignore', 'ignore', stderrFd ?? 'ignore'],
+    ...(modelPreflightReceipt
+      ? { env: { ...process.env, AI_ORCHESTRATOR_MODEL_PREFLIGHT: modelPreflightReceipt } }
+      : {}),
   });
   child.unref();
   if (stderrFd !== undefined) {
@@ -201,14 +209,18 @@ export class DefaultDashboardActionHandler implements DashboardActionHandler {
       };
     }
 
-    if (!TERMINAL_STATES.has(state.currentState) && state.currentState !== 'FAILED') {
+    if (
+      !TERMINAL_STATES.has(state.currentState) &&
+      state.currentState !== 'FAILED' &&
+      !state.pendingTerminalState
+    ) {
       return {
         success: false,
         error: `Run ${runId} is not in a terminal state (current: ${state.currentState})`,
       };
     }
 
-    const retryState = state.previousState;
+    const retryState = state.pendingTerminalState ? state.currentState : state.previousState;
     if (!retryState) {
       return {
         success: false,
@@ -216,7 +228,10 @@ export class DefaultDashboardActionHandler implements DashboardActionHandler {
       };
     }
 
-    if (TERMINAL_STATES.has(retryState) || retryState === 'FAILED') {
+    if (
+      (TERMINAL_STATES.has(retryState) || retryState === 'FAILED') &&
+      !state.pendingTerminalState
+    ) {
       return {
         success: false,
         error: `Cannot retry from terminal state '${retryState}'`,
@@ -323,21 +338,22 @@ export class DefaultDashboardActionHandler implements DashboardActionHandler {
     }));
   }
 
-  createRun(options: RunCreationParams): Promise<CreateRunResult> {
+  async createRun(options: RunCreationParams): Promise<CreateRunResult> {
     const prompt = options.prompt.trim();
     if (!prompt) {
-      return Promise.resolve({ success: false, error: 'Prompt must be non-empty' });
+      return { success: false, error: 'Prompt must be non-empty' };
     }
 
     const repoRoot = options.repoRoot;
 
     try {
+      const preflight = await preflightSelectedModels(repoRoot ?? tmpdir());
       const args = runCreationParamsToCliArgs({ ...options, prompt });
-      spawnDetachedCli(repoRoot ?? tmpdir(), args);
+      spawnDetachedCli(repoRoot ?? tmpdir(), args, undefined, preflight.receipt);
 
-      return Promise.resolve({ success: true, runId: '' });
+      return { success: true, runId: '' };
     } catch (e: unknown) {
-      return Promise.resolve({ success: false, error: e instanceof Error ? e.message : String(e) });
+      return { success: false, error: e instanceof Error ? e.message : String(e) };
     }
   }
 

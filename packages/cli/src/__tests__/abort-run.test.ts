@@ -51,6 +51,20 @@ describe('buildAbortedState', () => {
     expect(aborted.workflowName).toBe(state.workflowName);
   });
 
+  it('clears pending terminal cleanup and action cursors on explicit abort', () => {
+    const aborted = buildAbortedState(
+      makeState({
+        pendingTerminalState: 'DONE',
+        terminalRecoveryState: 'IMPLEMENTING',
+        entryActionContinuation: { stateId: 'DONE', nextActionIndex: 0, completedResults: [] },
+      }),
+    );
+    expect(aborted.currentState).toBe('ABORTED');
+    expect(aborted.pendingTerminalState).toBeUndefined();
+    expect(aborted.terminalRecoveryState).toBeUndefined();
+    expect(aborted.entryActionContinuation).toBeUndefined();
+  });
+
   it('preserves all non-overridden fields', () => {
     const state = makeState({
       iterationCounts: { IMPLEMENTING: 2 },

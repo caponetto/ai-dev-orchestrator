@@ -108,11 +108,11 @@ describe('GuardChecker', () => {
     expect(await checker.allPass(guards, makeContext())).toBe(false);
   });
 
-  it('iteration_below_limit passes when no contract found', async () => {
+  it('iteration_below_limit fails closed when no contract found', async () => {
     const checker = new GuardChecker(makeArtifactStore(), makeContractRegistry());
     const guard: Guard = { type: 'iteration_below_limit', params: { contract: 'unknown' } };
     const results = await checker.evaluateAll([guard], makeContext());
-    expect(results[0].passed).toBe(true);
+    expect(results[0].passed).toBe(false);
   });
 
   it('iteration_below_limit passes when iteration count is below max', async () => {

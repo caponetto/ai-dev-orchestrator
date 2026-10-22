@@ -12,6 +12,10 @@ export function buildAbortedState(state: PersistedState): PersistedState {
   return {
     ...state,
     currentState: 'ABORTED',
+    pendingTerminalState: undefined,
+    terminalRecoveryState: undefined,
+    entryActionContinuation: undefined,
+    interruptedActionResults: undefined,
     previousState: state.currentState,
     stateHistory: [...state.stateHistory, 'ABORTED'],
     transitionCount: state.transitionCount + 1,

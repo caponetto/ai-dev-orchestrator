@@ -254,6 +254,10 @@ export function NewRunPage() {
           <p className="mt-1 text-xs text-muted-foreground">
             Describe the task for the orchestrator to execute
           </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Selected models are checked before starting. Small test requests may incur provider
+            usage.
+          </p>
         </div>
         <div className="flex gap-3">
           <Button variant="outline" size="sm" onClick={handleCancel} disabled={isDisabled}>
@@ -264,7 +268,7 @@ export function NewRunPage() {
             onClick={() => void handleSubmit()}
             disabled={isDisabled || !prompt.trim()}
           >
-            {status.kind === 'submitting' ? 'Starting...' : 'Start Run'}
+            {status.kind === 'submitting' ? 'Checking models...' : 'Start Run'}
           </Button>
         </div>
       </div>
@@ -350,7 +354,11 @@ export function NewRunPage() {
               className="min-h-24 flex-1 bg-card"
             />
             {status.kind === 'error' && (
-              <p id="prompt-error" role="alert" className="text-xs text-destructive">
+              <p
+                id="prompt-error"
+                role="alert"
+                className="whitespace-pre-wrap text-xs text-destructive"
+              >
                 {status.message}
               </p>
             )}

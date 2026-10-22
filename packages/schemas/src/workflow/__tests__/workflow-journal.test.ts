@@ -19,6 +19,7 @@ const validRef = { type: 'plan', name: 'main-plan', version: 1, checksum: 'sha25
 
 describe('journalEventTypeSchema', () => {
   it.each([
+    'workflow_checkpoint',
     'run_started',
     'run_completed',
     'run_aborted',
@@ -79,6 +80,23 @@ describe('runLifecycleDataSchema', () => {
 });
 
 describe('stateTransitionDataSchema', () => {
+  it('preserves iteration and arbitration snapshots for custom workflow recovery', () => {
+    const data = {
+      kind: 'state_transition',
+      from: 'CUSTOM_REVIEW',
+      to: 'IMPLEMENTATION',
+      trigger: 'completion',
+      durationMs: 1,
+      guardsEvaluated: 0,
+      guardsPassed: 0,
+      governanceRequired: false,
+      terminalActionsPending: true,
+      transitionCount: 4,
+      iterationCounts: { custom_loop: 4 },
+      judgeArbitrationCounts: { custom_loop: 2 },
+    };
+    expect(stateTransitionDataSchema.parse(data)).toEqual(data);
+  });
   it('validates a transition event', () => {
     const data = {
       kind: 'state_transition',
@@ -110,6 +128,29 @@ describe('stateTransitionDataSchema', () => {
 });
 
 describe('workerEventDataSchema', () => {
+  it('preserves the completed entry and exit cursor on session completion', () => {
+    const data = {
+      kind: 'worker',
+      workerId: 'session',
+      role: 'planner',
+      stateId: 'WORK',
+      status: 'success',
+      entryActionContinuation: {
+        stateId: 'WORK',
+        nextActionIndex: 1,
+        completedResults: [{ action: { type: 'notify_human', params: {} }, success: true }],
+        completedExitResults: [
+          {
+            action: { type: 'dispatch_worker', params: { role: 'planner' } },
+            success: true,
+            artifactRef: validRef,
+          },
+        ],
+      },
+    };
+    expect(workerEventDataSchema.parse(JSON.parse(JSON.stringify(data)))).toEqual(data);
+  });
+
   it('validates a dispatched event', () => {
     const data = {
       kind: 'worker',
@@ -278,5 +319,49 @@ describe('journalFilterSchema', () => {
       before: '2026-01-02T00:00:00Z',
     };
     expect(journalFilterSchema.safeParse(data).success).toBe(true);
+  });
+});
+
+describe('workflow checkpoint data', () => {
+  it('preserves resumable session metadata and the terminal cursor through serialization', () => {
+    const data = {
+      kind: 'workflow_checkpoint',
+      state: {
+        runId: 'run',
+        schemaVersion: 2,
+        currentState: 'WAITING_FOR_HUMAN',
+        previousState: 'WORK',
+        stateEnteredAt: '',
+        transitionCount: 1,
+        stateHistory: ['WORK', 'WAITING_FOR_HUMAN'],
+        iterationCounts: {},
+        activeArtifacts: [],
+        lastProducedArtifact: null,
+        workflowName: 'test',
+        workflowVersion: '1',
+        persistedAt: '',
+        persistenceVersion: 1,
+        checksum: '',
+        waitingContext: {
+          reason: 'live_session_awaiting_human',
+          requiredInput: 'approval',
+          requestingState: 'DONE',
+          autoResumeSafe: false,
+          presentedArtifacts: [],
+          waitingSince: '',
+          liveSessionId: 'session',
+          pendingRequestId: 'request',
+          liveRequestType: 'permission',
+          sessionTransport: 'remote',
+        },
+        entryActionContinuation: {
+          stateId: 'DONE',
+          nextActionIndex: 1,
+          completedResults: [],
+          waitRequestingState: 'WORK',
+        },
+      },
+    };
+    expect(journalEventDataSchema.parse(JSON.parse(JSON.stringify(data)))).toEqual(data);
   });
 });

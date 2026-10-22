@@ -25,6 +25,9 @@ function createContext(overrides: Partial<RebuildContext> = {}): RebuildContext 
     workflowName: 'default',
     workflowVersion: '1.0.0',
     waitingContext: undefined,
+    cumulativeInputTokens: 0,
+    cumulativeOutputTokens: 0,
+    hasReceivedUsage: false,
     ...overrides,
   };
 }

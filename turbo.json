@@ -74,6 +74,7 @@
         "tsconfig.json",
         "tsconfig.base.json",
         "vitest.scripts.config.ts",
+        ".husky/pre-commit",
         "scripts/**/*.ts"
       ],
       "outputs": ["coverage-scripts/**", "test-report.scripts.junit.xml"]

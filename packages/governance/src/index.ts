@@ -26,6 +26,7 @@ export {
   buildContracts,
   BUILT_IN_CONTRACTS,
   CLARIFICATION_LOOP,
+  DECOMPOSITION_REVIEW_LOOP,
   IMPLEMENTATION_REVIEW_LOOP,
   PLAN_REVIEW_LOOP,
   DefaultIterationContractRegistry,

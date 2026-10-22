@@ -68,7 +68,7 @@ ai config show
 ai run "Add a /health endpoint that returns 200 OK"
 ai run --source jira:PROJ-123
 ai run --workflow pr-review --source github:owner/repo#42
-ai run --dry-run "Validate config only"
+ai run --dry-run "Validate configuration and model access"
 ```
 
 Current built-in workflows are `dev`, `pr-review`, and `task-breakdown`.

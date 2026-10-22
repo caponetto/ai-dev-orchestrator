@@ -84,6 +84,14 @@ describe('ModelAssigner — tier escalation', () => {
     expect(next?.model).toBe('claude-sonnet-5');
   });
 
+  it('continues from the model used for an earlier escalation without changing the default', () => {
+    const assigner = new ModelAssigner(createTieredConfig());
+    expect(assigner.getNextTier('implementer', 'claude-sonnet-5')?.model).toBe('claude-opus-5');
+    expect(assigner.getNextTier('implementer', 'claude-opus-5')).toBeNull();
+    expect(assigner.getNextTier('implementer', 'unknown-model')).toBeNull();
+    expect(assigner.getModelAssignment('implementer').model).toBe('claude-haiku-4-5-20251001');
+  });
+
   it('returns null when role is already at max tier', () => {
     const assigner = new ModelAssigner(createTieredConfig());
     const next = assigner.getNextTier('judge');

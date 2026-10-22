@@ -304,7 +304,7 @@ export class ScriptExecutor {
 
         if (killed) {
           resolve({
-            exitCode: code ?? 143,
+            exitCode: code === null || code === 0 ? 143 : code,
             stdout,
             stderr: stderr || 'Script timed out',
             durationMs,

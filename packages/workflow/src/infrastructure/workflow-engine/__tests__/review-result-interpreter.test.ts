@@ -22,6 +22,52 @@ function makeArtifactStore(overrides: Partial<ArtifactStore> = {}): ArtifactStor
   };
 }
 
+describe('sequential review failures', () => {
+  it.each([
+    ['review', 'plan_review', 'review_rejected'],
+    ['judge', 'judge_decision', 'judge_rejected'],
+  ] as const)(
+    'rejects %s approval from an artifact marked invalid by storage',
+    async (stateType, artifactType, expected) => {
+      const artifact = { ...approvedArtifact(artifactType), metadata: { validationFailed: true } };
+      const store = makeArtifactStore({ getLatest: vi.fn().mockResolvedValue(artifact) });
+      const interpreter = new ReviewResultInterpreter(store, makeContractRegistry());
+      expect(
+        await interpreter.interpret(
+          [
+            {
+              action: { type: 'dispatch_worker', params: { role: 'plan_reviewer' } },
+              success: true,
+              artifactRef: artifact.ref,
+            },
+          ],
+          'REVIEW',
+          stateType,
+        ),
+      ).toBe(expected);
+    },
+  );
+
+  it('does not let a successful journal action mask a failed reviewer', async () => {
+    const interpreter = new ReviewResultInterpreter(makeArtifactStore(), makeContractRegistry());
+    expect(
+      await interpreter.interpret(
+        [
+          { action: { type: 'record_journal', params: { event: 'run_started' } }, success: true },
+          {
+            action: { type: 'dispatch_worker', params: { role: 'plan_reviewer' } },
+            success: false,
+            error: 'offline',
+            errorType: 'agent_error',
+          },
+        ],
+        'PLAN_REVIEW',
+        'review',
+      ),
+    ).toBe('failure');
+  });
+});
+
 function makeContract(overrides: Partial<IterationContract> = {}): IterationContract {
   return {
     id: 'plan-review-contract',

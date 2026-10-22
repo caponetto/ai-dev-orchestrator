@@ -62,6 +62,12 @@ else
   fi
 fi
 
+# Typed ESLint resolves workspace exports through dist declarations. Refresh them
+# before lint-staged so a clean checkout or changed export cannot look untyped.
+if [ "$RUN_FULL" -eq 1 ]; then
+  pnpm typecheck
+fi
+
 run_shared_prefix
 
 if [ "$RUN_FULL" -eq 0 ]; then

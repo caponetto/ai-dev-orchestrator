@@ -146,6 +146,20 @@ describe('ScriptExecutor', () => {
     expect(result.scriptResult?.durationMs).toBeLessThan(10000);
   }, 15000);
 
+  it.each([0, 42])(
+    'fails timed-out scripts even when their SIGTERM handler exits %i',
+    async (exitCode) => {
+      await writeScript(
+        'handles-term.ts',
+        `process.on('SIGTERM', () => process.exit(${String(exitCode)}));\nsetInterval(() => {}, 1000);\n`,
+      );
+      const result = await executor.execute({ script: 'handles-term.ts', timeout: 500 }, context());
+      expect(result.success).toBe(false);
+      expect(result.scriptResult?.exitCode).toBe(exitCode === 0 ? 143 : exitCode);
+      expect(result.scriptResult?.durationMs).toBeGreaterThanOrEqual(490);
+    },
+  );
+
   it('records journal events for start and complete', async () => {
     await writeScript('journal-test', '#!/bin/bash\necho ok');
 

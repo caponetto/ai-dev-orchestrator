@@ -48,6 +48,32 @@ Dashboard defaults are:
 - host: `127.0.0.1`
 - API port: `9100`
 
+## Model Availability Before a New Run
+
+Before creating a run directory, `ai run` checks the effective model for every configured role
+using its selected built-in runner (`claude-code`, `cursor`, `codex`, or `opencode`). The check
+uses the same model precedence as dispatch: `agentConfig.model`, then the role model assignment.
+The `agent` sentinel checks the runner's default model.
+
+Each distinct runner/model pair sends a small inference request with the repository as its
+configuration context. Checks run two at a time, with a 30-second timeout per request. They add
+startup latency and may incur provider usage, including with `--dry-run`. A successful terminal
+response is required; a model catalog entry or installed CLI alone is insufficient. Provider
+errors, authentication failures, and timeouts block startup and report all affected models and
+roles, without creating a run directory. Availability can still change after this check.
+
+OpenCode checks require approval for all tools and omit `--auto`, so its non-interactive CLI
+rejects tool permission requests. This preserves the tool definitions sent to the provider;
+denying every tool instead can trigger OpenCode's free-tier rejection even inside the official CLI.
+
+The dashboard performs the same check before spawning the run process and displays failures on
+the New Run page. A configuration fingerprint and a receipt valid for 60 seconds let the child
+process reuse that check. Changed settings or expired receipts trigger a new check.
+
+Custom runners and roles that override the CLI command or arguments are not probed; the CLI
+emits an explicit warning for these roles. Fixture mode skips provider checks. Resume and retry
+continue to use their existing behavior.
+
 ## Human-in-the-Loop Model
 
 The current implementation uses three operator response paths:

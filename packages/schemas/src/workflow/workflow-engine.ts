@@ -446,6 +446,10 @@ export const workerResultSchema = z.object({
   errorType: workerErrorTypeSchema.optional(),
   artifactRef: artifactRefSchema.optional(),
   model: z.string().optional(),
+  taskId: z.string().optional(),
+  sessionOutcome: sessionDispatchOutcomeSchema.optional(),
+  sessionRef: agentSessionRefSchema.optional(),
+  pendingRequest: sessionPendingRequestSchema.optional(),
 });
 export type WorkerResult = z.infer<typeof workerResultSchema>;
 
