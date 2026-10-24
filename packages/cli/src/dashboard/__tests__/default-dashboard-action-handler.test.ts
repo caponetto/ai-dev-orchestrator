@@ -134,6 +134,26 @@ describe('DefaultDashboardActionHandler', () => {
     expect(abortMock).toHaveBeenCalledWith('sess-42', 'Aborted via dashboard');
   });
 
+  it('does not cancel a session when the abort request loses run ownership', async () => {
+    await seedRunState('run-losing-abort', { waitingContext: { liveSessionId: 'session' } });
+    const abort = vi.fn().mockResolvedValue(true);
+    const acquire = vi
+      .spyOn(DefaultStatePersistence.prototype, 'acquireLock')
+      .mockImplementation(() => {
+        throw new Error('owned elsewhere');
+      });
+    try {
+      const result = await new DefaultDashboardActionHandler(makeSupervisor({ abort })).abort(
+        'run-losing-abort',
+        {},
+      );
+      expect(result).toEqual({ success: false, error: 'owned elsewhere' });
+      expect(abort).not.toHaveBeenCalled();
+    } finally {
+      acquire.mockRestore();
+    }
+  });
+
   it('rejects a stale session abort before signalling the current run process', async () => {
     const abort = vi.fn().mockResolvedValue(true);
     const supervisor = makeSupervisor({ abort });

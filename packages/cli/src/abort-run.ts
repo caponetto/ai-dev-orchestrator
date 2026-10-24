@@ -79,6 +79,7 @@ export async function abortRunState(
   runId: string,
   state: PersistedState,
   reason: string,
+  options?: { expectedSessionId?: string; onOwned?: (latest: PersistedState) => Promise<void> },
 ): Promise<void> {
   // SIGTERM is asynchronous. Never overwrite an owner that is still checkpointing
   // or cleaning up, and re-read durable progress only after acquiring ownership.
@@ -95,6 +96,15 @@ export async function abortRunState(
     if (TERMINAL_STATES.has(latest.currentState)) {
       return;
     }
+    if (
+      options?.expectedSessionId &&
+      latest.waitingContext?.liveSessionId !== options.expectedSessionId
+    ) {
+      throw new Error(
+        `Session ID mismatch: expected ${latest.waitingContext?.liveSessionId ?? 'no live session'}, got ${options.expectedSessionId}`,
+      );
+    }
+    await options?.onOwned?.(latest);
     await statePersistence.save(buildAbortedState(latest));
     try {
       writeAbortJournalEntries(runsDir, runId, latest, reason);

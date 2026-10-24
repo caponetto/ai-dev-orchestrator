@@ -90,7 +90,6 @@ import {
   FilesystemManifestWriter,
 } from '@ai-dev-orchestrator/run-manifest';
 import {
-  AgentSessionReaper,
   AgentSessionRegistry,
   CliAgentRunner,
   CompositeAgentSessionSupervisor,
@@ -128,6 +127,7 @@ import type { ConfigSnapshot } from './config-snapshot';
 import { configSnapshotSchema, resolveRunModelAssignments } from './config-snapshot';
 import { validateSelectedModels } from './model-preflight';
 import { loadDefaultWorkflow, loadProjectConfig } from './project-config';
+import { ResumeStatePersistence } from './resume-state-persistence';
 import { loadLatestRunState } from './run-state-recovery';
 import {
   getAiDir,
@@ -476,6 +476,7 @@ function buildFixtureDispatchOverrides(
 // ---------------------------------------------------------------------------
 
 interface InfraParams {
+  readonly statePersistence?: DefaultStatePersistence;
   readonly runId: string;
   readonly runDir: string;
   readonly repoRoot: string;
@@ -540,7 +541,7 @@ async function buildOrchestratorInfra(params: InfraParams): Promise<InfraResult>
     readPersistedConfigSnapshot(runDir),
   );
 
-  const statePersistence = new DefaultStatePersistence(runsDir);
+  const statePersistence = params.statePersistence ?? new DefaultStatePersistence(runsDir);
   const manifestProducer = new DefaultManifestProducer();
 
   const eventBus = new InMemoryEventBus({ runId });
@@ -739,6 +740,7 @@ export async function resumeOrchestrator(
   repoRoot: string,
   runId: string,
 ): Promise<OrchestratorContext> {
+  const statePersistence = new ResumeStatePersistence(getRunsDir(), runId);
   const runDir = getRunDir(runId);
   const journalPath = getJournalPath(runDir);
 
@@ -749,27 +751,28 @@ export async function resumeOrchestrator(
     0,
   );
 
-  const journalWriter = new DefaultJournalWriter(journalPath, runId, startSequence);
+  const journalWriter = statePersistence.guardJournal(
+    new DefaultJournalWriter(journalPath, runId, startSequence),
+  );
 
   const { state: checkpoint } = loadLatestRunState(
-    new DefaultStatePersistence(getRunsDir()),
+    statePersistence,
     runId as RunId,
     existingEvents,
   );
   repoRoot = checkpoint?.repoRoot ?? repoRoot;
-  const infra = await buildOrchestratorInfra({ runId, runDir, repoRoot, journalWriter });
+  const infra = await buildOrchestratorInfra({
+    runId,
+    runDir,
+    repoRoot,
+    journalWriter,
+    statePersistence,
+  });
 
   await infra.sessionRegistry.rebuild();
 
-  const sessionStore = new DefaultAgentSessionStore(getRunsDir());
-  const reaper = new AgentSessionReaper(sessionStore, {
-    retentionMs: 0,
-    reapOrphans: true,
-    reapTerminal: false,
-  });
-  void reaper.reap(runId).catch(() => {
-    /* best-effort orphan cleanup */
-  });
+  // Session discovery is read-only. Orphan cleanup must not race a live owner;
+  // session reconciliation/finalization is performed by the engine after acquiring ownership.
 
   if (checkpoint) {
     const workflow = resolveWorkflowForResume(runDir, checkpoint);

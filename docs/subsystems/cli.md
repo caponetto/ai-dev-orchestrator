@@ -100,3 +100,32 @@ Prefer:
 ## External abort ownership
 
 CLI, dashboard and kill-command checkpoint aborts wait briefly for a signalled owner to exit, then acquire the run lock and reload the latest checkpoint/journal progress before writing. If ownership remains live, foreign or unreadable, the abort checkpoint is refused; retry after resolving ownership. A run that completed while termination was pending keeps its terminal checkpoint. Aborted checkpoints clear stale human-wait and manual-pause flags. Process termination remains best-effort and the force-abort path does not run workflow terminal entry actions; use engine/session cancellation for graceful cleanup, and inspect temporary/external resources after a forced termination.
+
+## Concurrent control of an existing run
+
+`resumeOrchestrator` captures checkpoint and journal content revisions before assembling the
+restored context. Once the engine acquires the run lock, it verifies those revisions before
+executing the saved state or using its journal cursor. If another owner made progress, the
+operation releases its newly acquired lock and fails with a request to reload the run. Reissue
+resume/retry/approval using a fresh context; an old request must not overwrite the newer state.
+Journal-only progress also invalidates an idle context.
+
+The resumed context permits checkpoint saves and journal appends only while it owns the run.
+Late error callbacks outside ownership do not append through the old journal writer. On release,
+the context records its own state/journal revision while still holding the lock, allowing its own
+subsequent pause/resume but detecting intervening progress by another owner. Run discovery and
+session registry loading do not reap orphan sessions before ownership. Diagnostic logging can
+still initialize or write `orchestrator.log`; it is not authoritative workflow progress.
+Unrelated orphan snapshots remain until explicit maintenance; resume does not perform bulk reaping.
+
+Dashboard abort validates an explicit session identity again after acquiring the run lock and
+loading the latest state. Session cancellation happens inside that owned section. A competing
+abort cannot cancel the supervisor session after losing ownership. CLI/dashboard process
+termination requests remain asynchronous and best-effort; sending a signal and acquiring the
+run lock are separate effects. The final checkpoint is decided from the state read under the
+lock, so completion committed in the meantime remains authoritative.
+
+These checks fence existing-run CLI composition, not arbitrary external file writers or remote
+side effects. Custom `WorkflowEngine` integrations must provide equivalent freshness/ownership
+semantics through their persistence implementation. Administrative edits and external effects
+without a durable journal/checkpoint record are not an exactly-once contract.

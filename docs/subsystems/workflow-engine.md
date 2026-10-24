@@ -14,7 +14,7 @@ The current engine:
 - appends journal events
 - produces a manifest and report near terminal completion
 
-Start, resume, and retry allow one execution loop per controller. Abort sets `ABORTED` before awaiting cancellation, blocks a new execution until cancellation finishes, and prevents in-flight cleanup from reporting success. Workers cancelled during context or prompt preparation cannot launch an agent afterward; cancellation also stops queued parallel workers. Resume requested during a manual pause waits for the active action to settle and checkpoint its cursor before acquiring the next run lock. Concurrent execution or restore operations are rejected. Starting a new run clears previous usage, worker metrics, feedback, action cursors, and iteration counters.
+Start, resume, and retry allow one execution loop per controller. Abort acquires ownership when idle, then sets `ABORTED` before awaiting cancellation, blocks a new execution until cancellation finishes, and prevents in-flight cleanup from reporting success. Workers cancelled during context or prompt preparation cannot launch an agent afterward; cancellation also stops queued parallel workers. Resume requested during a manual pause waits for the active action to settle and checkpoint its cursor before acquiring the next run lock. Concurrent execution or restore operations are rejected. Starting a new run clears previous usage, worker metrics, feedback, action cursors, and iteration counters.
 
 Retry accepts a restored `FAILED` or `ABORTED` run without an external checkpoint rewrite.
 It acquires the run lock, checkpoints the previous non-terminal action state, and executes
@@ -105,6 +105,18 @@ after a crash between content, metadata or inventory writes. Legacy orphan files
 conflicting evidence can still require explicit reconciliation. See [artifact recovery](artifacts.md)
 for the write boundary and repair rules. These boundaries do not provide a transaction across
 all files, external effects or a power-loss guarantee.
+
+## Ownership at cancellation boundaries
+
+Idle pause and abort acquire the run lock before changing state, cancelling workers or journaling.
+If acquisition fails, the controller preserves its previous state and performs none of those
+effects. Active execution retains its existing ownership until cancellation, checkpointing and
+terminal cleanup finish. Pause releases a lock it acquired for an idle operation after its
+checkpoint completes, including when checkpointing fails.
+
+CLI restoration additionally fences stale contexts against checkpoint and journal revisions;
+see [concurrent run control](cli.md#concurrent-control-of-an-existing-run). Mutual exclusion alone
+is insufficient if state and journal sequence were loaded before another owner made progress.
 
 ## Execution module boundaries
 

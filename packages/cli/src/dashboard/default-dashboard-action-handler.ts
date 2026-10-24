@@ -149,22 +149,22 @@ export class DefaultDashboardActionHandler implements DashboardActionHandler {
       terminateRunFromLock(lock);
     }
 
-    const liveSessionId = options.sessionId ?? state.waitingContext?.liveSessionId;
-    if (liveSessionId && this.sessionSupervisor) {
-      try {
-        await this.sessionSupervisor.abort(
-          liveSessionId,
-          options.reason ?? 'Aborted via dashboard',
-        );
-      } catch {
-        // Session abort is best-effort — the session may already be dead
-      }
-    }
-
     const abortReason = options.reason ?? 'Aborted via dashboard';
 
     try {
-      await abortRunState(statePersistence, runsDir, runId, state, abortReason);
+      await abortRunState(statePersistence, runsDir, runId, state, abortReason, {
+        expectedSessionId: options.sessionId,
+        onOwned: async (latest) => {
+          const liveSessionId = latest.waitingContext?.liveSessionId;
+          if (liveSessionId && this.sessionSupervisor) {
+            try {
+              await this.sessionSupervisor.abort(liveSessionId, abortReason);
+            } catch {
+              // Session cancellation is best-effort after run ownership and identity validation.
+            }
+          }
+        },
+      });
     } catch (e: unknown) {
       return { success: false, error: e instanceof Error ? e.message : String(e) };
     }

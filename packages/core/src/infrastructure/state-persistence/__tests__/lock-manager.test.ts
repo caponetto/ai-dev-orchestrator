@@ -10,15 +10,20 @@ import { LockManager } from '../lock-manager';
 
 const realFs = vi.hoisted(() => ({
   writeFileSync: null as null | typeof writeFileSync,
+  unlinkSync: null as null | typeof unlinkSync,
+  readFileSync: null as null | typeof readFileSync,
 }));
 
 vi.mock('node:fs', async (importOriginal) => {
   const mod = await importOriginal<Record<string, unknown>>();
   realFs.writeFileSync = mod.writeFileSync as typeof writeFileSync;
+  realFs.unlinkSync = mod.unlinkSync as typeof unlinkSync;
+  realFs.readFileSync = mod.readFileSync as typeof readFileSync;
   return {
     ...mod,
     writeFileSync: vi.fn(mod.writeFileSync as typeof writeFileSync),
     unlinkSync: vi.fn(mod.unlinkSync as typeof unlinkSync),
+    readFileSync: vi.fn(mod.readFileSync as typeof readFileSync),
   };
 });
 
@@ -32,10 +37,70 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.mocked(writeFileSync).mockRestore();
   vi.mocked(unlinkSync).mockRestore();
+  vi.mocked(readFileSync).mockRestore();
   rmSync(TEST_DIR, { recursive: true, force: true });
 });
 
 describe('LockManager', () => {
+  it.each(['replaced', 'removed'])(
+    'fails closed if the observed stale owner is %s after the retirement claim',
+    (change) => {
+      const manager = new LockManager(TEST_DIR);
+      const handle = manager.acquire(createRunId('run-stale-claim-change'));
+      const stale = { ...handle, pid: 999999 };
+      const replacement = { ...handle, ownershipToken: 'successor' };
+      writeFileSync(handle.lockPath, stringify(stale));
+      vi.spyOn(process, 'kill').mockImplementation(() => {
+        throw Object.assign(new Error('dead'), { code: 'ESRCH' });
+      });
+      vi.mocked(readFileSync)
+        .mockReturnValueOnce(stringify(stale))
+        .mockImplementationOnce(() => {
+          if (change === 'replaced') {
+            writeFileSync(handle.lockPath, stringify(replacement));
+          } else {
+            realFs.unlinkSync?.(handle.lockPath);
+          }
+          return change === 'replaced' ? stringify(replacement) : '';
+        });
+      expect(() => manager.acquire(handle.runId)).toThrow('Lock owner changed');
+      if (change === 'replaced') {
+        expect(realFs.readFileSync?.(handle.lockPath, 'utf8')).toBe(stringify(replacement));
+        manager.release(replacement);
+      } else {
+        expect(existsSync(handle.lockPath)).toBe(false);
+      }
+    },
+  );
+
+  it('does not unlink a changed owner after claiming retirement', () => {
+    const manager = new LockManager(TEST_DIR);
+    const handle = manager.acquire(createRunId('run-retirement-replaced'));
+    const replacement = { ...handle, ownershipToken: 'successor' };
+    vi.mocked(readFileSync)
+      .mockReturnValueOnce(stringify(handle))
+      .mockImplementationOnce(() => {
+        writeFileSync(handle.lockPath, stringify(replacement));
+        return stringify(replacement);
+      });
+    manager.release(handle);
+    expect(realFs.readFileSync?.(handle.lockPath, 'utf8')).toBe(stringify(replacement));
+    manager.release(replacement);
+  });
+  it('fences duplicate releases while removal is delayed so neither can delete a successor', () => {
+    const manager = new LockManager(TEST_DIR);
+    const handle = manager.acquire(createRunId('run-delayed-release'));
+    vi.mocked(unlinkSync).mockImplementationOnce((path) => {
+      manager.release(handle);
+      expect(() => manager.acquire(handle.runId)).toThrow();
+      realFs.unlinkSync?.(path);
+    });
+    manager.release(handle);
+    const successor = manager.acquire(handle.runId);
+    manager.release(handle);
+    expect(readFileSync(successor.lockPath, 'utf8')).toBe(stringify(successor));
+    manager.release(successor);
+  });
   it('fails closed if a stale reclamation was interrupted before unlinking', () => {
     const manager = new LockManager(TEST_DIR);
     const handle = manager.acquire(createRunId('run-interrupted-reaper'));

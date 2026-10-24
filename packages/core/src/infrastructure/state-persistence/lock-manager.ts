@@ -85,6 +85,13 @@ export class LockManager {
     ) {
       return;
     }
+    if (!this.claimRemoval(handle.lockPath, existing, handle.runId, true)) {
+      return;
+    }
+    const current = this.readLock(handle.lockPath);
+    if (!current || stringify(current) !== stringify(existing)) {
+      return;
+    }
     try {
       unlinkSync(handle.lockPath);
     } catch (error: unknown) {
@@ -161,20 +168,7 @@ export class LockManager {
   }
 
   private removeStaleLock(lockPath: string, observed: LockHandle, runId: RunId): void {
-    // A permanent claim for this dead acquisition prevents two delayed reapers
-    // from unlinking each other's successor. Never recycle a claim: if its owner
-    // crashes before removal, recovery must fail closed for operator inspection.
-    const fingerprint = createHash('sha256').update(stringify(observed)).digest('hex');
-    const claimPath = `${lockPath}.reclaim-${fingerprint}`;
-    try {
-      mkdirSync(claimPath);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new LockAcquisitionError(
-        runId,
-        `Stale lock reclamation already claimed or unavailable: ${message}`,
-      );
-    }
+    this.claimRemoval(lockPath, observed, runId);
     const current = this.readLock(lockPath);
     if (!current || stringify(current) !== stringify(observed)) {
       throw new LockAcquisitionError(runId, 'Lock owner changed during stale lock reclamation');
@@ -185,5 +179,29 @@ export class LockManager {
       const message = error instanceof Error ? error.message : String(error);
       throw new LockAcquisitionError(runId, message);
     }
+  }
+  private claimRemoval(
+    lockPath: string,
+    observed: LockHandle,
+    runId: RunId,
+    ignoreClaimed = false,
+  ): boolean {
+    // Releases and stale reapers share one permanent claim per acquisition. A delayed
+    // remover must never unlink a successor installed after another remover finishes.
+    const fingerprint = createHash('sha256').update(stringify(observed)).digest('hex');
+    const claimPath = `${lockPath}.reclaim-${fingerprint}`;
+    try {
+      mkdirSync(claimPath);
+    } catch (error: unknown) {
+      if (ignoreClaimed && error instanceof Error && 'code' in error && error.code === 'EEXIST') {
+        return false;
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      throw new LockAcquisitionError(
+        runId,
+        `Stale lock reclamation already claimed or unavailable: ${message}`,
+      );
+    }
+    return true;
   }
 }

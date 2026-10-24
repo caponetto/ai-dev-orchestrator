@@ -1744,11 +1744,44 @@ describe('human transition and abort cleanup regressions', () => {
     const f = createFixture();
     const controller = new LifecycleController(f);
     await controller.start(waitingConfig());
+    const before = controller.getState();
+    vi.mocked(f.runner.cancelAllWorkers).mockClear();
+    vi.mocked(f.journalWriter.append).mockClear();
+    vi.mocked(f.statePersistence.save).mockClear();
     vi.mocked(f.statePersistence).acquireLock.mockImplementationOnce(() => {
       throw new Error('run locked');
     });
     await expect(controller.abort('stop')).rejects.toThrow('run locked');
     expect(f.artifactStore.store).not.toHaveBeenCalled();
+    expect(f.runner.cancelAllWorkers).not.toHaveBeenCalled();
+    expect(f.journalWriter.append).not.toHaveBeenCalled();
+    expect(f.statePersistence.save).not.toHaveBeenCalled();
+    expect(controller.getState()).toEqual(before);
+  });
+
+  it('refuses an idle pause before changing state or journaling when ownership is unavailable', async () => {
+    const f = createFixture();
+    const controller = new LifecycleController(f);
+    await controller.start(waitingConfig());
+    const before = controller.getState();
+    vi.mocked(f.journalWriter.append).mockClear();
+    vi.mocked(f.statePersistence.save).mockClear();
+    vi.mocked(f.statePersistence.acquireLock).mockImplementationOnce(() => {
+      throw new Error('run locked');
+    });
+    await expect(
+      controller.pause({
+        reason: 'manual_pause',
+        requiredInput: 'approval',
+        requestingState: 'WORK',
+        autoResumeSafe: false,
+        presentedArtifacts: [],
+        waitingSince: new Date().toISOString(),
+      }),
+    ).rejects.toThrow('run locked');
+    expect(f.journalWriter.append).not.toHaveBeenCalled();
+    expect(f.statePersistence.save).not.toHaveBeenCalled();
+    expect(controller.getState()).toEqual(before);
   });
 
   it('runs abort cleanup when rejection happens within an active resume call', async () => {

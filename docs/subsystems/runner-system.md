@@ -81,6 +81,11 @@ that boundary is ambiguous and does not guarantee exactly-once delivery. Reconci
 state before retrying an ambiguous response. Local stdio sessions cannot reattach across process
 restart; remote recovery retains the original run/session/request identity.
 
+Resume construction loads session snapshots without starting orphan reaping. A contender must
+not mark or delete another owner's sessions while waiting for run ownership. The owning engine
+handles session reconciliation and finalization; standalone reaper maintenance requires exclusive
+run ownership.
+
 ## Durable remote completion
 
 Remote `done` freezes a completion receipt containing output, duration and optional final token

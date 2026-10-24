@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 
 import { generateAll } from '@ai-dev-orchestrator/config-templates';
 import { DefaultStatePersistence } from '@ai-dev-orchestrator/core';
+import { AgentSessionReaper, DefaultAgentSessionStore } from '@ai-dev-orchestrator/runner';
 import { AI_CONFIG_DIR_NAME } from '@ai-dev-orchestrator/schemas';
 import type { PersistedState, RunId, WorkflowDefinition } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
@@ -133,6 +134,39 @@ describe('composition-root orchestrator creation', () => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
     mockGlobalConfigPath.value = '';
+  });
+
+  it('keeps orphan session files unchanged while constructing an unowned resume context', async () => {
+    vi.stubEnv('AI_ORCHESTRATOR_FIXTURE', '1');
+    const original = await createOrchestrator(baseDir);
+    const sessions = new DefaultAgentSessionStore(mockPaths.runsDir);
+    await sessions.saveSnapshot({
+      ref: {
+        sessionId: 'orphan',
+        runId: original.runId,
+        role: 'planner',
+        stateId: 'WORK',
+        transport: 'stdio',
+      },
+      state: 'running',
+      reconnect: { type: 'stdio', pid: 999999 },
+      pendingRequests: [],
+      createdAt: '',
+      updatedAt: '',
+      lastProtocolTimestamp: '',
+    });
+    const reaper = vi.spyOn(AgentSessionReaper.prototype, 'reap');
+    const before = await sessions.loadSnapshot('orphan', original.runId);
+    const restored = await resumeOrchestrator(baseDir, original.runId);
+    for (const result of reaper.mock.results) {
+      if (result.type === 'return') {
+        await result.value;
+      }
+    }
+    restored.shutdownCoordinator?.uninstall();
+    original.shutdownCoordinator?.uninstall();
+    expect(reaper).not.toHaveBeenCalled();
+    expect(await sessions.loadSnapshot('orphan', original.runId)).toEqual(before);
   });
 
   it('succeeds when all roles are agent-dispatched and no provider key is set', async () => {

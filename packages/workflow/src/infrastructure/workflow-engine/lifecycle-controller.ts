@@ -305,39 +305,49 @@ export class LifecycleController implements WorkflowEngine {
     if (this.aborted || this.currentState === 'ABORTED') {
       return;
     }
-    this.executionPaused = true;
-    this.recordStateExit();
-    this.previousState = this.currentState;
-    this.currentState = 'WAITING_FOR_HUMAN';
-    this.stateEnteredAt = new Date().toISOString();
-    this.stateHistory.record('WAITING_FOR_HUMAN');
+    const acquired = !this.lockHandle && this.config !== null;
+    if (acquired) {
+      this.lockHandle = this.statePersistence.acquireLock(this.runId);
+    }
+    try {
+      this.executionPaused = true;
+      this.recordStateExit();
+      this.previousState = this.currentState;
+      this.currentState = 'WAITING_FOR_HUMAN';
+      this.stateEnteredAt = new Date().toISOString();
+      this.stateHistory.record('WAITING_FOR_HUMAN');
 
-    this.waitingContext = {
-      reason: context.reason,
-      requiredInput: context.requiredInput,
-      requestingState: context.requestingState,
-      autoResumeSafe: context.autoResumeSafe,
-      presentedArtifacts: context.presentedArtifacts,
-      waitingSince: context.waitingSince,
-    };
-
-    this.transitionCount += 1;
-    this.recordTransition(this.previousState, 'WAITING_FOR_HUMAN', 'human_input');
-
-    this.journalWriter.append({
-      timestamp: new Date().toISOString(),
-      runId: this.runId,
-      sequence: 0,
-      type: 'human_input_requested',
-      data: {
-        kind: 'human',
-        action: 'input_requested',
-        stateId: this.currentState,
+      this.waitingContext = {
         reason: context.reason,
-      },
-    });
+        requiredInput: context.requiredInput,
+        requestingState: context.requestingState,
+        autoResumeSafe: context.autoResumeSafe,
+        presentedArtifacts: context.presentedArtifacts,
+        waitingSince: context.waitingSince,
+      };
 
-    await this.saveCheckpoint();
+      this.transitionCount += 1;
+      this.recordTransition(this.previousState, 'WAITING_FOR_HUMAN', 'human_input');
+
+      this.journalWriter.append({
+        timestamp: new Date().toISOString(),
+        runId: this.runId,
+        sequence: 0,
+        type: 'human_input_requested',
+        data: {
+          kind: 'human',
+          action: 'input_requested',
+          stateId: this.currentState,
+          reason: context.reason,
+        },
+      });
+
+      await this.saveCheckpoint();
+    } finally {
+      if (acquired) {
+        this.releaseLockIfHeld();
+      }
+    }
   }
 
   /** @inheritdoc */
@@ -1083,6 +1093,9 @@ export class LifecycleController implements WorkflowEngine {
     if (this.aborted || this.currentState === 'ABORTED') {
       return;
     }
+    if (!this.lockHandle && this.config) {
+      this.lockHandle = this.statePersistence.acquireLock(this.runId);
+    }
     this.aborted = true;
     this.executionPaused = false;
     this.pendingTerminalState = null;
@@ -1102,9 +1115,6 @@ export class LifecycleController implements WorkflowEngine {
     const cancellation = this.runner.cancelAllWorkers().catch(() => undefined);
 
     try {
-      if (!this.lockHandle && this.config) {
-        this.lockHandle = this.statePersistence.acquireLock(this.runId);
-      }
       this.recordTransition(fromState, 'ABORTED', 'failure');
 
       this.journalWriter.append({
