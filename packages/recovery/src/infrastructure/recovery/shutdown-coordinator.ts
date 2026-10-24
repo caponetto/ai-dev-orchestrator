@@ -14,7 +14,10 @@ export class ShutdownCoordinator {
   private shutdownReason: ShutdownReason = 'signal';
   private shutdownRequestedAt: string | null = null;
   private readonly boundHandler: () => void;
-  private readonly shutdownListeners: Array<() => void> = [];
+  private readonly shutdownListeners = new Set<() => void>();
+  private installed = false;
+  private deadlineTimer: ReturnType<typeof setTimeout> | null = null;
+  private onTimeout: (() => void) | undefined;
 
   constructor(
     statePersistence: StatePersistence,
@@ -22,6 +25,9 @@ export class ShutdownCoordinator {
     gracefulTimeoutMs = 10000,
     schemaVersion = 1,
   ) {
+    if (!Number.isFinite(gracefulTimeoutMs) || gracefulTimeoutMs < 0) {
+      throw new RangeError('Graceful shutdown timeout must be a finite non-negative number');
+    }
     this.statePersistence = statePersistence;
     this.journalWriter = journalWriter;
     this.gracefulTimeoutMs = gracefulTimeoutMs;
@@ -31,12 +37,24 @@ export class ShutdownCoordinator {
     };
   }
 
-  install(): void {
+  install(onTimeout?: () => void): void {
+    if (this.installed) {
+      return;
+    }
+    this.installed = true;
+    this.onTimeout = onTimeout;
     process.on('SIGTERM', this.boundHandler);
     process.on('SIGINT', this.boundHandler);
+    this.armDeadline();
   }
 
   uninstall(): void {
+    this.installed = false;
+    this.onTimeout = undefined;
+    if (this.deadlineTimer !== null) {
+      clearTimeout(this.deadlineTimer);
+      this.deadlineTimer = null;
+    }
     process.removeListener('SIGTERM', this.boundHandler);
     process.removeListener('SIGINT', this.boundHandler);
   }
@@ -45,21 +63,59 @@ export class ShutdownCoordinator {
     return this.shutdownRequested;
   }
 
-  onShutdown(listener: () => void): void {
-    this.shutdownListeners.push(listener);
+  onShutdown(listener: () => void): () => void {
+    if (this.shutdownRequested) {
+      this.notify(listener);
+      return () => {};
+    }
+    this.shutdownListeners.add(listener);
+    return () => {
+      this.shutdownListeners.delete(listener);
+    };
   }
 
   requestShutdown(reason: ShutdownReason): void {
+    if (this.shutdownRequested) {
+      return;
+    }
     this.shutdownRequested = true;
     this.shutdownReason = reason;
     this.shutdownRequestedAt = new Date().toISOString();
-    for (const listener of this.shutdownListeners) {
-      try {
-        listener();
-      } catch {
-        // best-effort — don't let one failing listener block others
-      }
+    this.armDeadline();
+    for (const listener of [...this.shutdownListeners]) {
+      this.notify(listener);
     }
+    this.shutdownListeners.clear();
+  }
+
+  private notify(listener: () => void): void {
+    try {
+      listener();
+    } catch {
+      /* Other shutdown work must still run. */
+    }
+  }
+
+  private armDeadline(): void {
+    if (
+      !this.installed ||
+      !this.shutdownRequested ||
+      !this.onTimeout ||
+      this.deadlineTimer !== null
+    ) {
+      return;
+    }
+    const elapsed = Date.now() - Date.parse(this.getShutdownState().requestedAt);
+    this.deadlineTimer = setTimeout(
+      () => {
+        this.deadlineTimer = null;
+        const onTimeout = this.onTimeout;
+        if (onTimeout) {
+          this.notify(onTimeout);
+        }
+      },
+      Math.max(0, this.gracefulTimeoutMs - elapsed),
+    );
   }
 
   getShutdownReason(): ShutdownReason {

@@ -24,6 +24,7 @@ class LiveRequestPrompter {
     private readonly runId: string,
     private readonly store: LiveRequestStore,
     private readonly formatter: OutputFormatter,
+    private readonly onInterrupt: () => void,
   ) {
     this.timer = setInterval(() => {
       void this.poll();
@@ -101,6 +102,13 @@ class LiveRequestPrompter {
     const input = createInterface({ input: process.stdin, output: process.stdout });
     const prompt: ActivePrompt = { request, input, submitting: false };
     this.active = prompt;
+    input.once('SIGINT', () => {
+      if (this.isStopped() || this.active !== prompt) {
+        return;
+      }
+      this.stop();
+      this.onInterrupt();
+    });
     input.once('close', () => {
       if (this.isStopped() || this.active !== prompt || prompt.submitting) {
         return;
@@ -180,8 +188,11 @@ export function startLiveRequestPrompter(
   runId: string,
   store: LiveRequestStore,
   formatter: OutputFormatter,
+  onInterrupt: () => void = () => {
+    process.kill(process.pid, 'SIGINT');
+  },
 ): { stop: () => void } {
-  const prompter = new LiveRequestPrompter(runId, store, formatter);
+  const prompter = new LiveRequestPrompter(runId, store, formatter, onInterrupt);
   return {
     stop: () => {
       prompter.stop();

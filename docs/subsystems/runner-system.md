@@ -53,6 +53,12 @@ Permission heuristics check actual operation types before display labels. Every 
 
 ## Human request identity and delivery
 
+Global worker cancellation attempts every worker and every runner backend, even if one cancellation
+or signal fails. Local CLI subprocesses receive SIGTERM and use the existing five-second forced-kill
+grace period. The workflow also aborts live sessions for its run; remote cancellation is best-effort.
+The CLI's shutdown deadline is a separate bound on the orchestrator process and does not establish
+that remote side effects or arbitrary descendant processes have stopped.
+
 Local and remote sessions consume a response only for a matching pending request and payload
 kind. Duplicate consumed responses return false. Terminal sessions clear pending requests and
 ignore later protocol requests; a local timeout also settles any pending advancement waiter.

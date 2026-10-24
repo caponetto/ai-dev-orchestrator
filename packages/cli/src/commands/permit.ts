@@ -107,37 +107,41 @@ export async function permitCommand(
       return ExitCode.CONFIGURATION_ERROR;
     }
 
-    for (const w of ctx.warnings) {
-      formatter.warn(w);
-    }
-
-    let result: RunResult;
     try {
-      result = await ctx.engine.resume({
-        ...input,
-        sessionId: state.waitingContext.liveSessionId,
-        requestId: sessionRequestId,
-      });
-    } catch (error: unknown) {
-      formatter.error(toCLIError(error));
-      return ExitCode.RUN_FAILED;
-    }
+      for (const w of ctx.warnings) {
+        formatter.warn(w);
+      }
 
-    if (options.json) {
-      process.stdout.write(
-        JSON.stringify({
-          ...workflowResultFields(result),
-          messageId: sessionRequestId,
-          action: granted ? 'granted' : 'denied',
-        }) + '\n',
-      );
-    } else if (!reportWorkflowFailure(result, formatter)) {
-      formatter.info(
-        `Permission ${granted ? 'grant' : 'denial'} response processed (${sessionRequestId}). State: ${result.finalState}.`,
-      );
-    }
+      let result: RunResult;
+      try {
+        result = await ctx.engine.resume({
+          ...input,
+          sessionId: state.waitingContext.liveSessionId,
+          requestId: sessionRequestId,
+        });
+      } catch (error: unknown) {
+        formatter.error(toCLIError(error));
+        return ExitCode.RUN_FAILED;
+      }
 
-    return workflowResultFields(result).exitCode;
+      if (options.json) {
+        process.stdout.write(
+          JSON.stringify({
+            ...workflowResultFields(result),
+            messageId: sessionRequestId,
+            action: granted ? 'granted' : 'denied',
+          }) + '\n',
+        );
+      } else if (!reportWorkflowFailure(result, formatter)) {
+        formatter.info(
+          `Permission ${granted ? 'grant' : 'denial'} response processed (${sessionRequestId}). State: ${result.finalState}.`,
+        );
+      }
+
+      return workflowResultFields(result).exitCode;
+    } finally {
+      ctx.shutdownCoordinator?.uninstall();
+    }
   }
 
   // Fallback: non-session runs use the file-backed live request store

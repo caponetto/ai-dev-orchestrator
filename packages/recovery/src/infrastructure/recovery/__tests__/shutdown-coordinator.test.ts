@@ -46,6 +46,8 @@ describe('ShutdownCoordinator', () => {
 
   afterEach(() => {
     coordinator.uninstall();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   describe('initial state', () => {
@@ -71,6 +73,108 @@ describe('ShutdownCoordinator', () => {
       expect(state.requested).toBe(false);
       expect(state.requestedAt).toBe('');
     });
+  });
+
+  it('installs once and delivers only the first shutdown request', () => {
+    coordinator = new ShutdownCoordinator(makeMockStatePersistence(), makeMockJournalWriter());
+    const before = process.listenerCount('SIGINT');
+    coordinator.install();
+    coordinator.install();
+    expect(process.listenerCount('SIGINT')).toBe(before + 1);
+    const listener = vi.fn();
+    coordinator.onShutdown(listener);
+    coordinator.requestShutdown('abort');
+    const first = coordinator.getShutdownState();
+    coordinator.requestShutdown('signal');
+    expect(listener).toHaveBeenCalledOnce();
+    expect(coordinator.getShutdownState()).toEqual(first);
+  });
+
+  it('permits unsubscribe and immediately notifies late subscribers only once', () => {
+    coordinator = new ShutdownCoordinator(makeMockStatePersistence(), makeMockJournalWriter());
+    const removed = vi.fn();
+    const unsubscribe = coordinator.onShutdown(removed);
+    unsubscribe();
+    unsubscribe();
+    coordinator.requestShutdown('signal');
+    expect(removed).not.toHaveBeenCalled();
+    const late = vi.fn();
+    coordinator.onShutdown(late)();
+    coordinator.requestShutdown('abort');
+    expect(late).toHaveBeenCalledOnce();
+    expect(() => {
+      coordinator.onShutdown(() => {
+        throw new Error('late failure');
+      })();
+    }).not.toThrow();
+  });
+  it('keeps the first shutdown deadline across repeated signals and clears it on uninstall', () => {
+    vi.useFakeTimers();
+    coordinator = new ShutdownCoordinator(makeMockStatePersistence(), makeMockJournalWriter(), 100);
+    const expire = vi.fn();
+    coordinator.install(expire);
+    coordinator.requestShutdown('signal');
+    vi.advanceTimersByTime(75);
+    coordinator.requestShutdown('abort');
+    vi.advanceTimersByTime(25);
+    expect(expire).toHaveBeenCalledOnce();
+    coordinator.uninstall();
+    vi.advanceTimersByTime(100);
+    expect(expire).toHaveBeenCalledOnce();
+    vi.useRealTimers();
+  });
+  it('cancels a pending deadline on uninstall', () => {
+    vi.useFakeTimers();
+    coordinator = new ShutdownCoordinator(makeMockStatePersistence(), makeMockJournalWriter(), 100);
+    const expire = vi.fn();
+    coordinator.install(expire);
+    coordinator.requestShutdown('signal');
+    coordinator.uninstall();
+    vi.advanceTimersByTime(200);
+    expect(expire).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+  it('honors time already spent shutting down when installed late', () => {
+    vi.useFakeTimers();
+    coordinator = new ShutdownCoordinator(makeMockStatePersistence(), makeMockJournalWriter(), 100);
+    coordinator.requestShutdown('signal');
+    vi.advanceTimersByTime(75);
+    const expire = vi.fn();
+    coordinator.install(expire);
+    vi.advanceTimersByTime(25);
+    expect(expire).toHaveBeenCalledOnce();
+    vi.useRealTimers();
+  });
+  it.each([NaN, Infinity, -1])('rejects an invalid graceful timeout %s', (timeout) => {
+    coordinator = new ShutdownCoordinator(makeMockStatePersistence(), makeMockJournalWriter());
+    expect(
+      () => new ShutdownCoordinator(makeMockStatePersistence(), makeMockJournalWriter(), timeout),
+    ).toThrow('finite non-negative');
+  });
+  it('ignores a deadline callback already queued when the coordinator is uninstalled', () => {
+    vi.useFakeTimers();
+    const schedule = vi.spyOn(globalThis, 'setTimeout');
+    coordinator = new ShutdownCoordinator(makeMockStatePersistence(), makeMockJournalWriter(), 100);
+    const expire = vi.fn();
+    coordinator.install(expire);
+    coordinator.requestShutdown('signal');
+    const callback = schedule.mock.calls.at(-1)?.[0];
+    if (typeof callback !== 'function') {
+      throw new Error('Expected a scheduled deadline');
+    }
+    coordinator.uninstall();
+    callback();
+    expect(expire).not.toHaveBeenCalled();
+  });
+  it('supports an immediate deadline', () => {
+    vi.useFakeTimers();
+    coordinator = new ShutdownCoordinator(makeMockStatePersistence(), makeMockJournalWriter(), 0);
+    const expire = vi.fn();
+    coordinator.install(expire);
+    coordinator.requestShutdown('signal');
+    vi.advanceTimersByTime(0);
+    expect(expire).toHaveBeenCalledOnce();
+    vi.useRealTimers();
   });
 
   describe('signal handler installation', () => {

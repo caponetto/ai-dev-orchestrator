@@ -466,6 +466,50 @@ describe('DefaultRunnerSystem', () => {
     await dispatchPromise;
   });
 
+  it('signals every runner even when worker cancellation and another runner signal fail', async () => {
+    const first = {
+      ...makeMockAgentRunner(),
+      killAll: vi.fn(() => {
+        throw new Error('signal failed');
+      }),
+    };
+    const second = { ...makeMockAgentRunner(), killAll: vi.fn() };
+    const system = new DefaultRunnerSystem(
+      makeArtifactStore(),
+      makeRoleRegistry(),
+      makePromptEngine(),
+      makeEventBus(),
+      {
+        runnerRegistry: new Map<string, AgentRunner>([
+          ['cli', first],
+          ['second', second],
+        ]),
+      },
+    );
+    vi.spyOn(system, 'cancelWorker').mockRejectedValue(new Error('worker cancellation failed'));
+    // Register one real dispatch before cancellation so active-worker enumeration is exercised.
+    let finish!: (result: AgentResult) => void;
+    first.dispatch.mockReturnValueOnce(
+      new Promise<AgentResult>((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const dispatch = system.dispatch({
+      role: 'architect',
+      runId: createRunId('run-1'),
+      stateId: 'REVIEW',
+      inputArtifacts: [],
+    });
+    await vi.waitFor(() => {
+      expect(first.dispatch).toHaveBeenCalledOnce();
+    });
+    await system.cancelAllWorkers();
+    expect(first.killAll).toHaveBeenCalledOnce();
+    expect(second.killAll).toHaveBeenCalledOnce();
+    finish({ taskId: 'task', status: 'failure', durationMs: 0, error: 'cancelled' });
+    await dispatch;
+  });
+
   it('cancelAllWorkers calls killAll on runners that support it', async () => {
     resetWorkerCounter();
     const mockRunner = {

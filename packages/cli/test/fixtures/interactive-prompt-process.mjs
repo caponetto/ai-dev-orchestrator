@@ -38,11 +38,15 @@ if (mode === 'retry') {
     return write(...args);
   };
 }
+let interrupted = false;
+process.on('SIGINT', () => {
+  interrupted = true;
+});
 process.stdout.write(`TERMINAL_PID:${process.pid}\n`);
 const prompter = startLiveRequestPrompter('run', store, new OutputFormatter({ noColor: true }));
 try {
   const deadline = Date.now() + 15000;
-  while (!existsSync(join(root, 'stop'))) {
+  while (!interrupted && !existsSync(join(root, 'stop'))) {
     if (await store.awaitResponse('run', 'clarification', 0)) break;
     if (Date.now() > deadline) throw new Error('Terminal fixture timed out');
     await setTimeout(25);
@@ -54,6 +58,7 @@ try {
 process.stdout.write(
   'TERMINAL_RESULT:' +
     JSON.stringify({
+      interrupted,
       permission: await store.awaitResponse('run', 'permission', 0),
       clarification: await store.awaitResponse('run', 'clarification', 0),
     }) +

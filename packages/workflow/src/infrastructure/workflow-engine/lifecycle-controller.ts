@@ -67,6 +67,7 @@ import {
 import { StateHistory } from './state-history';
 import { executeTerminalActions } from './terminal-action-executor';
 import { TransitionEvaluator } from './transition-evaluator';
+import { cancelWorkflowExecution } from './workflow-cancellation';
 import { buildWorkflowCheckpoint } from './workflow-checkpoint';
 
 const DEFAULT_TRANSITION_LIMIT = 200;
@@ -1156,7 +1157,12 @@ export class LifecycleController implements WorkflowEngine {
     this.waitingContext = null;
     this.entryActionContinuation = null;
     this.interruptedActionResults = null;
-    const cancellation = this.runner.cancelAllWorkers().catch(() => undefined);
+    const cancellation = cancelWorkflowExecution(
+      this.runner,
+      this.sessionSupervisor,
+      this.runId,
+      reason,
+    );
 
     try {
       this.recordTransition(fromState, 'ABORTED', 'failure');
@@ -1253,10 +1259,6 @@ export class LifecycleController implements WorkflowEngine {
       'humanFeedback' | 'previousReviewContent' | 'iterationCount'
     > = {};
 
-    this.shutdownCoordinator?.onShutdown(() => {
-      this.runner.cancelAllWorkers().catch(() => undefined);
-    });
-
     while (
       !definition.terminalStates.includes(this.currentState) &&
       !this.aborted &&
@@ -1267,20 +1269,7 @@ export class LifecycleController implements WorkflowEngine {
       }
 
       if (this.shutdownCoordinator?.isShutdownRequested()) {
-        this.journalWriter.append({
-          timestamp: new Date().toISOString(),
-          runId: this.runId,
-          sequence: 0,
-          type: 'run_aborted',
-          data: {
-            kind: 'run_lifecycle',
-            workflowName: config.workflowDefinition.name,
-            workflowVersion: config.workflowDefinition.version,
-            reason: `shutdown:${this.shutdownCoordinator.getShutdownReason()}`,
-            status: 'interrupted',
-          },
-        });
-        await this.saveCheckpoint();
+        await this.abort(`shutdown:${this.shutdownCoordinator.getShutdownReason()}`);
         break;
       }
 
@@ -2593,11 +2582,31 @@ export class LifecycleController implements WorkflowEngine {
   }
 
   private async executeOwned(operation: () => Promise<RunResult>): Promise<RunResult> {
+    let shutdown: Promise<void> | undefined;
+    let unsubscribe: (() => void) | undefined;
     try {
-      const result = await operation();
+      const execution = operation();
+      unsubscribe = this.shutdownCoordinator?.onShutdown(() => {
+        if (
+          !this.lockHandle ||
+          !this.config ||
+          this.aborted ||
+          (this.config.workflowDefinition.terminalStates.includes(this.currentState) &&
+            !this.pendingTerminalState)
+        ) {
+          return;
+        }
+        shutdown = this.abort(
+          `shutdown:${this.shutdownCoordinator?.getShutdownReason() ?? 'signal'}`,
+        );
+        void shutdown.catch(() => undefined);
+      });
+      const result = await execution;
+      await shutdown;
       await this.settleAbort();
       return (await this.finishPendingAbort()) ?? result;
     } catch (error: unknown) {
+      await shutdown;
       // Abort may already have committed before the interrupted operation rejects. Finish
       // cleanup only if it has not started; failed terminal cleanup stays explicitly retryable.
       await this.settleAbort();
@@ -2608,8 +2617,12 @@ export class LifecycleController implements WorkflowEngine {
       ) {
         await this.finishPendingAbort();
       }
+      if (shutdown && this.aborted && this.pendingTerminalState !== 'ABORTED') {
+        return this.interruptedResult();
+      }
       throw error;
     } finally {
+      unsubscribe?.();
       this.activeExecution = null;
       this.executionActive = false;
       this.releaseLockIfHeld();

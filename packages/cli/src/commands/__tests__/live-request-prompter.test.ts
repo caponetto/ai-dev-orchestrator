@@ -90,6 +90,37 @@ function terminal(index = 0): Terminal {
   return value;
 }
 describe('serialized interactive live requests', () => {
+  it('interrupts once, closes the prompt and never submits a permission', async () => {
+    prompter.stop();
+    const interrupt = vi.fn();
+    prompter = startLiveRequestPrompter('run', store, formatter, interrupt);
+    await tick();
+    terminal().emit('SIGINT');
+    terminal().emit('SIGINT');
+    terminal().answer('yes');
+    await tick();
+    expect(interrupt).toHaveBeenCalledOnce();
+    expect(store.writeResponse).not.toHaveBeenCalled();
+    expect(observed.warn).not.toHaveBeenCalled();
+  });
+  it('ignores a queued interrupt from a replaced question', async () => {
+    await tick();
+    const old = terminal();
+    store.listPendingRequests.mockResolvedValue([clarification]);
+    await tick();
+    const kill = vi.spyOn(process, 'kill').mockReturnValue(true);
+    old.emit('SIGINT');
+    expect(kill).not.toHaveBeenCalled();
+    prompter.stop();
+    terminal(1).emit('SIGINT');
+    expect(kill).not.toHaveBeenCalled();
+  });
+  it('uses the normal process signal path when no interrupt callback is supplied', async () => {
+    const kill = vi.spyOn(process, 'kill').mockReturnValue(true);
+    await tick();
+    terminal().emit('SIGINT');
+    expect(kill).toHaveBeenCalledExactlyOnceWith(process.pid, 'SIGINT');
+  });
   it('does not open a terminal when no request is pending', async () => {
     store.listPendingRequests.mockResolvedValue([]);
     await tick();

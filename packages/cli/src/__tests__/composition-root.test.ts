@@ -4,9 +4,11 @@ import { dirname, join } from 'node:path';
 
 import { generateAll } from '@ai-dev-orchestrator/config-templates';
 import { DefaultStatePersistence } from '@ai-dev-orchestrator/core';
+import { ShutdownCoordinator } from '@ai-dev-orchestrator/recovery';
 import { AgentSessionReaper, DefaultAgentSessionStore } from '@ai-dev-orchestrator/runner';
 import { AI_CONFIG_DIR_NAME } from '@ai-dev-orchestrator/schemas';
 import type { PersistedState, RunId, WorkflowDefinition } from '@ai-dev-orchestrator/schemas';
+import { LifecycleController } from '@ai-dev-orchestrator/workflow';
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 
 import {
@@ -34,6 +36,7 @@ vi.mock('../workspace-paths', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...(actual as object),
+    getConfigSnapshotPath: vi.fn((runDir: string) => join(runDir, 'config-snapshot.json')),
     getGlobalConfigPath: () => mockGlobalConfigPath.value || '/nonexistent/global/config.yaml',
     getAiDir: () => mockPaths.aiDir,
     getRunsDir: () => mockPaths.runsDir,
@@ -69,6 +72,9 @@ describe('composition-root orchestrator creation', () => {
   beforeEach(() => {
     baseDir = join(tmpdir(), `comp-root-test-${String(Date.now())}`);
     mkdirSync(baseDir, { recursive: true });
+    vi.mocked(getConfigSnapshotPath)
+      .mockReset()
+      .mockImplementation((runDir: string) => join(runDir, 'config-snapshot.json'));
     mockPaths.aiDir = join(baseDir, '.ai');
     mockPaths.runsDir = join(baseDir, '.ai', 'runs');
 
@@ -167,6 +173,40 @@ describe('composition-root orchestrator creation', () => {
     original.shutdownCoordinator?.uninstall();
     expect(reaper).not.toHaveBeenCalled();
     expect(await sessions.loadSnapshot('orphan', original.runId)).toEqual(before);
+  });
+
+  it('removes signal handlers if writing a new context snapshot fails', async () => {
+    vi.stubEnv('AI_ORCHESTRATOR_FIXTURE', '1');
+    writeFullAiConfig(baseDir);
+    const before = process.listenerCount('SIGINT');
+    const uninstall = vi.spyOn(ShutdownCoordinator.prototype, 'uninstall');
+    vi.mocked(getConfigSnapshotPath).mockReturnValue(baseDir);
+    await expect(createOrchestrator(baseDir)).rejects.toThrow();
+    expect(uninstall).toHaveBeenCalledOnce();
+    expect(process.listenerCount('SIGINT')).toBe(before);
+  });
+  it('removes signal handlers if restoring an existing context fails', async () => {
+    vi.stubEnv('AI_ORCHESTRATOR_FIXTURE', '1');
+    writeFullAiConfig(baseDir);
+    const context = await createOrchestrator(baseDir);
+    const definition: WorkflowDefinition = {
+      name: 'shutdown-context',
+      version: '1',
+      initialState: 'DONE',
+      terminalStates: ['DONE'],
+      states: { DONE: { type: 'terminal', description: '', transitions: [] } },
+    };
+    writeFileSync(join(context.runDir, 'workflow-definition.json'), JSON.stringify(definition));
+    await context.engine.start(createRunConfig(context.runId, [], definition));
+    context.shutdownCoordinator?.uninstall();
+    const before = process.listenerCount('SIGINT');
+    const uninstall = vi.spyOn(ShutdownCoordinator.prototype, 'uninstall');
+    vi.spyOn(LifecycleController.prototype, 'restore').mockImplementationOnce(() => {
+      throw new Error('restore failed');
+    });
+    await expect(resumeOrchestrator(baseDir, context.runId)).rejects.toThrow('restore failed');
+    expect(uninstall).toHaveBeenCalledOnce();
+    expect(process.listenerCount('SIGINT')).toBe(before);
   });
 
   it('succeeds when all roles are agent-dispatched and no provider key is set', async () => {

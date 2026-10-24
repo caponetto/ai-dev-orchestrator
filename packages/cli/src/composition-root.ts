@@ -125,6 +125,7 @@ import { LifecycleController } from '@ai-dev-orchestrator/workflow';
 
 import type { ConfigSnapshot } from './config-snapshot';
 import { configSnapshotSchema, resolveRunModelAssignments } from './config-snapshot';
+import { installShutdownDeadline } from './install-shutdown-deadline';
 import { validateSelectedModels } from './model-preflight';
 import { loadDefaultWorkflow, loadProjectConfig } from './project-config';
 import { ResumeStatePersistence } from './resume-state-persistence';
@@ -659,7 +660,6 @@ async function buildOrchestratorInfra(params: InfraParams): Promise<InfraResult>
   const agentStreamBus = new FileBackedAgentStreamBus(runsDir);
 
   const shutdownCoordinator = new ShutdownCoordinator(statePersistence, journalWriter);
-  shutdownCoordinator.install();
 
   const engine = new LifecycleController({
     runner,
@@ -680,6 +680,8 @@ async function buildOrchestratorInfra(params: InfraParams): Promise<InfraResult>
     executionAnalytics,
     logger,
   });
+
+  installShutdownDeadline(shutdownCoordinator, logger);
 
   return {
     engine,
@@ -712,27 +714,36 @@ export async function createOrchestrator(repoRoot: string): Promise<Orchestrator
 
   const infra = await buildOrchestratorInfra({ runId, runDir, repoRoot, journalWriter });
 
-  writeFileSync(
-    getConfigSnapshotPath(runDir),
-    JSON.stringify(sanitizeConfigForDashboard(infra.config, infra.roleRegistry, repoRoot), null, 2),
-    'utf8',
-  );
+  try {
+    writeFileSync(
+      getConfigSnapshotPath(runDir),
+      JSON.stringify(
+        sanitizeConfigForDashboard(infra.config, infra.roleRegistry, repoRoot),
+        null,
+        2,
+      ),
+      'utf8',
+    );
 
-  return {
-    engine: infra.engine,
-    journalWriter,
-    journalReader,
-    statePersistence: infra.statePersistence,
-    agentStreamBus: infra.agentStreamBus,
-    liveRequestStore: infra.liveRequestStore,
-    artifactStore: infra.artifactStore,
-    runId,
-    runDir,
-    warnings: [...modelWarnings, ...infra.warnings],
-    budgetConfig: infra.config.governance.budget,
-    reportOutputPath: infra.config.runtime.reportOutputPath,
-    shutdownCoordinator: infra.shutdownCoordinator,
-  };
+    return {
+      engine: infra.engine,
+      journalWriter,
+      journalReader,
+      statePersistence: infra.statePersistence,
+      agentStreamBus: infra.agentStreamBus,
+      liveRequestStore: infra.liveRequestStore,
+      artifactStore: infra.artifactStore,
+      runId,
+      runDir,
+      warnings: [...modelWarnings, ...infra.warnings],
+      budgetConfig: infra.config.governance.budget,
+      reportOutputPath: infra.config.runtime.reportOutputPath,
+      shutdownCoordinator: infra.shutdownCoordinator,
+    };
+  } catch (error: unknown) {
+    infra.shutdownCoordinator.uninstall();
+    throw error;
+  }
 }
 
 /** Re-wire the orchestrator from an existing run's persisted state. */
@@ -769,42 +780,47 @@ export async function resumeOrchestrator(
     statePersistence,
   });
 
-  await infra.sessionRegistry.rebuild();
+  try {
+    await infra.sessionRegistry.rebuild();
 
-  // Session discovery is read-only. Orphan cleanup must not race a live owner;
-  // session reconciliation/finalization is performed by the engine after acquiring ownership.
+    // Session discovery is read-only. Orphan cleanup must not race a live owner;
+    // session reconciliation/finalization is performed by the engine after acquiring ownership.
 
-  if (checkpoint) {
-    const workflow = resolveWorkflowForResume(runDir, checkpoint);
-    const sources = readPersistedSources(runDir);
-    infra.engine.restore(
-      createRunConfig(runId, sources, workflow, {
-        maxTokens:
-          workflow.budget?.maxTokensPerRun ?? infra.config.governance.budget?.maxTokensPerRun,
-        alertThresholds: infra.config.governance.budget?.alertThresholds,
-        reportOutputPath: infra.config.runtime.reportOutputPath,
-        runDir,
-        repoRoot,
-      }),
-      checkpoint,
-    );
+    if (checkpoint) {
+      const workflow = resolveWorkflowForResume(runDir, checkpoint);
+      const sources = readPersistedSources(runDir);
+      infra.engine.restore(
+        createRunConfig(runId, sources, workflow, {
+          maxTokens:
+            workflow.budget?.maxTokensPerRun ?? infra.config.governance.budget?.maxTokensPerRun,
+          alertThresholds: infra.config.governance.budget?.alertThresholds,
+          reportOutputPath: infra.config.runtime.reportOutputPath,
+          runDir,
+          repoRoot,
+        }),
+        checkpoint,
+      );
+    }
+
+    return {
+      engine: infra.engine,
+      journalWriter,
+      journalReader,
+      statePersistence: infra.statePersistence,
+      agentStreamBus: infra.agentStreamBus,
+      liveRequestStore: infra.liveRequestStore,
+      artifactStore: infra.artifactStore,
+      runId,
+      runDir,
+      warnings: infra.warnings,
+      budgetConfig: infra.config.governance.budget,
+      reportOutputPath: infra.config.runtime.reportOutputPath,
+      shutdownCoordinator: infra.shutdownCoordinator,
+    };
+  } catch (error: unknown) {
+    infra.shutdownCoordinator.uninstall();
+    throw error;
   }
-
-  return {
-    engine: infra.engine,
-    journalWriter,
-    journalReader,
-    statePersistence: infra.statePersistence,
-    agentStreamBus: infra.agentStreamBus,
-    liveRequestStore: infra.liveRequestStore,
-    artifactStore: infra.artifactStore,
-    runId,
-    runDir,
-    warnings: infra.warnings,
-    budgetConfig: infra.config.governance.budget,
-    reportOutputPath: infra.config.runtime.reportOutputPath,
-    shutdownCoordinator: infra.shutdownCoordinator,
-  };
 }
 
 // ---------------------------------------------------------------------------

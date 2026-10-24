@@ -119,55 +119,64 @@ export async function answerCommand(
       return ExitCode.CONFIGURATION_ERROR;
     }
 
-    for (const w of ctx.warnings) {
-      formatter.warn(w);
-    }
-
-    const onUncaught = (err: unknown): void => {
-      const msg = err instanceof Error ? err.message : String(err);
-      ctx.journalWriter.append({
-        timestamp: new Date().toISOString(),
-        runId,
-        sequence: 0,
-        type: 'error',
-        data: { kind: 'error', errorCode: 'uncaught_exception', message: msg, recoverable: false },
-      });
-      process.exitCode = ExitCode.RUN_FAILED;
-    };
-    process.on('uncaughtException', onUncaught);
-    process.on('unhandledRejection', onUncaught);
-
-    let result: RunResult;
     try {
-      result = await ctx.engine.resume({
-        type: 'text',
-        content: answerContent,
-        sessionId: state.waitingContext.liveSessionId,
-        requestId: sessionRequestId,
-      });
-    } catch (error: unknown) {
-      formatter.error(toCLIError(error));
-      return ExitCode.RUN_FAILED;
+      for (const w of ctx.warnings) {
+        formatter.warn(w);
+      }
+
+      const onUncaught = (err: unknown): void => {
+        const msg = err instanceof Error ? err.message : String(err);
+        ctx.journalWriter.append({
+          timestamp: new Date().toISOString(),
+          runId,
+          sequence: 0,
+          type: 'error',
+          data: {
+            kind: 'error',
+            errorCode: 'uncaught_exception',
+            message: msg,
+            recoverable: false,
+          },
+        });
+        process.exitCode = ExitCode.RUN_FAILED;
+      };
+      process.on('uncaughtException', onUncaught);
+      process.on('unhandledRejection', onUncaught);
+
+      let result: RunResult;
+      try {
+        result = await ctx.engine.resume({
+          type: 'text',
+          content: answerContent,
+          sessionId: state.waitingContext.liveSessionId,
+          requestId: sessionRequestId,
+        });
+      } catch (error: unknown) {
+        formatter.error(toCLIError(error));
+        return ExitCode.RUN_FAILED;
+      } finally {
+        process.removeListener('uncaughtException', onUncaught);
+        process.removeListener('unhandledRejection', onUncaught);
+      }
+
+      if (options.json) {
+        process.stdout.write(
+          JSON.stringify({
+            ...workflowResultFields(result),
+            messageId: sessionRequestId,
+            status: 'session_clarification_answered',
+          }) + '\n',
+        );
+      } else if (!reportWorkflowFailure(result, formatter)) {
+        formatter.info(
+          `Session clarification answered for run ${runId}. State: ${result.finalState}.`,
+        );
+      }
+
+      return workflowResultFields(result).exitCode;
     } finally {
-      process.removeListener('uncaughtException', onUncaught);
-      process.removeListener('unhandledRejection', onUncaught);
+      ctx.shutdownCoordinator?.uninstall();
     }
-
-    if (options.json) {
-      process.stdout.write(
-        JSON.stringify({
-          ...workflowResultFields(result),
-          messageId: sessionRequestId,
-          status: 'session_clarification_answered',
-        }) + '\n',
-      );
-    } else if (!reportWorkflowFailure(result, formatter)) {
-      formatter.info(
-        `Session clarification answered for run ${runId}. State: ${result.finalState}.`,
-      );
-    }
-
-    return workflowResultFields(result).exitCode;
   }
 
   // Fallback: non-session runs use the file-backed live request store
@@ -224,83 +233,87 @@ export async function answerCommand(
     return ExitCode.CONFIGURATION_ERROR;
   }
 
-  for (const w of ctx.warnings) {
-    formatter.warn(w);
-  }
-
-  const wait = state?.waitingContext ?? state?.entryActionContinuation?.resumeWaitingContext;
-  if (!state || !wait || wait.requiredInput !== 'text' || wait.liveSessionId) {
-    formatter.error({
-      code: ExitCode.INVALID_ARGUMENTS,
-      message: 'This run has no persisted text wait to answer.',
-      remediation: 'Inspect the current run state and pending requests before responding.',
-    });
-    return ExitCode.INVALID_ARGUMENTS;
-  }
-  const accepted = state.entryActionContinuation?.resumeInput;
-  if (accepted?.type === 'text' && accepted.content !== answerContent) {
-    formatter.error({
-      code: ExitCode.INVALID_ARGUMENTS,
-      message: 'An answer is already accepted for this wait.',
-      remediation: 'Use `ai resume` to recover the accepted answer instead of replacing it.',
-    });
-    return ExitCode.INVALID_ARGUMENTS;
-  }
-
-  const onUncaughtFb = (err: unknown): void => {
-    const msg = err instanceof Error ? err.message : String(err);
-    ctx.journalWriter.append({
-      timestamp: new Date().toISOString(),
-      runId,
-      sequence: 0,
-      type: 'error',
-      data: { kind: 'error', errorCode: 'uncaught_exception', message: msg, recoverable: false },
-    });
-    process.exitCode = ExitCode.RUN_FAILED;
-  };
-  process.on('uncaughtException', onUncaughtFb);
-  process.on('unhandledRejection', onUncaughtFb);
-
-  let result: RunResult;
   try {
-    result = await ctx.engine.resume({
-      type: 'text',
-      content: answerContent,
-      waitIdentity: {
-        stateId: state.currentState,
-        requestingState: wait.requestingState,
-        waitingSince: wait.waitingSince,
-      },
-    });
-  } catch (error: unknown) {
-    formatter.error(toCLIError(error));
-    return ExitCode.RUN_FAILED;
+    for (const w of ctx.warnings) {
+      formatter.warn(w);
+    }
+
+    const wait = state?.waitingContext ?? state?.entryActionContinuation?.resumeWaitingContext;
+    if (!state || !wait || wait.requiredInput !== 'text' || wait.liveSessionId) {
+      formatter.error({
+        code: ExitCode.INVALID_ARGUMENTS,
+        message: 'This run has no persisted text wait to answer.',
+        remediation: 'Inspect the current run state and pending requests before responding.',
+      });
+      return ExitCode.INVALID_ARGUMENTS;
+    }
+    const accepted = state.entryActionContinuation?.resumeInput;
+    if (accepted?.type === 'text' && accepted.content !== answerContent) {
+      formatter.error({
+        code: ExitCode.INVALID_ARGUMENTS,
+        message: 'An answer is already accepted for this wait.',
+        remediation: 'Use `ai resume` to recover the accepted answer instead of replacing it.',
+      });
+      return ExitCode.INVALID_ARGUMENTS;
+    }
+
+    const onUncaughtFb = (err: unknown): void => {
+      const msg = err instanceof Error ? err.message : String(err);
+      ctx.journalWriter.append({
+        timestamp: new Date().toISOString(),
+        runId,
+        sequence: 0,
+        type: 'error',
+        data: { kind: 'error', errorCode: 'uncaught_exception', message: msg, recoverable: false },
+      });
+      process.exitCode = ExitCode.RUN_FAILED;
+    };
+    process.on('uncaughtException', onUncaughtFb);
+    process.on('unhandledRejection', onUncaughtFb);
+
+    let result: RunResult;
+    try {
+      result = await ctx.engine.resume({
+        type: 'text',
+        content: answerContent,
+        waitIdentity: {
+          stateId: state.currentState,
+          requestingState: wait.requestingState,
+          waitingSince: wait.waitingSince,
+        },
+      });
+    } catch (error: unknown) {
+      formatter.error(toCLIError(error));
+      return ExitCode.RUN_FAILED;
+    } finally {
+      process.removeListener('uncaughtException', onUncaughtFb);
+      process.removeListener('unhandledRejection', onUncaughtFb);
+    }
+
+    if (options.json) {
+      process.stdout.write(
+        JSON.stringify({
+          ...workflowResultFields(result),
+          status: 'answers_received',
+          accepted: result.answerAccepted === true,
+          ...(result.answerAccepted ? { artifactPath: answersPath } : {}),
+        }) + '\n',
+      );
+    } else if (!reportWorkflowFailure(result, formatter)) {
+      formatter.info(
+        result.answerAccepted
+          ? `Answers stored for run ${runId}. State: ${result.finalState}.`
+          : `Answer not accepted for run ${runId}. State: ${result.finalState}.`,
+      );
+      formatter.summary({
+        'Run ID': result.runId,
+        'Final State': result.finalState,
+        Artifacts: result.artifactInventory.length,
+      });
+    }
+
+    return workflowResultFields(result).exitCode;
   } finally {
-    process.removeListener('uncaughtException', onUncaughtFb);
-    process.removeListener('unhandledRejection', onUncaughtFb);
+    ctx.shutdownCoordinator?.uninstall();
   }
-
-  if (options.json) {
-    process.stdout.write(
-      JSON.stringify({
-        ...workflowResultFields(result),
-        status: 'answers_received',
-        accepted: result.answerAccepted === true,
-        ...(result.answerAccepted ? { artifactPath: answersPath } : {}),
-      }) + '\n',
-    );
-  } else if (!reportWorkflowFailure(result, formatter)) {
-    formatter.info(
-      result.answerAccepted
-        ? `Answers stored for run ${runId}. State: ${result.finalState}.`
-        : `Answer not accepted for run ${runId}. State: ${result.finalState}.`,
-    );
-    formatter.summary({
-      'Run ID': result.runId,
-      'Final State': result.finalState,
-      Artifacts: result.artifactInventory.length,
-    });
-  }
-
-  return workflowResultFields(result).exitCode;
 }

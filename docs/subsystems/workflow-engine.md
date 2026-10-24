@@ -40,6 +40,26 @@ Overlapping pause and abort checkpoints append their snapshots synchronously and
 writes in the same order. A failed save is reported to its caller and does not prevent a later
 cancellation checkpoint from committing. Active execution retains the run lock until its pending
 cancellation and abort cleanup settle, including when an earlier checkpoint fails.
+
+Signal cancellation is subscribed once per owned start/resume/retry execution and unsubscribed
+when that execution settles. It includes session attachment/advancement, rather than only the
+main transition loop. Shutdown before dispatch also produces ABORTED. Worker/session errors caused
+by cancellation preserve the interruption result; failed abort cleanup or checkpointing remains
+an error with retryable progress. A signal cannot overwrite observed completion or mutate an idle
+controller through a leftover listener.
+
+Worker cancellation and session cancellation start independently. Live sessions are selected from
+the current run, deduplicated by session ID, and terminal/foreign sessions are excluded. One backend
+failure cannot prevent the other cancellation attempts. Ownership remains held while execution
+or abort cleanup is outstanding. The CLI's deadline may terminate the process with that lock still
+present; a fresh process recovers the last durable journal/checkpoint and reclaims dead ownership.
+Remote cancellation remains best-effort and does not prove that external effects stopped.
+
+`ShutdownCoordinator.install(onTimeout?)` accepts a deadline policy; library callers choose that
+policy, while the CLI installs forced termination. `onShutdown` returns an unsubscribe function,
+delivers the first request once, and immediately notifies late subscribers. Repeated installation
+is idempotent, and uninstall clears the deadline and signal handlers. Normal engine shutdown writes
+full workflow snapshots; it does not use the coordinator's legacy minimal `initiateShutdown` helper.
 Session I/O failures arriving after cancellation has committed still finish unstarted abort
 cleanup before releasing ownership. Failed cleanup remains available for an explicit retry.
 

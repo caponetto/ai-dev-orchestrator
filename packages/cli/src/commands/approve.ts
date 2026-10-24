@@ -56,59 +56,63 @@ export async function approveCommand(
     return ExitCode.CONFIGURATION_ERROR;
   }
 
-  for (const w of ctx.warnings) {
-    formatter.warn(w);
-  }
-
-  const onUncaught = (err: unknown): void => {
-    const message = err instanceof Error ? err.message : String(err);
-    ctx.journalWriter.append({
-      timestamp: new Date().toISOString(),
-      runId,
-      sequence: 0,
-      type: 'error',
-      data: { kind: 'error', errorCode: 'uncaught_exception', message, recoverable: false },
-    });
-    process.exitCode = ExitCode.RUN_FAILED;
-  };
-  process.on('uncaughtException', onUncaught);
-  process.on('unhandledRejection', onUncaught);
-
-  let result: RunResult;
   try {
-    result = await ctx.engine.resume({ type: action, content });
-  } catch (error: unknown) {
-    formatter.error(toCLIError(error));
-    return ExitCode.RUN_FAILED;
-  } finally {
-    process.removeListener('uncaughtException', onUncaught);
-    process.removeListener('unhandledRejection', onUncaught);
-  }
-
-  if (options.json) {
-    process.stdout.write(
-      JSON.stringify({
-        ...workflowResultFields(result),
-        status: action,
-        artifacts: result.artifactInventory.length,
-      }) + '\n',
-    );
-  } else if (!reportWorkflowFailure(result, formatter)) {
-    if (result.finalState === 'DONE') {
-      formatter.success(
-        `Run ${runId} ${action === 'rejection' ? 'rejected' : 'approved'} and completed.`,
-      );
-    } else {
-      formatter.info(
-        `Run ${runId} ${action === 'rejection' ? 'rejected' : 'approved'}. State: ${result.finalState}.`,
-      );
+    for (const w of ctx.warnings) {
+      formatter.warn(w);
     }
-    formatter.summary({
-      'Run ID': result.runId,
-      'Final State': result.finalState,
-      Artifacts: result.artifactInventory.length,
-    });
-  }
 
-  return workflowResultFields(result).exitCode;
+    const onUncaught = (err: unknown): void => {
+      const message = err instanceof Error ? err.message : String(err);
+      ctx.journalWriter.append({
+        timestamp: new Date().toISOString(),
+        runId,
+        sequence: 0,
+        type: 'error',
+        data: { kind: 'error', errorCode: 'uncaught_exception', message, recoverable: false },
+      });
+      process.exitCode = ExitCode.RUN_FAILED;
+    };
+    process.on('uncaughtException', onUncaught);
+    process.on('unhandledRejection', onUncaught);
+
+    let result: RunResult;
+    try {
+      result = await ctx.engine.resume({ type: action, content });
+    } catch (error: unknown) {
+      formatter.error(toCLIError(error));
+      return ExitCode.RUN_FAILED;
+    } finally {
+      process.removeListener('uncaughtException', onUncaught);
+      process.removeListener('unhandledRejection', onUncaught);
+    }
+
+    if (options.json) {
+      process.stdout.write(
+        JSON.stringify({
+          ...workflowResultFields(result),
+          status: action,
+          artifacts: result.artifactInventory.length,
+        }) + '\n',
+      );
+    } else if (!reportWorkflowFailure(result, formatter)) {
+      if (result.finalState === 'DONE') {
+        formatter.success(
+          `Run ${runId} ${action === 'rejection' ? 'rejected' : 'approved'} and completed.`,
+        );
+      } else {
+        formatter.info(
+          `Run ${runId} ${action === 'rejection' ? 'rejected' : 'approved'}. State: ${result.finalState}.`,
+        );
+      }
+      formatter.summary({
+        'Run ID': result.runId,
+        'Final State': result.finalState,
+        Artifacts: result.artifactInventory.length,
+      });
+    }
+
+    return workflowResultFields(result).exitCode;
+  } finally {
+    ctx.shutdownCoordinator?.uninstall();
+  }
 }

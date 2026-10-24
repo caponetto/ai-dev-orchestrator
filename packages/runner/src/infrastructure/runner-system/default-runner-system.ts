@@ -385,11 +385,15 @@ export class DefaultRunnerSystem implements RunnerSystem {
     this.parallelCancellation.abort();
     this.parallelCancellation = new AbortController();
     const workerIds = [...this.activeWorkers.keys()];
-    await Promise.all(workerIds.map((id) => this.cancelWorker(id)));
+    await Promise.allSettled(workerIds.map((id) => this.cancelWorker(id)));
 
     for (const runner of this.runnerRegistry.values()) {
       if (hasKillAll(runner)) {
-        runner.killAll();
+        try {
+          runner.killAll();
+        } catch {
+          /* Signal the remaining runners even if one backend fails. */
+        }
       }
     }
   }

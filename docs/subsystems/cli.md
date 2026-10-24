@@ -123,6 +123,25 @@ its result is handled without restarting prompts or printing a late success. Shu
 wait indefinitely for storage. Real terminal regression tests use the system `script` utility on
 macOS/Linux; deterministic prompt lifecycle tests also run without a terminal.
 
+Ctrl+C in a live prompt requests workflow shutdown, closes the question and submits no default
+answer. EOF only closes prompting. Process SIGINT/SIGTERM and prompt interrupts use the same
+shutdown coordinator. Requests are idempotent: repeated signals retain the first reason and
+deadline. Cancellation starts for active workers and live sessions belonging to the current run.
+Graceful interruption returns the observed ABORTED outcome with exit code 4; a completed DONE
+result keeps exit code 0. Cleanup/persistence errors remain errors.
+
+Once infrastructure has been assembled, the CLI gives shutdown 10 seconds. If an operation or
+cancellation backend remains unresolved, it exits with code 4 and a timeout diagnostic, without
+claiming cleanup finished or emitting a fabricated final-state result. Timeout errors respect
+`--json` on stderr. It preserves durable
+checkpoint/journal progress and leaves an active owner's lock for dead-process recovery. Inspect
+the run and external work before explicitly retrying. A write started before interruption can
+still commit. The timer requires a responsive Node event loop and cannot preempt blocked JavaScript.
+
+Commands dispose signal handlers and the deadline on success, error and validation returns;
+failed context creation/restoration also removes installed handlers. Embedded callers using
+orchestrator factories directly own `shutdownCoordinator.uninstall()` after using the context.
+
 ## Source of Truth
 
 Prefer:

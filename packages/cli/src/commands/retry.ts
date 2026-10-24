@@ -49,105 +49,109 @@ export async function retryCommand(
     return ExitCode.CONFIGURATION_ERROR;
   }
 
-  for (const w of ctx.warnings) {
-    formatter.warn(w);
-  }
-
-  const state = ctx.engine.getState();
-  formatter.info(`Retrying from state: ${state.currentState}`);
-
-  const onUncaughtException = (err: Error): void => {
-    ctx.journalWriter.append({
-      timestamp: new Date().toISOString(),
-      runId,
-      sequence: 0,
-      type: 'error',
-      data: {
-        kind: 'error',
-        errorCode: 'uncaught_exception',
-        message: err.message,
-        recoverable: false,
-      },
-    });
-    process.exitCode = ExitCode.RUN_FAILED;
-  };
-
-  const onUnhandledRejection = (reason: unknown): void => {
-    const message = reason instanceof Error ? reason.message : String(reason);
-    ctx.journalWriter.append({
-      timestamp: new Date().toISOString(),
-      runId,
-      sequence: 0,
-      type: 'error',
-      data: {
-        kind: 'error',
-        errorCode: 'unhandled_rejection',
-        message,
-        recoverable: false,
-      },
-    });
-    process.exitCode = ExitCode.RUN_FAILED;
-  };
-
-  process.on('uncaughtException', onUncaughtException);
-  process.on('unhandledRejection', onUnhandledRejection);
-
-  formatter.startSpinner('Retrying workflow…');
-
-  let result: RunResult;
   try {
-    result = await ctx.engine.retry();
-
-    if (options.json) {
-      process.stdout.write(JSON.stringify(workflowResultFields(result)) + '\n');
+    for (const w of ctx.warnings) {
+      formatter.warn(w);
     }
 
-    if (result.finalState === 'WAITING_FOR_HUMAN') {
-      handleWaitingForHuman(result, ctx.engine, runId, formatter);
+    const state = ctx.engine.getState();
+    formatter.info(`Retrying from state: ${state.currentState}`);
+
+    const onUncaughtException = (err: Error): void => {
+      ctx.journalWriter.append({
+        timestamp: new Date().toISOString(),
+        runId,
+        sequence: 0,
+        type: 'error',
+        data: {
+          kind: 'error',
+          errorCode: 'uncaught_exception',
+          message: err.message,
+          recoverable: false,
+        },
+      });
+      process.exitCode = ExitCode.RUN_FAILED;
+    };
+
+    const onUnhandledRejection = (reason: unknown): void => {
+      const message = reason instanceof Error ? reason.message : String(reason);
+      ctx.journalWriter.append({
+        timestamp: new Date().toISOString(),
+        runId,
+        sequence: 0,
+        type: 'error',
+        data: {
+          kind: 'error',
+          errorCode: 'unhandled_rejection',
+          message,
+          recoverable: false,
+        },
+      });
+      process.exitCode = ExitCode.RUN_FAILED;
+    };
+
+    process.on('uncaughtException', onUncaughtException);
+    process.on('unhandledRejection', onUnhandledRejection);
+
+    formatter.startSpinner('Retrying workflow…');
+
+    let result: RunResult;
+    try {
+      result = await ctx.engine.retry();
+
+      if (options.json) {
+        process.stdout.write(JSON.stringify(workflowResultFields(result)) + '\n');
+      }
+
+      if (result.finalState === 'WAITING_FOR_HUMAN') {
+        handleWaitingForHuman(result, ctx.engine, runId, formatter);
+        return workflowResultFields(result).exitCode;
+      }
+    } catch (error: unknown) {
+      formatter.error(toCLIError(error));
+      return ExitCode.RUN_FAILED;
+    } finally {
+      process.removeListener('uncaughtException', onUncaughtException);
+      process.removeListener('unhandledRejection', onUnhandledRejection);
+    }
+
+    formatter.clearSpinner();
+
+    if (result.finalState === 'DONE') {
+      formatter.success('Workflow retried and completed successfully.');
+      formatter.summary({
+        'Run ID': result.runId,
+        'Final State': result.finalState,
+        Artifacts: result.artifactInventory.length,
+      });
       return workflowResultFields(result).exitCode;
     }
-  } catch (error: unknown) {
-    formatter.error(toCLIError(error));
-    return ExitCode.RUN_FAILED;
-  } finally {
-    process.removeListener('uncaughtException', onUncaughtException);
-    process.removeListener('unhandledRejection', onUnhandledRejection);
-  }
 
-  formatter.clearSpinner();
+    if (result.finalState === 'FAILED') {
+      formatter.error({
+        code: ExitCode.RUN_FAILED,
+        message: 'Workflow failed during retry.',
+        remediation: 'Check the journal for details.',
+      });
+      return workflowResultFields(result).exitCode;
+    }
 
-  if (result.finalState === 'DONE') {
-    formatter.success('Workflow retried and completed successfully.');
+    if (result.finalState === 'ABORTED') {
+      formatter.error({
+        code: ExitCode.RUN_ABORTED,
+        message: 'Workflow was aborted during retry.',
+        remediation: 'Check the journal for details.',
+      });
+      return workflowResultFields(result).exitCode;
+    }
+
     formatter.summary({
       'Run ID': result.runId,
       'Final State': result.finalState,
       Artifacts: result.artifactInventory.length,
     });
     return workflowResultFields(result).exitCode;
+  } finally {
+    ctx.shutdownCoordinator?.uninstall();
   }
-
-  if (result.finalState === 'FAILED') {
-    formatter.error({
-      code: ExitCode.RUN_FAILED,
-      message: 'Workflow failed during retry.',
-      remediation: 'Check the journal for details.',
-    });
-    return workflowResultFields(result).exitCode;
-  }
-
-  if (result.finalState === 'ABORTED') {
-    formatter.error({
-      code: ExitCode.RUN_ABORTED,
-      message: 'Workflow was aborted during retry.',
-      remediation: 'Check the journal for details.',
-    });
-    return workflowResultFields(result).exitCode;
-  }
-
-  formatter.summary({
-    'Run ID': result.runId,
-    'Final State': result.finalState,
-    Artifacts: result.artifactInventory.length,
-  });
-  return workflowResultFields(result).exitCode;
 }

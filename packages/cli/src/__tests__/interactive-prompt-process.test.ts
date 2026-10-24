@@ -80,6 +80,7 @@ async function terminal(mode: string) {
       const match = /TERMINAL_RESULT:([^\r\n]+)/.exec(output);
       expect(match, output).not.toBeNull();
       return JSON.parse(match?.[1] ?? '{}') as {
+        interrupted: boolean;
         permission: LiveResponse | null;
         clarification: LiveResponse | null;
       };
@@ -102,6 +103,16 @@ afterEach(async () => {
 describe.skipIf(process.platform === 'win32')(
   'interactive requests through a real POSIX terminal',
   () => {
+    it('routes terminal Ctrl+C to shutdown without submitting a default response', async () => {
+      const session = await terminal('interrupt');
+      await session.waitFor('Allow? [Y/n]');
+      session.child.stdin.write('\x03');
+      const result = await session.finish();
+      expect(result.interrupted).toBe(true);
+      expect(result.permission).toBeNull();
+      expect(result.clarification).toBeNull();
+      expect(session.output()).not.toContain('Terminal input closed');
+    }, 20_000);
     it('serializes permission and clarification, accepting no as denial', async () => {
       const session = await terminal('normal');
       await session.waitFor('Allow? [Y/n]');

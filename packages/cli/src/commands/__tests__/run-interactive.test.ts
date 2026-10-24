@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
+import { ShutdownCoordinator } from '@ai-dev-orchestrator/recovery';
 import type { LiveRequest } from '@ai-dev-orchestrator/runner';
 import type { RunResult } from '@ai-dev-orchestrator/schemas';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -49,6 +50,8 @@ function observe(output: OutputFormatter) {
   };
 }
 let answer: (value: string) => void;
+let input: EventEmitter;
+let shutdown: ShutdownCoordinator;
 let store: {
   listPendingRequests: ReturnType<typeof vi.fn>;
   writeResponse: ReturnType<typeof vi.fn>;
@@ -63,6 +66,7 @@ beforeEach(() => {
     .mockReset()
     .mockImplementation(() => {
       const line = new EventEmitter();
+      input = line;
       return Object.assign(line, {
         question: vi.fn((_question: string, callback: (value: string) => void) => {
           answer = callback;
@@ -77,8 +81,10 @@ beforeEach(() => {
     writeResponse: vi.fn().mockResolvedValue('response_written'),
   };
   finish = deferred<RunResult>();
+  shutdown = new ShutdownCoordinator({} as never, {} as never);
   vi.mocked(createOrchestrator).mockResolvedValue({
     runId: 'run',
+    shutdownCoordinator: shutdown,
     runDir: root,
     warnings: [],
     engine: { start: () => finish.promise },
@@ -103,6 +109,36 @@ afterEach(async () => {
   rmSync(root, { recursive: true, force: true });
 });
 describe('interactive run delivery', () => {
+  it('turns prompt Ctrl+C into coordinator shutdown without a default decision', async () => {
+    await vi.advanceTimersByTimeAsync(1000);
+    input.emit('SIGINT');
+    expect(shutdown.isShutdownRequested()).toBe(true);
+    expect(store.writeResponse).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(createInterface).toHaveBeenCalledTimes(1);
+    expect(observed.warn).not.toHaveBeenCalled();
+  });
+  it('stops immediately when shutdown races a pending catalog read', async () => {
+    const read = deferred<readonly LiveRequest[]>();
+    store.listPendingRequests.mockReturnValueOnce(read.promise);
+    await vi.advanceTimersByTimeAsync(1000);
+    shutdown.requestShutdown('signal');
+    read.resolve([permission]);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(createInterface).not.toHaveBeenCalled();
+  });
+  it('handles a write completing after a shutdown request without late success', async () => {
+    const write = deferred<'response_written'>();
+    store.writeResponse.mockReturnValueOnce(write.promise);
+    await vi.advanceTimersByTimeAsync(1000);
+    answer('yes');
+    shutdown.requestShutdown('signal');
+    write.resolve('response_written');
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(observed.info).not.toHaveBeenCalledWith(expect.stringContaining('response stored'));
+    expect(store.writeResponse).toHaveBeenCalledOnce();
+    expect(createInterface).toHaveBeenCalledOnce();
+  });
   it('waits for strict storage acknowledgement before reporting a stored permission', async () => {
     const write = deferred<'response_written'>();
     store.writeResponse.mockReturnValue(write.promise);
