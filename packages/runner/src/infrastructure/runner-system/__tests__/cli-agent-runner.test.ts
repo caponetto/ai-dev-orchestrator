@@ -129,11 +129,18 @@ describe('CliAgentRunner', () => {
       adapter: createOpencodeCliAdapter(),
       handshakeTimeoutMs: 20,
     });
-    const result = await runner.dispatch(task, (event) => {
+    let enteredBackoff!: () => void;
+    const backoff = new Promise<void>((resolve) => {
+      enteredBackoff = resolve;
+    });
+    const dispatching = runner.dispatch(task, (event) => {
       if (event.content.includes('Retrying transient')) {
-        runner.killAll();
+        enteredBackoff();
       }
     });
+    await backoff;
+    runner.killAll();
+    const result = await dispatching;
     expect(result.status).toBe('failure');
     expect(result.error).toContain('cancelled');
     expect(await readFile(marker, 'utf8')).toBe('attempt\n');

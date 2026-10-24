@@ -36,6 +36,23 @@ Approved budget extensions survive checkpoint restore and journal replay. Comple
 
 Each checkpoint is durably journaled as `workflow_checkpoint` before the checkpoint file is written. These events preserve live-session identity, pending requests, dispatch context, budget decisions, and action cursors, so journal-only recovery resumes completed terminal work without repeating it. Session completion events include the updated entry and exit action cursor alongside token usage. Journal replay applies both together, so a crash before the next checkpoint cannot re-request the completed session’s approval or charge its completion twice. Transition counters prevent replaying a transition already included in a checkpoint event. Older session events retain their session identifier; recovery without that identifier fails instead of advancing past the worker.
 
+Overlapping pause and abort checkpoints append their snapshots synchronously and commit state-file
+writes in the same order. A failed save is reported to its caller and does not prevent a later
+cancellation checkpoint from committing. Active execution retains the run lock until its pending
+cancellation and abort cleanup settle, including when an earlier checkpoint fails.
+Session I/O failures arriving after cancellation has committed still finish unstarted abort
+cleanup before releasing ownership. Failed cleanup remains available for an explicit retry.
+
+A session completion arriving during a manual pause preserves the manual gate and records the
+completed cursor and usage before resume. If cancellation arrives during output or aggregate
+storage, completed session usage is still journaled/checkpointed, while cancelled work cursors
+cannot replace abort cleanup. A late pause cannot overwrite an aborted run.
+
+Recovery avoids repeating work whose completion cursor is durably recorded. External effects and
+their journal records are not a transaction: a process crash after an effect completes but before
+its completion record is appended can cause that effect to run again. Actions with external
+effects should therefore tolerate retry; checkpoints do not guarantee exactly-once execution.
+
 Journal-only recovery preserves ordered state visits and rebuilds token totals from completed and failed workers. Transition events carry exact iteration and judge-arbitration snapshots; older journals use the shared built-in state-to-contract mapping. Human rejection resets review rounds, matching normal execution.
 
 Resume reconciles a valid checkpoint with subsequent durable journal events, including terminal action cursors written before a checkpoint-file failure. Intentional checkpoint edits such as dashboard retry take precedence over older journal snapshots. The persisted repository path is restored before rebuilding run infrastructure, so workers continue in a repository selected by a setup script.

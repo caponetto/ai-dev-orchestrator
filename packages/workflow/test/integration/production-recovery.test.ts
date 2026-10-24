@@ -172,69 +172,75 @@ afterEach(() => {
 });
 
 describe('production components across a checkpoint failure', () => {
-  it('recovers terminal progress from the journal with the same artifacts and usage as uninterrupted execution', async () => {
-    const baseline = createHarness(temporaryDirectory());
-    expect((await baseline.controller.start(baseline.config)).finalState).toBe('DONE');
-    const baselineState = baseline.persistence.load(runId);
-    assert(baselineState);
+  it.each([0, 1, 2])(
+    'recovers terminal cursor %i from the journal with the same artifacts and usage as uninterrupted execution',
+    async (cursor) => {
+      const baseline = createHarness(temporaryDirectory());
+      expect((await baseline.controller.start(baseline.config)).finalState).toBe('DONE');
+      const baselineState = baseline.persistence.load(runId);
+      assert(baselineState);
 
-    const dir = temporaryDirectory();
-    const interrupted = createHarness(dir);
-    const save = interrupted.persistence.save.bind(interrupted.persistence);
-    vi.spyOn(interrupted.persistence, 'save').mockImplementation(async (state) => {
-      if (state.pendingTerminalState && state.entryActionContinuation?.nextActionIndex === 1) {
-        throw new Error('Injected checkpoint failure after first cleanup');
-      }
-      await save(state);
-    });
-    await expect(interrupted.controller.start(interrupted.config)).rejects.toThrow(
-      'Injected checkpoint failure',
-    );
-    expect(interrupted.persistence.probeLock(runId).exists).toBe(false);
-    expect(interrupted.persistence.load(runId)?.entryActionContinuation?.nextActionIndex).not.toBe(
-      1,
-    );
-
-    // Recreate all production components so no in-memory cursor or inventory can help recovery.
-    const restored = createHarness(dir);
-    const replay = restored.persistence.reconstructFromJournal(
-      runId,
-      new DefaultJournalReader(restored.journalPath).readAll(),
-    );
-    assert(replay);
-    expect(replay.pendingTerminalState).toBe('DONE');
-    expect(replay.entryActionContinuation?.nextActionIndex).toBe(1);
-    restored.controller.restore(restored.config, replay);
-    expect((await restored.controller.retry()).finalState).toBe('DONE');
-
-    const recovered = restored.persistence.load(runId);
-    expect(recovered).toMatchObject({
-      currentState: baselineState.currentState,
-      cumulativeInputTokens: 30,
-      cumulativeOutputTokens: 20,
-      workerMetricsByRole: replay.workerMetricsByRole,
-    });
-    for (const state of [baselineState, recovered]) {
-      expect(state?.workerMetricsByRole?.planner).toMatchObject({
-        dispatches: 1,
-        inputTokens: 30,
-        outputTokens: 20,
+      const dir = temporaryDirectory();
+      const interrupted = createHarness(dir);
+      const save = interrupted.persistence.save.bind(interrupted.persistence);
+      vi.spyOn(interrupted.persistence, 'save').mockImplementation(async (state) => {
+        if (
+          state.pendingTerminalState &&
+          state.entryActionContinuation?.nextActionIndex === cursor
+        ) {
+          throw new Error(`Injected checkpoint failure at cleanup cursor ${String(cursor)}`);
+        }
+        await save(state);
       });
-    }
-    expect(recovered?.pendingTerminalState).toBeUndefined();
-    expect(recovered?.waitingContext).toBeUndefined();
-    expect(interrupted.dispatch).toHaveBeenCalledTimes(1);
-    expect(restored.dispatch).not.toHaveBeenCalled();
-    const baselineRefs = await baseline.artifactStore.list({});
-    expect(await restored.artifactStore.list({})).toEqual(baselineRefs);
-    expect(baselineRefs.map((ref) => [ref.name, ref.version])).toEqual([
-      ['planner-output', 1],
-      ['first', 1],
-      ['second', 1],
-    ]);
-    for (const ref of baselineRefs) {
-      expect(await restored.artifactStore.verify(ref)).toMatchObject({ valid: true });
-    }
-    expect(restored.persistence.probeLock(runId).exists).toBe(false);
-  });
+      await expect(interrupted.controller.start(interrupted.config)).rejects.toThrow(
+        'Injected checkpoint failure',
+      );
+      expect(interrupted.persistence.probeLock(runId).exists).toBe(false);
+      expect(
+        interrupted.persistence.load(runId)?.entryActionContinuation?.nextActionIndex,
+      ).not.toBe(cursor);
+
+      // Recreate all production components so no in-memory cursor or inventory can help recovery.
+      const restored = createHarness(dir);
+      const replay = restored.persistence.reconstructFromJournal(
+        runId,
+        new DefaultJournalReader(restored.journalPath).readAll(),
+      );
+      assert(replay);
+      expect(replay.pendingTerminalState).toBe('DONE');
+      expect(replay.entryActionContinuation?.nextActionIndex).toBe(cursor);
+      restored.controller.restore(restored.config, replay);
+      expect((await restored.controller.retry()).finalState).toBe('DONE');
+
+      const recovered = restored.persistence.load(runId);
+      expect(recovered).toMatchObject({
+        currentState: baselineState.currentState,
+        cumulativeInputTokens: 30,
+        cumulativeOutputTokens: 20,
+        workerMetricsByRole: replay.workerMetricsByRole,
+      });
+      for (const state of [baselineState, recovered]) {
+        expect(state?.workerMetricsByRole?.planner).toMatchObject({
+          dispatches: 1,
+          inputTokens: 30,
+          outputTokens: 20,
+        });
+      }
+      expect(recovered?.pendingTerminalState).toBeUndefined();
+      expect(recovered?.waitingContext).toBeUndefined();
+      expect(interrupted.dispatch).toHaveBeenCalledTimes(1);
+      expect(restored.dispatch).not.toHaveBeenCalled();
+      const baselineRefs = await baseline.artifactStore.list({});
+      expect(await restored.artifactStore.list({})).toEqual(baselineRefs);
+      expect(baselineRefs.map((ref) => [ref.name, ref.version])).toEqual([
+        ['planner-output', 1],
+        ['first', 1],
+        ['second', 1],
+      ]);
+      for (const ref of baselineRefs) {
+        expect(await restored.artifactStore.verify(ref)).toMatchObject({ valid: true });
+      }
+      expect(restored.persistence.probeLock(runId).exists).toBe(false);
+    },
+  );
 });

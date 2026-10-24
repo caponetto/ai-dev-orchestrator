@@ -115,6 +115,7 @@ export class LifecycleController implements WorkflowEngine {
   private abortCompletion: Promise<void> | null = null;
   private executionActive = false;
   private activeExecution: Promise<RunResult> | null = null;
+  private checkpointWrite: Promise<void> = Promise.resolve();
   private pendingTerminalState: string | null = null;
   private terminalRecoveryState: string | null = null;
   private runId: RunId = createRunId('');
@@ -300,6 +301,9 @@ export class LifecycleController implements WorkflowEngine {
 
   /** @inheritdoc */
   async pause(context: WaitingContext): Promise<void> {
+    if (this.aborted || this.currentState === 'ABORTED') {
+      return;
+    }
     this.executionPaused = true;
     this.recordStateExit();
     this.previousState = this.currentState;
@@ -434,12 +438,13 @@ export class LifecycleController implements WorkflowEngine {
       }
 
       const sessionId = savedWaitingContext.liveSessionId;
+      const isAborted = () => this.aborted;
       const session = await resumeLiveSession(savedWaitingContext, input, sessionId, {
         supervisor: this.sessionSupervisor,
         journalWriter: this.journalWriter,
         runId: this.runId,
         getStateId: () => this.currentState,
-        isAborted: () => this.aborted,
+        isAborted,
       });
       // Abort may run during the promise handoff after the helper's final I/O check.
       if (session.kind === 'interrupted' || this.aborted) {
@@ -451,15 +456,27 @@ export class LifecycleController implements WorkflowEngine {
       const { handle, advance } = session;
 
       if (advance.kind === 'completed') {
-        this.recordStateExit();
-        this.previousState = this.currentState;
-        this.currentState = savedWaitingContext.requestingState;
-        this.stateEnteredAt = new Date().toISOString();
-        this.transitionCount += 1;
-        this.stateHistory.record(this.currentState);
+        if (!this.executionPaused) {
+          this.recordStateExit();
+          this.previousState = this.currentState;
+          this.currentState = savedWaitingContext.requestingState;
+          this.stateEnteredAt = new Date().toISOString();
+          this.transitionCount += 1;
+          this.stateHistory.record(this.currentState);
 
-        this.recordTransition(this.previousState, this.currentState, 'human_approved');
+          this.recordTransition(this.previousState, this.currentState, 'human_approved');
+        }
         const roleId = handle.ref.role;
+        const continuation = this.entryActionContinuation ?? {
+          stateId: savedWaitingContext.requestingState,
+          completedResults: [],
+          nextActionIndex:
+            (this.config.workflowDefinition.states[
+              savedWaitingContext.requestingState
+            ].entryActions?.findIndex(
+              (action) => action.type === 'dispatch_worker' && action.params.role === roleId,
+            ) ?? -1) + 1,
+        };
         const sessionActionResult = await createSessionCompletion(
           roleId,
           advance,
@@ -469,14 +486,6 @@ export class LifecycleController implements WorkflowEngine {
         );
 
         this.accounting.record([sessionActionResult]);
-        const continuation = this.entryActionContinuation ?? {
-          stateId: this.currentState,
-          completedResults: [],
-          nextActionIndex:
-            (this.config.workflowDefinition.states[this.currentState].entryActions?.findIndex(
-              (action) => action.type === 'dispatch_worker' && action.params.role === roleId,
-            ) ?? -1) + 1,
-        };
         const isExitSession =
           continuation.completedExitResults?.some(
             (result) => result.sessionRef?.sessionId === sessionId,
@@ -497,17 +506,19 @@ export class LifecycleController implements WorkflowEngine {
           ),
         );
 
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- abort() may run while storing a dynamic aggregate.
-        if (this.aborted) {
-          return this.interruptedResult();
-        }
         if (pendingIndex < 0) {
           completedResults.push(sessionActionResult);
         }
-        this.entryActionContinuation = {
+        // Keep completed usage/output durable even if abort won during artifact I/O, without
+        // restoring a work cursor over the abort cleanup cursor.
+        const completedContinuation = {
           ...continuation,
           ...(isExitSession ? { completedExitResults: completedResults } : { completedResults }),
         };
+        const cancelled = isAborted();
+        if (!cancelled) {
+          this.entryActionContinuation = completedContinuation;
+        }
         this.journalWriter.append({
           timestamp: new Date().toISOString(),
           runId: this.runId,
@@ -517,19 +528,23 @@ export class LifecycleController implements WorkflowEngine {
             kind: 'worker',
             workerId: sessionId,
             role: roleId,
-            stateId: this.currentState,
+            stateId: savedWaitingContext.requestingState,
             status: sessionActionResult.success ? 'success' : 'failed',
             inputTokens: advance.tokenUsage?.inputTokens,
             outputTokens: advance.tokenUsage?.outputTokens,
             durationMs: advance.durationMs,
             error: sessionActionResult.error,
-            entryActionContinuation: structuredClone(this.entryActionContinuation),
+            entryActionContinuation: cancelled ? undefined : structuredClone(completedContinuation),
             outputArtifacts: sessionActionResult.artifactRef
               ? [sessionActionResult.artifactRef]
               : [],
           },
         });
-        if (await this.pauseForSession(completedResults, this.entryActionContinuation)) {
+        if (cancelled) {
+          await this.saveCheckpoint();
+          return this.interruptedResult();
+        }
+        if (await this.pauseForSession(completedResults, completedContinuation)) {
           return this.interruptedResult();
         }
         await this.saveCheckpoint();
@@ -2228,8 +2243,15 @@ export class LifecycleController implements WorkflowEngine {
       type: 'workflow_checkpoint',
       data: { kind: 'workflow_checkpoint', state: structuredClone(state) },
     });
-    await this.statePersistence.save(state);
-    await this.reporting.writeInterim(() => this.reportingSnapshot());
+    // Pause and abort can checkpoint while an execution is awaiting I/O. Keep journal append
+    // order synchronous, and commit snapshots in that same order so an older save cannot win.
+    const write = this.checkpointWrite.then(async () => {
+      await this.statePersistence.save(state);
+      await this.reporting.writeInterim(() => this.reportingSnapshot());
+    });
+    // A failed caller still sees its error; later cancellation/recovery writes may proceed.
+    this.checkpointWrite = write.catch(() => undefined);
+    await write;
   }
 
   private async handleDeadSession(
@@ -2457,10 +2479,22 @@ export class LifecycleController implements WorkflowEngine {
       const result = await operation();
       await this.settleAbort();
       return (await this.finishPendingAbort()) ?? result;
+    } catch (error: unknown) {
+      // Abort may already have committed before the interrupted operation rejects. Finish
+      // cleanup only if it has not started; failed terminal cleanup stays explicitly retryable.
+      await this.settleAbort();
+      if (
+        this.aborted &&
+        this.pendingTerminalState === 'ABORTED' &&
+        this.entryActionContinuation?.stateId !== 'ABORTED'
+      ) {
+        await this.finishPendingAbort();
+      }
+      throw error;
     } finally {
-      this.releaseLockIfHeld();
       this.activeExecution = null;
       this.executionActive = false;
+      this.releaseLockIfHeld();
     }
   }
 
@@ -2534,7 +2568,8 @@ export class LifecycleController implements WorkflowEngine {
   }
 
   private releaseLockIfHeld(): void {
-    if (this.lockHandle) {
+    // Active executions release from executeOwned only, after cancellation/cleanup settles.
+    if (this.lockHandle && !this.executionActive) {
       this.statePersistence.releaseLock(this.lockHandle);
       this.lockHandle = null;
     }
