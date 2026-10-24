@@ -259,6 +259,7 @@ export async function executeCliProcess(
           void requests.handleClarificationRequest(message, task, transport, onStreamEvent);
           break;
         case 'done': {
+          finalUsage = message.payload.tokenUsage ?? finalUsage;
           clearTimeout(overallTimer);
           doneHandled = true;
           if (finalArtifact) {

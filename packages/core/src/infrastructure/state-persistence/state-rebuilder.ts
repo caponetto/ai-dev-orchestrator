@@ -32,6 +32,7 @@ export interface RebuildContext {
   terminalRecoveryState?: string;
   entryActionContinuation?: EntryActionContinuation;
   executionPaused?: boolean;
+  workerMetricsByRole?: PersistedState['workerMetricsByRole'];
 }
 
 export function applyRunStarted(
@@ -93,6 +94,29 @@ function applyWorkerUsage(
   if (event.data.entryActionContinuation) {
     ctx.entryActionContinuation = structuredClone(event.data.entryActionContinuation);
     ctx.waitingContext = undefined;
+    if (
+      event.data.role &&
+      (event.data.inputTokens !== undefined || event.data.outputTokens !== undefined)
+    ) {
+      const role = event.data.role;
+      const previous = ctx.workerMetricsByRole?.[role] ?? {
+        inputTokens: 0,
+        outputTokens: 0,
+        dispatches: 0,
+        durationMs: 0,
+        artifactsProduced: 0,
+      };
+      ctx.workerMetricsByRole = {
+        ...ctx.workerMetricsByRole,
+        [role]: {
+          ...previous,
+          inputTokens: previous.inputTokens + (event.data.inputTokens ?? 0),
+          outputTokens: previous.outputTokens + (event.data.outputTokens ?? 0),
+          dispatches: previous.dispatches + 1,
+          durationMs: previous.durationMs + (event.data.durationMs ?? 0),
+        },
+      };
+    }
   }
 }
 
@@ -226,6 +250,7 @@ export function rebuildStateFromEvents(
         cumulativeInputTokens: snapshot.cumulativeInputTokens ?? 0,
         cumulativeOutputTokens: snapshot.cumulativeOutputTokens ?? 0,
         hasReceivedUsage: snapshot.hasReceivedUsage ?? false,
+        workerMetricsByRole: snapshot.workerMetricsByRole,
         artifactMap: new Map([
           ...ctx.artifactMap,
           ...snapshot.activeArtifacts.map((ref): [string, ArtifactRef] => [ref.type, ref]),
@@ -271,6 +296,7 @@ export function rebuildStateFromEvents(
     terminalRecoveryState: ctx.terminalRecoveryState,
     entryActionContinuation: ctx.entryActionContinuation,
     executionPaused: ctx.executionPaused,
+    ...(ctx.workerMetricsByRole ? { workerMetricsByRole: ctx.workerMetricsByRole } : {}),
   };
 
   const checksum = computeStateChecksum(state);

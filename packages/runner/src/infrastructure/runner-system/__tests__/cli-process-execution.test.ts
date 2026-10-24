@@ -71,7 +71,10 @@ describe('CLI subprocess execution', () => {
           content: '{"summary":"done"}',
           isFinal: true,
         }),
-        createProtocolMessage('done', { status: 'success' }),
+        createProtocolMessage('done', {
+          status: 'success',
+          tokenUsage: { inputTokens: 30, outputTokens: 20 },
+        }),
       ]
         .map(serializeMessage)
         .join('\n') + '\n';
@@ -103,7 +106,11 @@ describe('CLI subprocess execution', () => {
           config: { command: process.execPath, handshakeTimeoutMs: 1000 },
         },
       );
-      expect(result).toMatchObject({ status: 'success', artifactContent: '{"summary":"done"}' });
+      expect(result).toMatchObject({
+        status: 'success',
+        artifactContent: '{"summary":"done"}',
+        tokenUsage: { inputTokens: 30, outputTokens: 20 },
+      });
       expect(readOutput).not.toHaveBeenCalled();
       assert(receive);
       receive(

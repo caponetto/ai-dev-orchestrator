@@ -1,4 +1,5 @@
 import type {
+  AgentTokenUsage,
   ConfidenceReport,
   PermissionAction,
   ThreeTierSeverity,
@@ -86,6 +87,7 @@ export interface LogPayload {
 export interface DonePayload {
   readonly summary: string;
   readonly confidence?: ConfidenceReport;
+  readonly tokenUsage?: AgentTokenUsage;
 }
 
 export interface ErrorPayload {

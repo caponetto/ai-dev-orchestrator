@@ -10,6 +10,7 @@ import type {
   AgentSessionHandle,
   AgentSessionRef,
   ArtifactType,
+  ArtifactRef,
   HumanInput,
   PersistedWaitingContext,
   RunId,
@@ -152,6 +153,7 @@ export async function createSessionCompletion(
   outputType: ArtifactType | undefined,
   artifactStore: ArtifactStore,
   runId: RunId,
+  sessionId?: string,
 ): Promise<ActionResult> {
   const sessionAction: Action = { type: 'dispatch_worker', params: { role: roleId } };
   let sessionActionResult: ActionResult;
@@ -162,12 +164,36 @@ export async function createSessionCompletion(
     if (!advance.artifactContent) {
       throw new Error(`Session for role '${roleId}' completed without output`);
     }
-    const artifactRef = await artifactStore.store({
+    let artifactRef: ArtifactRef | undefined;
+    if (sessionId) {
+      const refs = await artifactStore.list({ type: outputType, name: `${roleId}-output` });
+      for (const ref of refs) {
+        const artifact = await artifactStore.get(ref);
+        if (
+          artifact.metadata?.['completionSessionId'] !== sessionId ||
+          artifact.metadata['completionRunId'] !== runId
+        ) {
+          continue;
+        }
+        if (
+          artifact.content !== advance.artifactContent ||
+          !(await artifactStore.verify(ref)).valid
+        ) {
+          throw new Error(
+            `Stored completion for session '${sessionId}' is inconsistent or corrupt`,
+          );
+        }
+        artifactRef = ref;
+        break;
+      }
+    }
+    artifactRef ??= await artifactStore.store({
       type: outputType,
       name: `${roleId}-output`,
       content: advance.artifactContent,
       producedBy: roleId,
       runId: runId,
+      metadata: sessionId ? { completionSessionId: sessionId, completionRunId: runId } : undefined,
     });
     sessionActionResult = { action: sessionAction, success: true, artifactRef };
   } catch (error: unknown) {

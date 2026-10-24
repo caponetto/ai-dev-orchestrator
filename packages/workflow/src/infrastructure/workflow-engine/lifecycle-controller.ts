@@ -500,6 +500,7 @@ export class LifecycleController implements WorkflowEngine {
           this.roleRegistry?.getRole(roleId)?.ownedArtifacts[0],
           this.artifactStore,
           this.runId,
+          sessionId,
         );
 
         this.accounting.record([sessionActionResult]);

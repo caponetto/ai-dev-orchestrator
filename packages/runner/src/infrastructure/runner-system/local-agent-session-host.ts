@@ -266,6 +266,7 @@ export class LocalAgentSessionHost {
           this.handleClarificationRequest(message);
           break;
         case 'done': {
+          this._finalTokenUsage = message.payload.tokenUsage ?? this._finalTokenUsage;
           this.clearTimer();
           this._state = 'completed';
           const doneResult = {

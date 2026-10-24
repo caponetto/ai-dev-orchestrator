@@ -81,6 +81,27 @@ that boundary is ambiguous and does not guarantee exactly-once delivery. Reconci
 state before retrying an ambiguous response. Local stdio sessions cannot reattach across process
 restart; remote recovery retains the original run/session/request identity.
 
+## Durable remote completion
+
+Remote `done` freezes a completion receipt containing output, duration and optional final token
+usage. Session snapshots persist that receipt before `waitForAdvance` or the host result promise
+exposes success. Both immediate and already-waiting observers follow this ordering. A failed save
+is observable and the in-memory receipt remains retryable; failed finalization does not discard
+the host. Cancellation while the receipt is being saved cannot be reported as success.
+
+After restart or finalization, a completed remote snapshot with a receipt can be attached and
+observed locally without reconnecting or resending a human response, even after its lease expires.
+Failed/aborted snapshots and legacy completed snapshots without receipts cannot fabricate output
+or reopen a terminal connection. Completion duration is fixed when `done` arrives, rather than
+growing on each observation. `done.tokenUsage` optionally supplies final cumulative input/output
+counts; remote, local-session and ordinary CLI protocol consumers retain those counts.
+
+The snapshot field and protocol usage field are additive; older snapshots and messages remain
+valid. This provides process-restart recovery after receipt persistence. A process death before
+that write completes can still require recovery from the remote agent. Snapshot write/rename is
+not a power-loss/fsync guarantee, and no receiver acknowledgement or exactly-once remote delivery
+contract is introduced.
+
 ## CLI execution module boundaries
 
 `CliAgentRunner` remains the public dispatch/session facade and configuration entry point.

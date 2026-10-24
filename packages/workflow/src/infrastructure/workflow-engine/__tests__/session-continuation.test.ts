@@ -257,6 +257,110 @@ describe('session continuation', () => {
 });
 
 describe('session completion artifacts', () => {
+  it('finds an earlier completion among peer sessions and different runs', async () => {
+    const store = createMockArtifactStore();
+    const target = await store.store({
+      type: 'plan',
+      name: 'planner-output',
+      content: '{}',
+      producedBy: 'planner',
+    });
+    const artifact = await store.get(target);
+    const peers = [2, 3, 4].map((version) => ({ ...target, version }));
+    vi.mocked(store.list).mockResolvedValue([...peers, target]);
+    vi.mocked(store.get).mockImplementation((ref) =>
+      Promise.resolve({
+        ...artifact,
+        ref,
+        metadata:
+          ref.version === 2
+            ? undefined
+            : {
+                completionSessionId: ref.version === 3 ? 'peer' : 'session',
+                completionRunId: ref.version === 4 ? 'other-run' : 'run',
+              },
+      }),
+    );
+    vi.mocked(store.store).mockClear();
+    const result = await createSessionCompletion(
+      'planner',
+      { kind: 'completed', artifactContent: '{}', durationMs: 1 },
+      'plan',
+      store,
+      createRunId('run'),
+      'session',
+    );
+    expect(result).toMatchObject({ success: true, artifactRef: target });
+    expect(store.list).toHaveBeenCalledWith({ type: 'plan', name: 'planner-output' });
+    expect(store.verify).toHaveBeenCalledExactlyOnceWith(target);
+    expect(store.store).not.toHaveBeenCalled();
+  });
+
+  it.each(['changed', 'corrupt'] as const)(
+    'fails a reused completion whose output is %s',
+    async (failure) => {
+      const store = createMockArtifactStore();
+      const ref = await store.store({
+        type: 'plan',
+        name: 'planner-output',
+        content: failure === 'changed' ? '{"different":true}' : '{}',
+        producedBy: 'planner',
+      });
+      const artifact = await store.get(ref);
+      vi.mocked(store.get).mockResolvedValue({
+        ...artifact,
+        metadata: { completionSessionId: 'session', completionRunId: 'run' },
+      });
+      if (failure === 'corrupt') {
+        vi.mocked(store.verify).mockResolvedValue({
+          valid: false,
+          expectedChecksum: 'a',
+          actualChecksum: 'b',
+          ref,
+        });
+      }
+      const result = await createSessionCompletion(
+        'planner',
+        { kind: 'completed', artifactContent: '{}', durationMs: 1 },
+        'plan',
+        store,
+        createRunId('run'),
+        'session',
+      );
+      expect(result).toMatchObject({
+        success: false,
+        error: expect.stringContaining('inconsistent or corrupt') as unknown,
+      });
+      expect(store.store).toHaveBeenCalledTimes(1);
+    },
+  );
+  it('reuses a verified artifact from the same completed session after a pre-journal crash', async () => {
+    const store = createMockArtifactStore();
+    const ref = await store.store({
+      type: 'plan',
+      name: 'planner-output',
+      content: '{}',
+      producedBy: 'planner',
+    });
+    const artifact = await store.get(ref);
+    vi.mocked(store.get).mockResolvedValue({
+      ...artifact,
+      metadata: { completionSessionId: 'session', completionRunId: 'run' },
+    });
+    vi.mocked(store.store).mockClear();
+    const result = await createSessionCompletion(
+      'planner',
+      { kind: 'completed', artifactContent: '{}', durationMs: 1 },
+      'plan',
+      store,
+      createRunId('run'),
+      'session',
+    );
+    expect(result.artifactRef).toEqual(ref);
+    expect(store.store).not.toHaveBeenCalled();
+    expect(store.verify).toHaveBeenCalledWith(ref);
+  });
+
   it('stores completed output and retains usage for accounting by the controller', async () => {
     const store = createMockArtifactStore();
     const result = await createSessionCompletion(

@@ -80,6 +80,29 @@ Resume reconciles a valid checkpoint with subsequent durable journal events, inc
 
 Human text responses become feedback for the next worker. States declared with `type: wait` expose their waiting context regardless of their name and require resume rather than retry. Human-driven transitions execute the source state's exit actions; their cursors retain the original response and waiting context across session, budget, and manual pauses. Aborting a paused run executes every declared `ABORTED` entry action and checkpoints terminal cleanup progress. Completing a dynamic task session updates only the matching session, preserving completed peer artifacts. Review and judge artifacts marked as having failed validation cannot approve a transition, including artifacts produced after session reattachment.
 
+## Completion handoff and recovery
+
+Completed session artifacts carry their run/session identity in metadata. If a restart occurs
+after artifact storage returns but before the completion journal/checkpoint, the controller reuses
+matching output only after verifying its content and checksum. A changed or corrupt completion
+fails instead of silently producing another version. This lookup also handles completed peer
+versions under the same role output name.
+
+The session completion journal event retains its cursor, output reference, duration and available
+usage. Replay restores both cumulative tokens and per-role metrics before continuing, so a crash
+between that event and the next checkpoint neither redispatches the worker nor charges completion
+again. Real-component and fresh-process comparisons cover these handoff boundaries.
+
+Missing output and artifact schema failures cannot report workflow success. A final manifest
+failure is surfaced after durable completion; the saved `DONE` state and usage remain authoritative,
+and CLI inspection reconciles a stale interim manifest's running status without executing work.
+Custom report-path failures remain best-effort and do not undo completed output.
+
+Artifact content, metadata, inventory and workflow journal writes are separate effects. Reuse
+applies to completed, indexed artifact writes; process death inside a partial artifact write may
+leave orphan files requiring reconciliation. These boundaries do not provide a transaction across
+all files, external effects or a power-loss guarantee.
+
 ## Execution module boundaries
 
 `LifecycleController` owns the active execution, run lock, transition state and durable action

@@ -136,6 +136,31 @@ describe('reconnectMetaSchema (discriminated union)', () => {
 });
 
 describe('agentSessionSnapshotSchema', () => {
+  it('preserves a completion receipt while keeping legacy snapshots valid', () => {
+    const legacy = {
+      ref: { sessionId: 's', runId: 'r', stateId: 'WORK', role: 'planner', transport: 'remote' },
+      state: 'completed',
+      pendingRequests: [],
+      lastProtocolTimestamp: '',
+      createdAt: '',
+      updatedAt: '',
+    };
+    expect(agentSessionSnapshotSchema.safeParse(legacy).success).toBe(true);
+    const completion = {
+      artifactContent: '{}',
+      durationMs: 10,
+      tokenUsage: { inputTokens: 30, outputTokens: 20 },
+    };
+    expect(agentSessionSnapshotSchema.parse({ ...legacy, completion }).completion).toEqual(
+      completion,
+    );
+    expect(
+      agentSessionSnapshotSchema.safeParse({
+        ...legacy,
+        completion: { ...completion, durationMs: -1 },
+      }).success,
+    ).toBe(false);
+  });
   it('validates a snapshot', () => {
     const data = {
       ref: {

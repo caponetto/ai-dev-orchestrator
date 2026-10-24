@@ -269,6 +269,22 @@ describe('LocalAgentSessionHost', () => {
   });
 
   describe('done message handling', () => {
+    it('retains final token usage supplied by protocol completion', async () => {
+      transport._messageHandler?.(
+        createProtocolMessage('done', {
+          summary: 'done',
+          tokenUsage: { inputTokens: 30, outputTokens: 20 },
+        }),
+      );
+      expect(await host.resultPromise).toMatchObject({
+        status: 'success',
+        tokenUsage: { inputTokens: 30, outputTokens: 20 },
+      });
+      expect(await host.waitForAdvance()).toMatchObject({
+        kind: 'completed',
+        tokenUsage: { inputTokens: 30, outputTokens: 20 },
+      });
+    });
     it('transitions to completed on done message', () => {
       transport._messageHandler?.({
         type: 'done',

@@ -41,6 +41,64 @@ function rebuild(events: JournalEvent[]) {
 }
 
 describe('journal accounting reconstruction', () => {
+  it.each([true, false])(
+    'restores per-role completion metrics once (checkpoint metrics present: %s)',
+    (hasMetrics) => {
+      const base = rebuild([transition('INTAKE', 'WORK')]);
+      const metrics = {
+        inputTokens: 0,
+        outputTokens: 0,
+        dispatches: 1,
+        durationMs: 0,
+        artifactsProduced: 0,
+      };
+      const checkpoint: JournalEvent = {
+        timestamp: '',
+        runId,
+        sequence: ++sequence,
+        type: 'workflow_checkpoint',
+        data: {
+          kind: 'workflow_checkpoint',
+          state: { ...base, workerMetricsByRole: hasMetrics ? { planner: metrics } : undefined },
+        },
+      };
+      const event: JournalEvent = {
+        timestamp: '',
+        runId,
+        sequence: ++sequence,
+        type: 'worker_completed',
+        data: {
+          kind: 'worker',
+          workerId: 'session',
+          role: 'planner',
+          inputTokens: 30,
+          outputTokens: 20,
+          durationMs: 5,
+          entryActionContinuation: { stateId: 'WORK', completedResults: [], nextActionIndex: 1 },
+        },
+      };
+      const recovered = rebuild([checkpoint, event]);
+      expect(recovered.workerMetricsByRole?.planner).toEqual({
+        ...metrics,
+        inputTokens: 30,
+        outputTokens: 20,
+        durationMs: 5,
+        dispatches: hasMetrics ? 2 : 1,
+      });
+      const saved: JournalEvent = {
+        timestamp: '',
+        runId,
+        sequence: ++sequence,
+        type: 'workflow_checkpoint',
+        data: { kind: 'workflow_checkpoint', state: recovered },
+      };
+      expect(rebuild([checkpoint, event, saved]).workerMetricsByRole).toEqual(
+        recovered.workerMetricsByRole,
+      );
+      expect(metrics.inputTokens).toBe(0);
+    },
+  );
+
   it.each([
     ['PLAN_REVIEW', 'plan_review_loop'],
     ['CODE_REVIEW', 'implementation_review_loop'],

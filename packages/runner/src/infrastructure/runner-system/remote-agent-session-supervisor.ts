@@ -23,6 +23,7 @@ import type {
   RemoteReconnectMeta,
   SessionPendingRequest,
 } from '@ai-dev-orchestrator/schemas';
+import { agentSessionSnapshotSchema } from '@ai-dev-orchestrator/schemas';
 
 import type { AgentSessionRegistry } from './agent-session-registry';
 import type { WebSocketProtocolTransport } from './websocket-protocol-transport';
@@ -42,6 +43,8 @@ interface RemoteSessionHost {
   transport: WebSocketProtocolTransport | null;
   lastProtocolTimestamp: string;
   finalArtifact?: string;
+  completion?: NonNullable<AgentSessionSnapshot['completion']>;
+  completionWrite?: Promise<void>;
   startTime: number;
   streamHandlers: ((event: AgentOutputStreamEvent) => void)[];
   resultResolve?: (result: RemoteSessionResult) => void;
@@ -115,6 +118,14 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
       };
     }
 
+    const snapshot = this.registry.get(sessionId);
+    if (
+      snapshot?.ref.transport === 'remote' &&
+      snapshot.state === 'completed' &&
+      snapshot.completion
+    ) {
+      return { ref: snapshot.ref, state: 'completed', pendingRequests: [] };
+    }
     const handle = await this.reconnect(sessionId);
     if (handle && onStreamEvent) {
       const restored = this.hosts.get(sessionId);
@@ -291,7 +302,11 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
         host.transport.close();
         host.transport = null;
       }
-      await this.persistSnapshot(host);
+      if (host.completion) {
+        await this.persistCompletion(host, host.completion);
+      } else {
+        await this.persistSnapshot(host);
+      }
       this.hosts.delete(sessionId);
     }
   }
@@ -333,16 +348,22 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
   async waitForAdvance(sessionId: string): Promise<SessionAdvanceResult> {
     const host = this.hosts.get(sessionId);
     if (!host) {
+      const snapshot = this.registry.get(sessionId);
+      if (
+        snapshot?.ref.transport === 'remote' &&
+        snapshot.state === 'completed' &&
+        snapshot.completion
+      ) {
+        return { kind: 'completed', ...snapshot.completion };
+      }
       return { kind: 'failed', error: `Session ${sessionId} not found` };
     }
 
     if (isTerminal(host.state)) {
       if (host.state === 'completed') {
-        return {
-          kind: 'completed',
-          artifactContent: host.finalArtifact,
-          durationMs: Date.now() - host.startTime,
-        };
+        return host.completion
+          ? this.persistCompletion(host, host.completion)
+          : { kind: 'failed', error: 'Session completion receipt is unavailable' };
       }
       return { kind: 'failed', error: 'Session already terminated' };
     }
@@ -356,6 +377,9 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
     const result = await new Promise<SessionAdvanceResult>((resolve) => {
       host.advanceResolve = resolve;
     });
+    if (result.kind === 'completed' && host.completion) {
+      return this.persistCompletion(host, host.completion);
+    }
     await this.persistSnapshot(host);
     return result;
   }
@@ -460,17 +484,17 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
           this.stopHeartbeat(host);
           const doneArtifact =
             host.finalArtifact ?? JSON.stringify({ summary: message.payload.summary });
-          const doneDur = Date.now() - host.startTime;
-          host.resultResolve?.({
-            status: 'success',
+          host.completion = {
             artifactContent: doneArtifact,
-            durationMs: doneDur,
-          });
-          host.resultResolve = undefined;
+            durationMs: Math.max(0, Date.now() - host.startTime),
+            tokenUsage: message.payload.tokenUsage,
+          };
+          // The transport callback cannot await I/O. Port observers await this same write;
+          // rejection is observed there, and an in-memory receipt remains retryable.
+          void this.persistCompletion(host, host.completion).catch(() => undefined);
           this.resolveAdvance(host, {
             kind: 'completed',
-            artifactContent: doneArtifact,
-            durationMs: doneDur,
+            ...host.completion,
           });
           break;
         }
@@ -605,6 +629,29 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
     await this.registry.register(snapshot);
   }
 
+  private async persistCompletion(
+    host: RemoteSessionHost,
+    completion: NonNullable<AgentSessionSnapshot['completion']>,
+  ): Promise<SessionAdvanceResult> {
+    const receipt = agentSessionSnapshotSchema.shape.completion.unwrap().parse(completion);
+    host.completion = receipt;
+    const write = host.completionWrite ?? this.persistSnapshot(host);
+    host.completionWrite = write;
+    try {
+      await write;
+      if (host.state !== 'completed') {
+        return { kind: 'failed', error: 'Session already terminated' };
+      }
+      host.resultResolve?.({ status: 'success', ...receipt });
+      host.resultResolve = undefined;
+      return { kind: 'completed', ...receipt };
+    } finally {
+      if (host.completionWrite === write) {
+        host.completionWrite = undefined;
+      }
+    }
+  }
+
   private buildSnapshot(host: RemoteSessionHost): AgentSessionSnapshot {
     return {
       ref: host.ref,
@@ -616,6 +663,7 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
       updatedAt: new Date().toISOString(),
       expiresAt: host.reconnectMeta.leaseExpiresAt,
       workerId: host.ref.sessionId,
+      completion: host.completion,
     };
   }
 }

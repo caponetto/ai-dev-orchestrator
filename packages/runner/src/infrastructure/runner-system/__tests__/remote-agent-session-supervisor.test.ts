@@ -67,6 +67,8 @@ describe('RemoteAgentSessionSupervisor', () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
+    await supervisor.finalize(REF.sessionId);
     await rm(dir, { recursive: true, force: true });
   });
 
@@ -78,6 +80,175 @@ describe('RemoteAgentSessionSupervisor', () => {
     const transport = new WebSocketProtocolTransport(ws);
     return { ws, transport };
   }
+
+  it.each(['immediate', 'pending'] as const)(
+    'recovers exact completion after %s advancement and finalization without reconnecting',
+    async (mode) => {
+      const { ws, transport } = makeTransport();
+      await supervisor.createSession(REF, undefined, RECONNECT_META, transport);
+      const advancing = mode === 'pending' ? supervisor.waitForAdvance(REF.sessionId) : undefined;
+      sendWsMessage(
+        ws,
+        createProtocolMessage('artifact', {
+          artifactType: 'implementation',
+          content: '{"final":true}',
+          isFinal: true,
+        }),
+      );
+      sendWsMessage(
+        ws,
+        createProtocolMessage('done', {
+          summary: 'finished',
+          tokenUsage: { inputTokens: 30, outputTokens: 20 },
+        }),
+      );
+      const result = await (advancing ?? supervisor.waitForAdvance(REF.sessionId));
+      expect(result).toMatchObject({
+        kind: 'completed',
+        artifactContent: '{"final":true}',
+        tokenUsage: { inputTokens: 30, outputTokens: 20 },
+      });
+      await supervisor.finalize(REF.sessionId);
+      const restartedRegistry = new AgentSessionRegistry(new DefaultAgentSessionStore(dir));
+      await restartedRegistry.rebuild();
+      const restarted = new RemoteAgentSessionSupervisor(restartedRegistry);
+      const factory = vi.fn(() => Promise.resolve(makeTransport().transport));
+      restarted.setTransportFactory(factory);
+      expect((await restarted.attach(REF.sessionId))?.state).toBe('completed');
+      expect(await restarted.waitForAdvance(REF.sessionId)).toEqual(result);
+      expect(factory).not.toHaveBeenCalled();
+      expect(
+        await restarted.sendHumanResponse(REF.sessionId, 'old-request', { granted: true }),
+      ).toBe(false);
+    },
+  );
+
+  it('retains the done summary on the fast completion path', async () => {
+    const { ws, transport } = makeTransport();
+    await supervisor.createSession(REF, undefined, RECONNECT_META, transport);
+    sendWsMessage(ws, createProtocolMessage('done', { summary: 'summary only' }));
+    expect(await supervisor.waitForAdvance(REF.sessionId)).toMatchObject({
+      kind: 'completed',
+      artifactContent: '{"summary":"summary only"}',
+    });
+  });
+
+  it.each(['completed', 'failed', 'aborted'] as const)(
+    'does not invent output or reconnect a legacy %s snapshot without a receipt',
+    async (state) => {
+      await registry.register({
+        ref: REF,
+        state,
+        pendingRequests: [],
+        lastProtocolTimestamp: '',
+        reconnect: RECONNECT_META,
+        createdAt: '',
+        updatedAt: '',
+      });
+      const factory = vi.fn(() => Promise.resolve(makeTransport().transport));
+      supervisor.setTransportFactory(factory);
+      expect(await supervisor.attach(REF.sessionId)).toBeNull();
+      expect(await supervisor.waitForAdvance(REF.sessionId)).toMatchObject({ kind: 'failed' });
+      expect(factory).not.toHaveBeenCalled();
+    },
+  );
+
+  it('refuses a completed in-memory host without its required receipt', async () => {
+    const { transport } = makeTransport();
+    await supervisor.createSession(REF, undefined, RECONNECT_META, transport);
+    const host = supervisor.getHost(REF.sessionId);
+    if (!host) {
+      throw new Error('missing host');
+    }
+    host.state = 'completed';
+    expect(await supervisor.waitForAdvance(REF.sessionId)).toMatchObject({
+      kind: 'failed',
+      error: 'Session completion receipt is unavailable',
+    });
+  });
+
+  it('retains a completed host when finalization cannot persist, then retries safely', async () => {
+    const { ws, transport } = makeTransport();
+    await supervisor.createSession(REF, undefined, RECONNECT_META, transport);
+    sendWsMessage(ws, createProtocolMessage('done', { summary: 'finished' }));
+    const expected = await supervisor.waitForAdvance(REF.sessionId);
+    const save = vi
+      .spyOn(store, 'saveSnapshot')
+      .mockRejectedValueOnce(new Error('finalization unavailable'));
+    await expect(supervisor.finalize(REF.sessionId)).rejects.toThrow('finalization unavailable');
+    expect(supervisor.getHost(REF.sessionId)).toBeDefined();
+    save.mockRestore();
+    expect(await supervisor.waitForAdvance(REF.sessionId)).toEqual(expected);
+    await supervisor.finalize(REF.sessionId);
+    expect(supervisor.getHost(REF.sessionId)).toBeUndefined();
+    expect(await supervisor.waitForAdvance(REF.sessionId)).toEqual(expected);
+  });
+
+  it('does not expose success until the completion snapshot commits and retries a failed commit', async () => {
+    const { ws, transport } = makeTransport();
+    await supervisor.createSession(REF, undefined, RECONNECT_META, transport);
+    const save = vi
+      .spyOn(store, 'saveSnapshot')
+      .mockRejectedValue(new Error('completion disk unavailable'));
+    const advancing = supervisor.waitForAdvance(REF.sessionId);
+    sendWsMessage(ws, createProtocolMessage('done', { summary: 'finished' }));
+    await expect(advancing).rejects.toThrow('completion disk unavailable');
+    expect(registry.get(REF.sessionId)?.state).toBe('running');
+    save.mockRestore();
+    expect(await supervisor.waitForAdvance(REF.sessionId)).toMatchObject({
+      kind: 'completed',
+      artifactContent: '{"summary":"finished"}',
+    });
+    expect((await store.loadSnapshot(REF.sessionId, REF.runId))?.state).toBe('completed');
+  });
+
+  it('does not turn cancellation into success while its completion snapshot is pending', async () => {
+    const { ws, transport } = makeTransport();
+    await supervisor.createSession(REF, undefined, RECONNECT_META, transport);
+    let release!: () => void;
+    let entered!: () => void;
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const save = store.saveSnapshot.bind(store);
+    vi.spyOn(store, 'saveSnapshot').mockImplementation(async (snapshot) => {
+      if (snapshot.state === 'completed') {
+        entered();
+        await blocked;
+      }
+      await save(snapshot);
+    });
+    const advancing = supervisor.waitForAdvance(REF.sessionId);
+    sendWsMessage(ws, createProtocolMessage('done', { summary: 'done' }));
+    await started;
+    const aborting = supervisor.abort(REF.sessionId, 'stop');
+    release();
+    expect(await advancing).toMatchObject({ kind: 'failed' });
+    await aborting;
+    expect(registry.get(REF.sessionId)?.state).toBe('aborted');
+  });
+
+  it('preserves frozen duration and observes completion after lease expiry', async () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
+    const { ws, transport } = makeTransport();
+    await supervisor.createSession(
+      REF,
+      undefined,
+      { ...RECONNECT_META, leaseExpiresAt: '2020-01-01T00:00:00Z' },
+      transport,
+    );
+    clock.mockReturnValue(1100);
+    sendWsMessage(ws, createProtocolMessage('done', { summary: 'done' }));
+    expect(await supervisor.waitForAdvance(REF.sessionId)).toMatchObject({ durationMs: 100 });
+    await supervisor.finalize(REF.sessionId);
+    const restored = new RemoteAgentSessionSupervisor(registry);
+    clock.mockReturnValue(9000);
+    expect((await restored.attach(REF.sessionId))?.state).toBe('completed');
+    expect(await restored.waitForAdvance(REF.sessionId)).toMatchObject({ durationMs: 100 });
+  });
 
   it.each(['done', 'error'] as const)(
     'does not deliver responses or reopen a session after %s',
