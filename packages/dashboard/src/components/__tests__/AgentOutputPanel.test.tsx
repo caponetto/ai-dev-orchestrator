@@ -52,6 +52,72 @@ function makeGroups(
 }
 
 describe('AgentOutputPanel', () => {
+  it('restores answered clarification history and expires unanswered requests on dispatch completion', () => {
+    const question = makeLine({
+      type: 'clarification_request',
+      requestMessageId: 'question',
+      content: 'Question',
+      protocolMessage: {
+        messageType: 'clarification_request',
+        payload: { question: 'Which color?', options: ['Blue'] },
+      },
+    });
+    const { rerender } = renderWithRouter(
+      <AgentOutputPanel groups={makeGroups([question])} status="connected" runId="run-1" />,
+    );
+    expect(screen.getByRole('textbox', { name: 'Clarification answer' })).toBeInTheDocument();
+    const answer = makeLine({
+      requestMessageId: 'question',
+      timestamp: '2024-01-01T00:00:01Z',
+      protocolMessage: { messageType: 'clarification_response', payload: { answer: 'Blue' } },
+    });
+    rerender(
+      <AgentOutputPanel groups={makeGroups([question, answer])} status="connected" runId="run-1" />,
+    );
+    expect(screen.getByText('Answer submitted')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Clarification answer' })).not.toBeInTheDocument();
+    const done = makeLine({
+      timestamp: '2024-01-01T00:00:02Z',
+      protocolMessage: { messageType: 'done', payload: { summary: 'done' } },
+    });
+    rerender(
+      <AgentOutputPanel groups={makeGroups([question, done])} status="connected" runId="run-1" />,
+    );
+    expect(screen.getByText('Request expired (agent finished)')).toBeInTheDocument();
+  });
+
+  it('requires clarification identity and resets the form when a new request replaces it', async () => {
+    const question = makeLine({
+      type: 'clarification_request',
+      protocolMessage: {
+        messageType: 'clarification_request',
+        payload: { question: 'Which color?' },
+      },
+    });
+    const { rerender } = renderWithRouter(
+      <AgentOutputPanel groups={makeGroups([question])} status="connected" runId="run-1" />,
+    );
+    expect(screen.queryByRole('textbox', { name: 'Clarification answer' })).not.toBeInTheDocument();
+    rerender(
+      <AgentOutputPanel
+        groups={makeGroups([{ ...question, structuredData: { messageId: 'first' } }])}
+        status="connected"
+        runId="run-1"
+      />,
+    );
+    await userEvent
+      .setup()
+      .type(screen.getByRole('textbox', { name: 'Clarification answer' }), 'Blue');
+    rerender(
+      <AgentOutputPanel
+        groups={makeGroups([{ ...question, requestMessageId: 'second' }])}
+        status="connected"
+        runId="run-1"
+      />,
+    );
+    expect(screen.getByRole('textbox', { name: 'Clarification answer' })).toHaveValue('');
+  });
+
   it('keeps pending controls mounted and resets the response for a new wait', async () => {
     let resolveRequest!: (result: { success: boolean; outcome: 'started' }) => void;
     vi.mocked(api.approve).mockImplementationOnce(

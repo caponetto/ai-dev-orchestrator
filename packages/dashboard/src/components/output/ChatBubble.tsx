@@ -7,6 +7,7 @@ import type { DispatchArtifacts } from '../../lib/dispatch-artifacts';
 import { resolveDispatchArtifacts } from '../../lib/dispatch-artifacts';
 import { humanize } from '../../lib/humanize';
 import { cn } from '../../lib/utils';
+import { LiveClarificationForm } from '../live-clarification-form';
 import { PermissionBanner } from '../PermissionBanner';
 
 import { ArtifactsPopover } from './ArtifactsPopover';
@@ -79,6 +80,7 @@ export function SystemMessage({
     return (
       <div className="my-2">
         <PermissionBanner
+          key={`${runId}:${messageId}`}
           runId={runId}
           messageId={messageId}
           action={str(pm.payload.action ?? line.structuredData?.action)}
@@ -102,6 +104,7 @@ export function SystemMessage({
   }
 
   if (pm.messageType === 'clarification_request') {
+    const messageId = line.requestMessageId ?? str(line.structuredData?.messageId);
     const question = str(pm.payload.question);
     const options = Array.isArray(pm.payload.options) ? (pm.payload.options as string[]) : [];
     return (
@@ -122,6 +125,15 @@ export function SystemMessage({
               </span>
             ))}
           </div>
+        )}
+        {messageId && (
+          <LiveClarificationForm
+            key={`${runId}:${messageId}`}
+            runId={runId}
+            messageId={messageId}
+            answered={respondedRequestIds?.has(messageId) ?? false}
+            expired={finishedDispatchIds?.has(line.dispatchId) ?? false}
+          />
         )}
       </div>
     );

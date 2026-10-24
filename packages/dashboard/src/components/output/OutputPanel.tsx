@@ -254,6 +254,10 @@ export function AgentOutputPanel({
   const respondedRequestIds = useMemo(() => {
     const map = new Map<string, 'granted' | 'denied'>();
     for (const l of allLines) {
+      // Clarifications use membership only; permission decisions retain their grant/deny value.
+      if (l.protocolMessage?.messageType === 'clarification_response' && l.requestMessageId) {
+        map.set(l.requestMessageId, 'granted');
+      }
       if (l.protocolMessage?.messageType === 'permission_response' && l.requestMessageId) {
         const granted = l.protocolMessage.payload.granted === true;
         map.set(l.requestMessageId, granted ? 'granted' : 'denied');

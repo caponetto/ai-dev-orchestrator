@@ -117,6 +117,9 @@ test('browser approval, abort and retry reach production server and action handl
           { timeout: 30_000, message: `${action} did not reach ${expected}: ${stderr}` },
         )
         .toBe(expected);
+      await expect(
+        page.getByText(action === 'abort' ? 'ABORTED' : 'COMPLETED', { exact: true }),
+      ).toBeVisible();
     }
     const completedAbort = await request.post(`${backend}/api/runs/browser-approve/abort`, {
       data: {},

@@ -23,6 +23,48 @@ describe('PermissionBanner', () => {
     riskLevel: 'medium',
   };
 
+  it('reports a failed decision without an unhandled rejection and allows retry', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.respondPermission).mockRejectedValueOnce(
+      new Error('Unable to store live response'),
+    );
+    renderWithRouter(<PermissionBanner {...defaultProps} />);
+    await user.click(screen.getByRole('button', { name: 'Approve' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to store live response');
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Approve' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText(/granted/)).toBeInTheDocument();
+  });
+
+  it('retains an acknowledged decision when the agent finishes before its response event arrives', async () => {
+    const { rerender } = renderWithRouter(<PermissionBanner {...defaultProps} />);
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Approve' }));
+    expect(await screen.findByText(/granted/)).toBeInTheDocument();
+    rerender(
+      <PermissionBanner {...defaultProps} initialResolved="denied" reason="agent_finished" />,
+    );
+    expect(screen.getByText(/granted/)).toBeInTheDocument();
+    expect(screen.queryByText(/expired/)).not.toBeInTheDocument();
+  });
+
+  it('displays non-Error failures without losing the controls', async () => {
+    vi.mocked(api.respondPermission).mockRejectedValueOnce('offline');
+    renderWithRouter(<PermissionBanner {...defaultProps} />);
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Approve' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('offline');
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeEnabled();
+  });
+
+  it('applies a durable decision arriving after the controls mount', () => {
+    const { rerender } = renderWithRouter(<PermissionBanner {...defaultProps} />);
+    rerender(<PermissionBanner {...defaultProps} initialResolved="denied" />);
+    expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+    expect(screen.getByText(/denied/)).toBeInTheDocument();
+  });
+
   it('renders the action label', () => {
     renderWithRouter(<PermissionBanner {...defaultProps} />);
     expect(screen.getByText('Write File')).toBeInTheDocument();

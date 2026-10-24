@@ -19,6 +19,13 @@ import type { SseStatus } from './use-event-stream';
 import { useEventStream } from './use-event-stream';
 import { usePermissionNotifications } from './use-permission-notifications';
 
+const RUN_STATE_REFRESH_EVENTS = new Set([
+  'state_changed',
+  'run_started',
+  'run_completed',
+  'run_aborted',
+]);
+
 function extractLiveUsageFromStream(
   groups: ReadonlyMap<string, DispatchGroup>,
 ): Map<string, { inputTokens: number; outputTokens: number }> {
@@ -166,7 +173,6 @@ export function useRunDetail(runId: string | undefined): UseRunDetailResult {
 
   const { events: liveEvents } = useEventStream(runId);
   const { groups: agentGroups, status: agentStreamStatus } = useAgentStream(runId, Boolean(runId));
-  const lastProcessedLiveEventRef = useRef<string | null>(null);
 
   usePermissionNotifications(agentGroups);
   useCompletionNotifications(liveEvents);
@@ -335,69 +341,55 @@ export function useRunDetail(runId: string | undefined): UseRunDetailResult {
     };
   }, [runId, shouldAutoRefresh]);
 
+  // React can batch several SSE messages. Health/noise events must not hide a
+  // lifecycle update or cancel its in-flight refresh; replayed history has the same key.
+  const latestRefreshEvent = liveEvents.find(
+    (event) =>
+      event.runId === runId &&
+      (RUN_STATE_REFRESH_EVENTS.has(event.type) || shouldRefreshUsage(event.type)),
+  );
+  const refreshEventKey = latestRefreshEvent ? JSON.stringify(latestRefreshEvent) : undefined;
   useEffect(() => {
-    if (!runId || liveEvents.length === 0) {
+    if (!runId || !refreshEventKey) {
       return;
     }
-
-    const latest = liveEvents[0];
-    const eventKey = `${latest.timestamp}:${latest.type}:${latest.runId ?? ''}:${JSON.stringify(latest.data ?? {})}`;
-    if (lastProcessedLiveEventRef.current === eventKey) {
-      return;
-    }
-    lastProcessedLiveEventRef.current = eventKey;
-
     let cancelled = false;
-
-    if (latest.type === 'state_changed') {
-      api
-        .fetchRunState(runId)
-        .then((s) => {
-          if (!cancelled) {
-            setRunState(s);
-          }
-        })
-        .catch(() => undefined);
-      api
-        .fetchWorkflow(runId)
-        .then((w) => {
-          if (!cancelled) {
-            setWorkflow(w);
-          }
-        })
-        .catch(() => undefined);
-      api
-        .fetchArtifacts(runId)
-        .then((v) => {
-          if (!cancelled) {
-            setArtifacts(v);
-          }
-        })
-        .catch(() => undefined);
-      api
-        .fetchUsage(runId)
-        .then((v) => {
-          if (!cancelled) {
-            setUsage(v);
-          }
-        })
-        .catch(() => undefined);
-    }
-    if (shouldRefreshUsage(latest.type)) {
-      api
-        .fetchUsage(runId)
-        .then((v) => {
-          if (!cancelled) {
-            setUsage(v);
-          }
-        })
-        .catch(() => undefined);
-    }
-
+    api
+      .fetchRunState(runId)
+      .then((state) => {
+        if (!cancelled) {
+          setRunState(state);
+        }
+      })
+      .catch(() => undefined);
+    api
+      .fetchWorkflow(runId)
+      .then((value) => {
+        if (!cancelled) {
+          setWorkflow(value);
+        }
+      })
+      .catch(() => undefined);
+    api
+      .fetchArtifacts(runId)
+      .then((value) => {
+        if (!cancelled) {
+          setArtifacts(value);
+        }
+      })
+      .catch(() => undefined);
+    api
+      .fetchUsage(runId)
+      .then((value) => {
+        if (!cancelled) {
+          setUsage(value);
+        }
+      })
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
-  }, [liveEvents, runId]);
+  }, [refreshEventKey, runId]);
 
   return {
     runState,
