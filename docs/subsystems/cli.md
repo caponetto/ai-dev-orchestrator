@@ -87,7 +87,8 @@ The current implementation uses three operator response paths:
 - `ai answer` for clarification requests
 - `ai permit` for live permission requests emitted by agent sessions
 
-`ai resume` is separate. It resumes an interrupted run; it does not answer a pending request.
+`ai resume` resumes interrupted work and eligible persisted approval waits. Text waits require
+`ai answer`; live permission requests use `ai permit`.
 
 ## Source of Truth
 
@@ -157,3 +158,41 @@ conflicting launch requests for that run during the same window. Entries clear a
 failure. This is not durable/multi-server idempotency and does not define ordering among later
 requests; execution remains protected by run ownership and freshness checks. Stale terminal or
 session-target requests found during validation fail before spawning.
+
+## Workflow results and process exit codes
+
+`run`, `resume`, `retry`, `approve` (including `--reject`) and engine-backed `answer` use the
+returned workflow state to decide the process exit status:
+
+| Returned state     | Exit code | JSON outcome |
+| ------------------ | --------- | ------------ |
+| DONE               | 0         | `completed`  |
+| FAILED             | 3         | `failed`     |
+| ABORTED            | 4         | `aborted`    |
+| WAITING_FOR_HUMAN  | 0         | `waiting`    |
+| Other/custom state | 0         | `returned`   |
+
+Zero can mean the command paused for further input. Check `outcome` and `finalState` before
+assuming the workflow completed. Custom states retain their existing zero exit status without
+being labeled completed. Requesting rejection does not force exit code 4: the observed state
+decides, including failure during rejection or a workflow that continues after it. Thrown errors
+retain the existing bootstrap/execution error handling.
+
+In `--json` mode an engine result record includes `runId`, `finalState`, `outcome` and `exitCode`,
+including when execution pauses. Existing action-specific `status`, artifact counts/paths and
+message IDs remain available. `run`/`resume`/`retry` retain their existing progress, success, error
+and summary output; JSON is a stream of newline-delimited records. Identify the workflow result
+by its `finalState` and `outcome` fields, rather than assuming every line is a completion result.
+Errors may also be written to stderr.
+
+`answer --message-id` can instead write a response for a live file-backed clarification request
+without running the engine. Its existing `status: live_clarification_answered` is an acknowledgement
+of that write, with `outcome: response_written` and `exitCode: 0`. It has no `finalState` and does
+not establish that the agent consumed the answer or the workflow completed.
+
+### Build cache correctness
+
+CLI development and production bundle tasks extend the root Turbo input set and add embedded
+config-template assets. Command source, build configuration and assets must all invalidate cached
+bundles. Script tests inspect Turbo's resolved inputs for both modes; their cache also tracks the
+root and CLI Turbo configuration files.

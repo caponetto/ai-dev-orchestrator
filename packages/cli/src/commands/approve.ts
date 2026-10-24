@@ -5,6 +5,7 @@ import type { RunResult } from '@ai-dev-orchestrator/schemas';
 import { resumeOrchestrator } from '../composition-root';
 import { ExitCode, toCLIError } from '../output/exit-codes';
 import type { OutputFormatter } from '../output/formatter';
+import { reportWorkflowFailure, workflowResultFields } from '../output/workflow-result';
 import { getRunDir } from '../workspace-paths';
 
 import { findLatestRunWithState } from './find-run';
@@ -87,19 +88,18 @@ export async function approveCommand(
   if (options.json) {
     process.stdout.write(
       JSON.stringify({
-        runId,
+        ...workflowResultFields(result),
         status: action,
-        finalState: result.finalState,
         artifacts: result.artifactInventory.length,
       }) + '\n',
     );
-  } else {
+  } else if (!reportWorkflowFailure(result, formatter)) {
     if (result.finalState === 'DONE') {
       formatter.success(
         `Run ${runId} ${action === 'rejection' ? 'rejected' : 'approved'} and completed.`,
       );
     } else {
-      formatter.success(
+      formatter.info(
         `Run ${runId} ${action === 'rejection' ? 'rejected' : 'approved'}. State: ${result.finalState}.`,
       );
     }
@@ -110,5 +110,5 @@ export async function approveCommand(
     });
   }
 
-  return options.reject ? ExitCode.RUN_ABORTED : ExitCode.SUCCESS;
+  return workflowResultFields(result).exitCode;
 }

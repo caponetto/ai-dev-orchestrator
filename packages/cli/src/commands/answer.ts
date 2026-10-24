@@ -8,6 +8,7 @@ import type { RunId, RunResult } from '@ai-dev-orchestrator/schemas';
 import { resumeOrchestrator } from '../composition-root';
 import { ExitCode, toCLIError } from '../output/exit-codes';
 import type { OutputFormatter } from '../output/formatter';
+import { reportWorkflowFailure, workflowResultFields } from '../output/workflow-result';
 import { getArtifactsDir, getRunDir, getRunsDir } from '../workspace-paths';
 
 import { findLatestRunWithState } from './find-run';
@@ -140,19 +141,18 @@ export async function answerCommand(
     if (options.json) {
       process.stdout.write(
         JSON.stringify({
-          runId,
+          ...workflowResultFields(result),
           messageId: sessionRequestId,
           status: 'session_clarification_answered',
-          finalState: result.finalState,
         }) + '\n',
       );
-    } else {
-      formatter.success(
+    } else if (!reportWorkflowFailure(result, formatter)) {
+      formatter.info(
         `Session clarification answered for run ${runId}. State: ${result.finalState}.`,
       );
     }
 
-    return ExitCode.SUCCESS;
+    return workflowResultFields(result).exitCode;
   }
 
   // Fallback: non-session runs use the file-backed live request store
@@ -183,10 +183,14 @@ export async function answerCommand(
           runId,
           messageId: liveTarget.messageId,
           status: 'live_clarification_answered',
+          outcome: 'response_written',
+          exitCode: ExitCode.SUCCESS,
         }) + '\n',
       );
     } else {
-      formatter.success(`Live clarification answered for run ${runId} (${liveTarget.messageId}).`);
+      formatter.success(
+        `Live clarification response stored for run ${runId} (${liveTarget.messageId}).`,
+      );
     }
     return ExitCode.SUCCESS;
   }
@@ -242,14 +246,13 @@ export async function answerCommand(
   if (options.json) {
     process.stdout.write(
       JSON.stringify({
-        runId,
+        ...workflowResultFields(result),
         status: 'answers_received',
-        finalState: result.finalState,
         artifactPath: answersPath,
       }) + '\n',
     );
-  } else {
-    formatter.success(`Answers stored for run ${runId}. State: ${result.finalState}.`);
+  } else if (!reportWorkflowFailure(result, formatter)) {
+    formatter.info(`Answers stored for run ${runId}. State: ${result.finalState}.`);
     formatter.summary({
       'Run ID': result.runId,
       'Final State': result.finalState,
@@ -257,5 +260,5 @@ export async function answerCommand(
     });
   }
 
-  return ExitCode.SUCCESS;
+  return workflowResultFields(result).exitCode;
 }

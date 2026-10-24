@@ -5,6 +5,7 @@ import type { RunResult } from '@ai-dev-orchestrator/schemas';
 import { resumeOrchestrator } from '../composition-root';
 import { ExitCode, toCLIError } from '../output/exit-codes';
 import type { OutputFormatter } from '../output/formatter';
+import { workflowResultFields } from '../output/workflow-result';
 import { handleWaitingForHuman } from '../waiting-for-human';
 import { getRunDir } from '../workspace-paths';
 
@@ -97,9 +98,13 @@ export async function retryCommand(
   try {
     result = await ctx.engine.retry();
 
+    if (options.json) {
+      process.stdout.write(JSON.stringify(workflowResultFields(result)) + '\n');
+    }
+
     if (result.finalState === 'WAITING_FOR_HUMAN') {
       handleWaitingForHuman(result, ctx.engine, runId, formatter);
-      return ExitCode.SUCCESS;
+      return workflowResultFields(result).exitCode;
     }
   } catch (error: unknown) {
     formatter.error(toCLIError(error));
@@ -118,7 +123,7 @@ export async function retryCommand(
       'Final State': result.finalState,
       Artifacts: result.artifactInventory.length,
     });
-    return ExitCode.SUCCESS;
+    return workflowResultFields(result).exitCode;
   }
 
   if (result.finalState === 'FAILED') {
@@ -127,7 +132,7 @@ export async function retryCommand(
       message: 'Workflow failed during retry.',
       remediation: 'Check the journal for details.',
     });
-    return ExitCode.RUN_FAILED;
+    return workflowResultFields(result).exitCode;
   }
 
   if (result.finalState === 'ABORTED') {
@@ -136,7 +141,7 @@ export async function retryCommand(
       message: 'Workflow was aborted during retry.',
       remediation: 'Check the journal for details.',
     });
-    return ExitCode.RUN_ABORTED;
+    return workflowResultFields(result).exitCode;
   }
 
   formatter.summary({
@@ -144,5 +149,5 @@ export async function retryCommand(
     'Final State': result.finalState,
     Artifacts: result.artifactInventory.length,
   });
-  return ExitCode.SUCCESS;
+  return workflowResultFields(result).exitCode;
 }

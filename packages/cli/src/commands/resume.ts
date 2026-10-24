@@ -5,6 +5,7 @@ import type { PersistedState, RunId, RunResult } from '@ai-dev-orchestrator/sche
 import { resumeOrchestrator } from '../composition-root';
 import { ExitCode, toCLIError } from '../output/exit-codes';
 import type { OutputFormatter } from '../output/formatter';
+import { workflowResultFields } from '../output/workflow-result';
 import { handleWaitingForHuman } from '../waiting-for-human';
 import { getRunDir } from '../workspace-paths';
 
@@ -103,9 +104,13 @@ export async function resumeCommand(
   try {
     result = await ctx.engine.resume({ type: 'approval', content: 'Resumed via CLI' });
 
+    if (options.json) {
+      process.stdout.write(JSON.stringify(workflowResultFields(result)) + '\n');
+    }
+
     if (result.finalState === 'WAITING_FOR_HUMAN') {
       handleWaitingForHuman(result, ctx.engine, runId, formatter);
-      return ExitCode.SUCCESS;
+      return workflowResultFields(result).exitCode;
     }
   } catch (error: unknown) {
     formatter.error(toCLIError(error));
@@ -121,7 +126,7 @@ export async function resumeCommand(
       'Final State': result.finalState,
       Artifacts: result.artifactInventory.length,
     });
-    return ExitCode.SUCCESS;
+    return workflowResultFields(result).exitCode;
   }
 
   if (result.finalState === 'FAILED') {
@@ -130,7 +135,7 @@ export async function resumeCommand(
       message: 'Workflow failed during resume.',
       remediation: 'Check the journal for details.',
     });
-    return ExitCode.RUN_FAILED;
+    return workflowResultFields(result).exitCode;
   }
 
   if (result.finalState === 'ABORTED') {
@@ -139,7 +144,7 @@ export async function resumeCommand(
       message: 'Workflow was aborted during resume.',
       remediation: 'Check the journal for details.',
     });
-    return ExitCode.RUN_ABORTED;
+    return workflowResultFields(result).exitCode;
   }
 
   formatter.summary({
@@ -147,5 +152,5 @@ export async function resumeCommand(
     'Final State': result.finalState,
     Artifacts: result.artifactInventory.length,
   });
-  return ExitCode.SUCCESS;
+  return workflowResultFields(result).exitCode;
 }

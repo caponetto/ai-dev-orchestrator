@@ -435,6 +435,10 @@ describe('answerCommand', () => {
     expect(parsed.runId).toBe(runId);
     expect(parsed.messageId).toBe('clar-json');
     expect(parsed.status).toBe('live_clarification_answered');
+    expect(parsed.outcome).toBe('response_written');
+    expect(parsed.exitCode).toBe(ExitCode.SUCCESS);
+    expect(parsed).not.toHaveProperty('finalState');
+    expect(mockResumeOrchestrator).not.toHaveBeenCalled();
   });
 });
 
