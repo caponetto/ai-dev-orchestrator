@@ -36,6 +36,19 @@ function input(): Parameters<typeof buildWorkflowCheckpoint>[0] {
 }
 
 describe('workflow checkpoint serialization', () => {
+  it('retains the accepted answer receipt independently of transient worker feedback', () => {
+    const snapshot = input();
+    const lastHumanAnswer = {
+      stateId: 'WAIT',
+      requestingState: 'WORK',
+      waitingSince: 'wait-1',
+      content: 'accepted',
+    };
+    expect(
+      buildWorkflowCheckpoint({ ...snapshot, progress: { ...snapshot.progress, lastHumanAnswer } })
+        .lastHumanAnswer,
+    ).toEqual(lastHumanAnswer);
+  });
   it('preserves schema defaults and execution counters while omitting absent continuation state', () => {
     const checkpoint = buildWorkflowCheckpoint(input());
     expect(checkpoint).toMatchObject({

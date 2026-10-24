@@ -41,6 +41,38 @@ function rebuild(events: JournalEvent[]) {
 }
 
 describe('journal accounting reconstruction', () => {
+  it('does not consume a newer wait when replaying a checkpointed-answer diagnostic', () => {
+    const base = rebuild([transition('INTAKE', 'WORK')]);
+    const waitingContext = {
+      reason: 'clarification_needed',
+      requiredInput: 'text' as const,
+      requestingState: 'WORK',
+      waitingSince: 'new-wait',
+      autoResumeSafe: false,
+      presentedArtifacts: [],
+    };
+    const lastHumanAnswer = {
+      stateId: 'WAIT',
+      requestingState: 'WORK',
+      waitingSince: 'old-wait',
+      content: 'accepted',
+    };
+    const snapshot: JournalEvent = {
+      timestamp: '',
+      runId,
+      sequence: ++sequence,
+      type: 'workflow_checkpoint',
+      data: { kind: 'workflow_checkpoint', state: { ...base, waitingContext, lastHumanAnswer } },
+    };
+    const diagnostic: JournalEvent = {
+      timestamp: '',
+      runId,
+      sequence: ++sequence,
+      type: 'human_input_received',
+      data: { kind: 'human', action: 'answer_checkpointed', stateId: 'WAIT' },
+    };
+    expect(rebuild([snapshot, diagnostic])).toMatchObject({ waitingContext, lastHumanAnswer });
+  });
   it.each([true, false])(
     'restores per-role completion metrics once (checkpoint metrics present: %s)',
     (hasMetrics) => {

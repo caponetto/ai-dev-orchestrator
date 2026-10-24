@@ -366,6 +366,7 @@ export const runResultSchema = z.object({
   finalState: z.string(),
   artifactInventory: z.array(artifactRefSchema).readonly(),
   manifest: runManifestSchema,
+  answerAccepted: z.boolean().optional(),
 });
 export type RunResult = z.infer<typeof runResultSchema>;
 
@@ -375,6 +376,13 @@ export const humanInputSchema = z.object({
   artifactRef: artifactRefSchema.optional(),
   sessionId: z.string().min(1).optional(),
   requestId: z.string().min(1).optional(),
+  waitIdentity: z
+    .object({
+      stateId: z.string(),
+      requestingState: z.string(),
+      waitingSince: z.string(),
+    })
+    .optional(),
 });
 export type HumanInput = z.infer<typeof humanInputSchema>;
 

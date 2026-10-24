@@ -196,3 +196,31 @@ CLI development and production bundle tasks extend the root Turbo input set and 
 config-template assets. Command source, build configuration and assets must all invalidate cached
 bundles. Script tests inspect Turbo's resolved inputs for both modes; their cache also tracks the
 root and CLI Turbo configuration files.
+
+## Persisted human answers
+
+For a persisted non-session text wait, `ai answer` loads the latest checkpoint/journal state and
+submits the observed wait state, requesting state and waiting timestamp with the answer. Blank
+answers, non-text waits and attempts to replace an already accepted interrupted answer are
+rejected. Session clarification and targeted live-response delivery retain their separate paths.
+
+The CLI does not create `artifacts/clarification_answers_v1.md` before bootstrap or ownership.
+The engine accepts a matching text answer under the run lock and records `lastHumanAnswer`
+(content plus wait identity) in its checkpoint before exit actions. The compatibility file is
+an atomic projection of that receipt, not an independently committed or inventoried artifact.
+Persisted non-session answer JSON includes `accepted`; `artifactPath` is present only when the engine
+confirms acceptance of that answer. Governance escalation before acceptance reports
+`accepted: false` and does not present an older answer file as the new result.
+
+A lock conflict, stale restored context, changed wait or bootstrap failure cannot replace the
+file. Once acceptance is durable, a later execution/projection error can still make the command
+fail; it does not revoke the accepted answer. Use `ai resume` to recover the saved input rather
+than submit replacement text. Resume permits an already accepted text continuation, while a
+new unanswered text wait still requires `ai answer`. Its gate check uses journal-ahead progress.
+
+After acquiring ownership, CLI recovery repairs the file from the latest accepted checkpoint,
+including a journal snapshot newer than `state.yaml`. Projection uses a flushed temporary file
+and atomic rename; abandoned projection temporaries are removed under ownership. Recovery
+replays the saved input rather than replacing it. Legacy checkpoints without an accepted-answer
+receipt remain readable and do not trigger file reconstruction. This covers process interruption;
+it does not add a multi-file hardware/power-loss transaction or turn the file into artifact history.

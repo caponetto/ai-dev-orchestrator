@@ -1,7 +1,8 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { DefaultStatePersistence } from '@ai-dev-orchestrator/core';
+import { DefaultJournalReader } from '@ai-dev-orchestrator/journal';
 import { FileBackedLiveRequestStore } from '@ai-dev-orchestrator/runner';
 import type { RunId, RunResult } from '@ai-dev-orchestrator/schemas';
 
@@ -9,7 +10,8 @@ import { resumeOrchestrator } from '../composition-root';
 import { ExitCode, toCLIError } from '../output/exit-codes';
 import type { OutputFormatter } from '../output/formatter';
 import { reportWorkflowFailure, workflowResultFields } from '../output/workflow-result';
-import { getArtifactsDir, getRunDir, getRunsDir } from '../workspace-paths';
+import { loadLatestRunState } from '../run-state-recovery';
+import { getArtifactsDir, getJournalPath, getRunDir, getRunsDir } from '../workspace-paths';
 
 import { findLatestRunWithState } from './find-run';
 
@@ -71,11 +73,24 @@ export async function answerCommand(
     return ExitCode.INVALID_ARGUMENTS;
   }
 
+  if (!answerContent.trim()) {
+    formatter.error({
+      code: ExitCode.INVALID_ARGUMENTS,
+      message: 'Answer content must be non-empty.',
+      remediation: 'Provide a non-empty answer or input file.',
+    });
+    return ExitCode.INVALID_ARGUMENTS;
+  }
+
   const runsDir = getRunsDir();
 
   // Route through session supervisor when a live session is waiting for clarification
   const statePersistence = new DefaultStatePersistence(runsDir);
-  const state = statePersistence.load(runId as RunId);
+  const state = loadLatestRunState(
+    statePersistence,
+    runId as RunId,
+    new DefaultJournalReader(getJournalPath(runDir)).readAll(),
+  ).state;
 
   if (
     state?.waitingContext?.liveSessionId &&
@@ -198,11 +213,7 @@ export async function answerCommand(
   // Live clarifications require --message-id for deterministic routing.
   // Without it, fall through to the persisted WAITING_FOR_HUMAN path.
   const artifactsDir = getArtifactsDir(runDir);
-  if (!existsSync(artifactsDir)) {
-    mkdirSync(artifactsDir, { recursive: true });
-  }
   const answersPath = join(artifactsDir, 'clarification_answers_v1.md');
-  writeFileSync(answersPath, answerContent, 'utf8');
 
   formatter.info(`Answering run: ${runId}`);
 
@@ -216,6 +227,25 @@ export async function answerCommand(
 
   for (const w of ctx.warnings) {
     formatter.warn(w);
+  }
+
+  const wait = state?.waitingContext ?? state?.entryActionContinuation?.resumeWaitingContext;
+  if (!state || !wait || wait.requiredInput !== 'text' || wait.liveSessionId) {
+    formatter.error({
+      code: ExitCode.INVALID_ARGUMENTS,
+      message: 'This run has no persisted text wait to answer.',
+      remediation: 'Inspect the current run state and pending requests before responding.',
+    });
+    return ExitCode.INVALID_ARGUMENTS;
+  }
+  const accepted = state.entryActionContinuation?.resumeInput;
+  if (accepted?.type === 'text' && accepted.content !== answerContent) {
+    formatter.error({
+      code: ExitCode.INVALID_ARGUMENTS,
+      message: 'An answer is already accepted for this wait.',
+      remediation: 'Use `ai resume` to recover the accepted answer instead of replacing it.',
+    });
+    return ExitCode.INVALID_ARGUMENTS;
   }
 
   const onUncaughtFb = (err: unknown): void => {
@@ -234,7 +264,15 @@ export async function answerCommand(
 
   let result: RunResult;
   try {
-    result = await ctx.engine.resume({ type: 'text', content: answerContent });
+    result = await ctx.engine.resume({
+      type: 'text',
+      content: answerContent,
+      waitIdentity: {
+        stateId: state.currentState,
+        requestingState: wait.requestingState,
+        waitingSince: wait.waitingSince,
+      },
+    });
   } catch (error: unknown) {
     formatter.error(toCLIError(error));
     return ExitCode.RUN_FAILED;
@@ -248,11 +286,16 @@ export async function answerCommand(
       JSON.stringify({
         ...workflowResultFields(result),
         status: 'answers_received',
-        artifactPath: answersPath,
+        accepted: result.answerAccepted === true,
+        ...(result.answerAccepted ? { artifactPath: answersPath } : {}),
       }) + '\n',
     );
   } else if (!reportWorkflowFailure(result, formatter)) {
-    formatter.info(`Answers stored for run ${runId}. State: ${result.finalState}.`);
+    formatter.info(
+      result.answerAccepted
+        ? `Answers stored for run ${runId}. State: ${result.finalState}.`
+        : `Answer not accepted for run ${runId}. State: ${result.finalState}.`,
+    );
     formatter.summary({
       'Run ID': result.runId,
       'Final State': result.finalState,

@@ -11,6 +11,7 @@ import {
   guardSchema,
   guardTypeSchema,
   humanInputSchema,
+  runResultSchema,
   stateDefinitionSchema,
   stateTypeSchema,
   transitionContextSchema,
@@ -267,6 +268,12 @@ describe('waitingContextSchema', () => {
 });
 
 describe('engineStateSchema', () => {
+  it('accepts optional answer acceptance evidence while preserving legacy results', () => {
+    const evidence = runResultSchema.pick({ answerAccepted: true });
+    expect(evidence.parse({})).toEqual({});
+    expect(evidence.parse({ answerAccepted: false })).toEqual({ answerAccepted: false });
+    expect(evidence.safeParse({ answerAccepted: 'yes' }).success).toBe(false);
+  });
   it('validates engine state', () => {
     const data = {
       runId: 'r-1',
@@ -311,6 +318,11 @@ describe('humanInputSchema', () => {
   it('validates text input', () => {
     const data = { type: 'text', content: 'Focus on performance' };
     expect(humanInputSchema.safeParse(data).success).toBe(true);
+    const waitIdentity = { stateId: 'WAIT', requestingState: 'WORK', waitingSince: 'wait-1' };
+    expect(humanInputSchema.parse({ ...data, waitIdentity }).waitIdentity).toEqual(waitIdentity);
+    expect(humanInputSchema.safeParse({ ...data, waitIdentity: { stateId: 'WAIT' } }).success).toBe(
+      false,
+    );
   });
 
   it('validates approval with artifact ref', () => {

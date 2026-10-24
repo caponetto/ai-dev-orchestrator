@@ -30,6 +30,7 @@ import type {
   EntryActionContinuation,
   GovernanceOutcome,
   HumanInput,
+  JournalEvent,
   LockHandle,
   PersistedState,
   PersistedWaitingContext,
@@ -131,6 +132,7 @@ export class LifecycleController implements WorkflowEngine {
   private lockHandle: LockHandle | null = null;
   private waitingContext: PersistedWaitingContext | null = null;
   private lastHumanFeedback: string | null = null;
+  private lastHumanAnswer: PersistedState['lastHumanAnswer'] | null = null;
   private lastReviewContent: string | null = null;
   private lastTrigger: string | null = null;
   private governanceDecisionCount = 0;
@@ -242,6 +244,7 @@ export class LifecycleController implements WorkflowEngine {
     }
 
     this.lastHumanFeedback = state.lastHumanFeedback ?? null;
+    this.lastHumanAnswer = state.lastHumanAnswer ?? null;
     this.lastReviewContent = state.lastReviewContent ?? null;
     this.lastTrigger = state.lastTrigger ?? null;
     this.governanceDecisionCount = state.governanceDecisionCount ?? 0;
@@ -361,7 +364,18 @@ export class LifecycleController implements WorkflowEngine {
   private async resumeWithLock(input: HumanInput): Promise<RunResult> {
     const savedWaitingContext = this.waitingContext;
     try {
-      return await this.resumeRun(input);
+      const result = await this.resumeRun(input);
+      if (input.waitIdentity) {
+        return {
+          ...result,
+          answerAccepted:
+            this.lastHumanAnswer?.content === input.content &&
+            this.lastHumanAnswer.stateId === input.waitIdentity.stateId &&
+            this.lastHumanAnswer.requestingState === input.waitIdentity.requestingState &&
+            this.lastHumanAnswer.waitingSince === input.waitIdentity.waitingSince,
+        };
+      }
+      return result;
     } catch (error: unknown) {
       if (
         (this.currentState === 'WAITING_FOR_HUMAN' ||
@@ -383,6 +397,18 @@ export class LifecycleController implements WorkflowEngine {
     if (!this.config) {
       throw new Error('No active run to resume');
     }
+    const targetWait = this.waitingContext ?? this.entryActionContinuation?.resumeWaitingContext;
+    if (
+      input.waitIdentity &&
+      (input.type !== 'text' ||
+        !input.content.trim() ||
+        targetWait?.requiredInput !== 'text' ||
+        input.waitIdentity.stateId !== this.currentState ||
+        input.waitIdentity.requestingState !== targetWait.requestingState ||
+        input.waitIdentity.waitingSince !== targetWait.waitingSince)
+    ) {
+      throw new Error('Human answer no longer matches the current text wait');
+    }
     if (
       (input.sessionId !== undefined && input.sessionId !== this.waitingContext?.liveSessionId) ||
       (input.requestId !== undefined && input.requestId !== this.waitingContext?.pendingRequestId)
@@ -393,7 +419,8 @@ export class LifecycleController implements WorkflowEngine {
     const originalWait = pendingHumanTransition?.resumeWaitingContext;
     const isOriginalGate =
       this.waitingContext?.reason === originalWait?.reason &&
-      this.waitingContext?.requestingState === originalWait?.requestingState;
+      this.waitingContext?.requestingState === originalWait?.requestingState &&
+      this.waitingContext?.waitingSince === originalWait?.waitingSince;
     if (
       pendingHumanTransition?.resumeInput &&
       pendingHumanTransition.stateId === this.currentState &&
@@ -421,6 +448,7 @@ export class LifecycleController implements WorkflowEngine {
         };
       }
       const fromState = this.currentState;
+      this.acceptHumanAnswer(input, savedWaitingContext);
       this.previousState = fromState;
       this.currentState = savedWaitingContext.requestingState;
       this.stateEnteredAt = new Date().toISOString();
@@ -670,7 +698,10 @@ export class LifecycleController implements WorkflowEngine {
       };
     }
 
-    if ((input.type === 'rejection' || input.type === 'text') && input.content) {
+    if (
+      (input.type === 'rejection' || (input.type === 'text' && !input.waitIdentity)) &&
+      input.content
+    ) {
       this.lastHumanFeedback = input.content;
     }
 
@@ -769,7 +800,7 @@ export class LifecycleController implements WorkflowEngine {
           ? 'human_rejected'
           : 'human_input';
 
-    this.journalWriter.append({
+    const responseEvent: JournalEvent = {
       timestamp: new Date().toISOString(),
       runId: this.runId,
       sequence: 0,
@@ -781,12 +812,15 @@ export class LifecycleController implements WorkflowEngine {
             : 'human_input_received',
       data: {
         kind: 'human',
-        action: input.type,
+        action: input.waitIdentity ? 'answer_checkpointed' : input.type,
         stateId: this.currentState,
         inputType: input.type,
         ...(input.content ? { message: input.content } : {}),
       },
-    });
+    };
+    if (!input.waitIdentity) {
+      this.journalWriter.append(responseEvent);
+    }
 
     const definition = this.config.workflowDefinition;
     const stateDefinition = definition.states[this.currentState];
@@ -874,6 +908,13 @@ export class LifecycleController implements WorkflowEngine {
           resumeWaitingContext: savedWaitingContext ?? undefined,
         };
         this.entryActionContinuation = exitContext;
+        if (this.acceptHumanAnswer(input, savedWaitingContext)) {
+          // Journal/checkpoint the accepted input before exit effects and file projection.
+          await this.saveCheckpoint();
+          if (input.waitIdentity) {
+            this.journalWriter.append(responseEvent);
+          }
+        }
         for (const action of (stateDefinition.exitActions ?? []).slice(exitResults.length)) {
           if (exitResults.some((result) => !result.success)) {
             break;
@@ -961,6 +1002,9 @@ export class LifecycleController implements WorkflowEngine {
           },
         });
       } else {
+        if (input.waitIdentity) {
+          throw new Error('No matching transition for this human answer');
+        }
         const reqState = savedWaitingContext?.requestingState ?? 'unknown';
         this.logger.warn(
           `[LifecycleController] No matching transition from '${this.currentState}' with trigger '${trigger}' (requestingState: '${reqState}'). ` +
@@ -2266,6 +2310,20 @@ export class LifecycleController implements WorkflowEngine {
     };
   }
 
+  private acceptHumanAnswer(input: HumanInput, wait: PersistedWaitingContext | null): boolean {
+    if (input.type !== 'text' || wait?.requiredInput !== 'text' || wait.liveSessionId) {
+      return false;
+    }
+    this.lastHumanAnswer = {
+      stateId: this.currentState,
+      requestingState: wait.requestingState,
+      waitingSince: wait.waitingSince,
+      content: input.content,
+    };
+    this.lastHumanFeedback = input.content;
+    return true;
+  }
+
   private async saveCheckpoint(): Promise<void> {
     const state = buildWorkflowCheckpoint({
       runId: this.runId,
@@ -2277,6 +2335,7 @@ export class LifecycleController implements WorkflowEngine {
         transitionCount: this.transitionCount,
         stateHistory: this.stateHistory.getHistory(),
         lastHumanFeedback: this.lastHumanFeedback,
+        lastHumanAnswer: this.lastHumanAnswer,
         lastReviewContent: this.lastReviewContent,
         lastTrigger: this.lastTrigger,
         waitingContext: this.waitingContext,
@@ -2571,6 +2630,7 @@ export class LifecycleController implements WorkflowEngine {
     this.previousState = null;
     this.waitingContext = null;
     this.lastHumanFeedback = null;
+    this.lastHumanAnswer = null;
     this.lastReviewContent = null;
     this.lastTrigger = null;
     this.governanceDecisionCount = 0;

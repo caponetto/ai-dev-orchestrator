@@ -73,13 +73,15 @@ describe.each(commands)('%s workflow result contract', (command) => {
       const result: RunResult = {
         runId: 'run-result',
         finalState,
+        answerAccepted: command === 'answer',
         artifactInventory: [],
         manifest: {} as RunResult['manifest'],
       };
       const waitingContext = {
-        requiredInput: command === 'session-answer' ? 'text' : 'approval',
+        requiredInput: command === 'session-answer' || command === 'answer' ? 'text' : 'approval',
         reason: 'waiting_for_human',
         requestingState: 'WORK',
+        waitingSince: 'wait-1',
         ...(command === 'session-answer'
           ? {
               liveSessionId: 'session-1',
@@ -97,13 +99,14 @@ describe.each(commands)('%s workflow result contract', (command) => {
         engine: { start: execute, resume: execute, retry: execute, getState: () => state },
         statePersistence: { load: () => state },
         journalWriter: { append: vi.fn() },
+        journalReader: { readAll: () => [] },
         artifactStore: { store: vi.fn() },
         liveRequestStore: { listPendingRequests: vi.fn().mockResolvedValue([]) },
       };
       vi.mocked(createOrchestrator).mockResolvedValue(context as never);
       vi.mocked(resumeOrchestrator).mockResolvedValue(context as never);
       vi.spyOn(DefaultStatePersistence.prototype, 'load').mockReturnValue(
-        command === 'session-answer' ? (state as never) : null,
+        command === 'session-answer' || command === 'answer' ? (state as never) : null,
       );
       const formatter = new OutputFormatter({ json, noColor: true });
       const success = vi.spyOn(formatter, 'success');

@@ -6,6 +6,7 @@ import { resumeOrchestrator } from '../composition-root';
 import { ExitCode, toCLIError } from '../output/exit-codes';
 import type { OutputFormatter } from '../output/formatter';
 import { workflowResultFields } from '../output/workflow-result';
+import { loadLatestRunState } from '../run-state-recovery';
 import { handleWaitingForHuman } from '../waiting-for-human';
 import { getRunDir } from '../workspace-paths';
 
@@ -66,6 +67,13 @@ export async function resumeCommand(
   } catch {
     loadFailed = true;
   }
+  if (checkpoint) {
+    checkpoint = loadLatestRunState(
+      ctx.statePersistence,
+      runId as RunId,
+      ctx.journalReader.readAll(),
+    ).state;
+  }
   if (!checkpoint) {
     checkpoint = ctx.statePersistence.reconstructFromJournal(
       runId as RunId,
@@ -89,7 +97,10 @@ export async function resumeCommand(
   formatter.info(`Resuming from state: ${checkpoint.currentState}`);
 
   const wc = checkpoint.waitingContext;
-  if (wc?.requiredInput === 'text') {
+  if (
+    wc?.requiredInput === 'text' &&
+    checkpoint.entryActionContinuation?.resumeInput?.type !== 'text'
+  ) {
     formatter.error({
       code: ExitCode.INVALID_ARGUMENTS,
       message: 'This run is waiting for text input, not approval.',

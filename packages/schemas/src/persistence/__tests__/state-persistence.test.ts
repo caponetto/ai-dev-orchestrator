@@ -140,6 +140,21 @@ describe('persistedStateSchema', () => {
       checksum: 'sha256-abc',
     };
     expect(persistedStateSchema.safeParse(data).success).toBe(true);
+    const lastHumanAnswer = {
+      stateId: 'WAIT',
+      requestingState: 'WORK',
+      waitingSince: 'wait-1',
+      content: 'accepted',
+    };
+    expect(persistedStateSchema.parse({ ...data, lastHumanAnswer }).lastHumanAnswer).toEqual(
+      lastHumanAnswer,
+    );
+    expect(
+      persistedStateSchema.safeParse({
+        ...data,
+        lastHumanAnswer: { ...lastHumanAnswer, content: 42 },
+      }).success,
+    ).toBe(false);
   });
 
   it('validates with all optional fields', () => {

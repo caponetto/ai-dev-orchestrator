@@ -49,6 +49,51 @@ function parseJsonFromChunks(chunks: string[]): unknown {
   return JSON.parse(jsonLine);
 }
 
+async function seedTextWait(runId: string): Promise<void> {
+  const persistence = new DefaultStatePersistence(getRunsDir());
+  const state = persistence.load(createRunId(runId));
+  assert(state);
+  const definition: WorkflowDefinition = {
+    name: 'answer-journey',
+    version: '1',
+    initialState: 'WAITING_FOR_HUMAN',
+    terminalStates: ['DONE'],
+    states: {
+      WAITING_FOR_HUMAN: {
+        type: 'wait',
+        description: 'Clarification',
+        transitions: [
+          {
+            target: 'DONE',
+            trigger: 'human_input',
+            guards: [],
+            priority: 0,
+            governanceRequired: false,
+          },
+        ],
+      },
+      DONE: { type: 'terminal', description: '', transitions: [] },
+    },
+  };
+  writeFileSync(join(getRunDir(runId), 'workflow-definition.json'), JSON.stringify(definition));
+  await persistence.save({
+    ...state,
+    currentState: 'WAITING_FOR_HUMAN',
+    previousState: state.currentState,
+    workflowName: definition.name,
+    workflowVersion: definition.version,
+    persistedAt: new Date(Math.max(Date.now(), Date.parse(state.persistedAt) + 1)).toISOString(),
+    waitingContext: {
+      reason: 'clarification_needed',
+      requiredInput: 'text',
+      requestingState: 'WAITING_FOR_HUMAN',
+      waitingSince: 'answer-journey',
+      autoResumeSafe: false,
+      presentedArtifacts: [],
+    },
+  });
+}
+
 describe('CLI E2E — User Journeys (real composition, fixture driver)', { timeout: 30_000 }, () => {
   let baseDir: string;
   let stdoutChunks: string[];
@@ -276,6 +321,7 @@ describe('CLI E2E — User Journeys (real composition, fixture driver)', { timeo
     expect(runCode).toBe(ExitCode.SUCCESS);
 
     const runId = findRunId();
+    await seedTextWait(runId);
 
     stdoutChunks = [];
     await answerCommand(
@@ -326,6 +372,7 @@ describe('CLI E2E — User Journeys (real composition, fixture driver)', { timeo
     expect(runCode).toBe(ExitCode.SUCCESS);
 
     const runId = findRunId();
+    await seedTextWait(runId);
 
     stdoutChunks = [];
     await answerCommand(

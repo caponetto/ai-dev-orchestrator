@@ -86,6 +86,14 @@ export const persistedStateSchema = z.object({
   dispatchCounter: z.number().optional(),
   firedThresholdIndex: z.number().optional(),
   lastHumanFeedback: z.string().optional(),
+  lastHumanAnswer: z
+    .object({
+      stateId: z.string(),
+      requestingState: z.string(),
+      waitingSince: z.string(),
+      content: z.string(),
+    })
+    .optional(),
   lastReviewContent: z.string().optional(),
   lastTrigger: z.string().optional(),
   stateTimestamps: z

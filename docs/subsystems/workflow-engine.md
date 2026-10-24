@@ -263,3 +263,23 @@ Dynamic batches preserve original task identities when workers fail or pause. Th
 The workflow execution timeout applies to one controller execution. Restore and explicit retry start a new execution timeout; token/iteration totals and budget approvals remain persisted. Agent transient retries share their original dispatch timeout.
 
 For PR-review publishing, a crash after `gh gist create` succeeds but before the result/cursor is saved has an uncertain external outcome. Before retrying PUBLISH_FINDINGS, inspect the authenticated account's Gists for `PR Review Findings — run <runId>` and reconcile the existing URL to avoid duplicate publishing. PR-review clone cleanup is best-effort; inspect retained temporary clones after a failed or forced run. Setup failures remove newly allocated clones before a repository directive can be saved.
+
+## Accepted text answers
+
+Human input may include an optional `waitIdentity` (current wait state, requesting state and
+waiting timestamp). The engine rejects a mismatched identity or blank targeted answer before
+ownership-dependent effects. The CLI supplies this identity for persisted text waits; legacy
+unbound engine inputs and session/request identity fields remain supported.
+
+A matched non-session text transition checkpoints `lastHumanAnswer` and its `resumeInput`
+continuation before exit actions. Explicitly paused text waits also retain the accepted receipt.
+The receipt survives consumption of transient worker feedback and later checkpoints, so recovery
+can reconstruct the CLI compatibility answer file under the lock. An interrupted transition
+replays its saved input; a different incoming answer cannot replace that committed input.
+A response without a matching transition does not replace the prior accepted receipt.
+
+Targeted answers journal an `answer_checkpointed` diagnostic only after durable acceptance.
+Recovery treats that diagnostic as informational; the checkpoint owns waiting/continuation state.
+A crash while evaluating a not-yet-accepted answer therefore leaves its text wait intact, and a
+delayed diagnostic cannot clear a newer wait. Targeted resume results include optional
+`answerAccepted` evidence, so governance escalation cannot falsely acknowledge an answer.

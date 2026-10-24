@@ -350,6 +350,35 @@ describe('resumeCommand gate handling', () => {
     mockResumeOrchestrator.mockReset();
   });
 
+  it('resumes an already accepted text input saved in an interrupted transition', async () => {
+    const runId = 'accepted-text';
+    const runDir = join(testDir, '.ai', 'runs', runId);
+    mkdirSync(runDir, { recursive: true });
+    const resume = vi.fn().mockResolvedValue({ runId, finalState: 'DONE', artifactInventory: [] });
+    mockResumeOrchestrator.mockResolvedValue({
+      engine: { resume } as never,
+      statePersistence: {
+        load: () => ({
+          currentState: 'WAIT',
+          waitingContext: { requiredInput: 'text' },
+          entryActionContinuation: { resumeInput: { type: 'text', content: 'accepted' } },
+        }),
+      } as never,
+      journalReader: { readAll: () => [] } as never,
+      journalWriter: {} as never,
+      agentStreamBus: {} as never,
+      liveRequestStore: {} as never,
+      artifactStore: {} as never,
+      runId,
+      runDir,
+      warnings: [],
+    });
+    expect(
+      await resumeCommand(testDir, { runId, json: false, verbose: false }, makeFormatter()),
+    ).toBe(ExitCode.SUCCESS);
+    expect(resume).toHaveBeenCalledWith({ type: 'approval', content: 'Resumed via CLI' });
+  });
+
   it('rejects resume when run is waiting for text input', async () => {
     const runId = '20260703-120000-abc123';
     const runDir = join(testDir, '.ai', 'runs', runId);

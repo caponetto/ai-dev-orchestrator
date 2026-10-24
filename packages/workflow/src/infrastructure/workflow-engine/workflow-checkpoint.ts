@@ -18,6 +18,7 @@ interface WorkflowCheckpointInput {
     readonly transitionCount: number;
     readonly stateHistory: readonly string[];
     readonly lastHumanFeedback: string | null;
+    readonly lastHumanAnswer?: PersistedState['lastHumanAnswer'] | null;
     readonly lastReviewContent: string | null;
     readonly lastTrigger: string | null;
     readonly waitingContext: PersistedWaitingContext | null;
@@ -60,6 +61,7 @@ export function buildWorkflowCheckpoint(input: WorkflowCheckpointInput): Persist
     activeArtifacts: [],
     lastProducedArtifact: null,
     lastHumanFeedback: input.progress.lastHumanFeedback ?? undefined,
+    lastHumanAnswer: input.progress.lastHumanAnswer ?? undefined,
     lastReviewContent: input.progress.lastReviewContent ?? undefined,
     lastTrigger: input.progress.lastTrigger ?? undefined,
     waitingContext: input.progress.waitingContext ?? undefined,

@@ -3,8 +3,12 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { DefaultStatePersistence } from '@ai-dev-orchestrator/core';
+import { DefaultJournalReader } from '@ai-dev-orchestrator/journal';
 import type { JournalWriter } from '@ai-dev-orchestrator/ports';
 import type { LockHandle, PersistedState, RunId } from '@ai-dev-orchestrator/schemas';
+
+import { projectHumanAnswer } from './human-answer-projection';
+import { loadLatestRunState } from './run-state-recovery';
 
 /** Fence a restored CLI context against durable progress made by another owner. */
 export class ResumeStatePersistence extends DefaultStatePersistence {
@@ -31,6 +35,9 @@ export class ResumeStatePersistence extends DefaultStatePersistence {
           `Run ${runId} changed since recovery was loaded; reload the run before retrying`,
         );
       }
+      const runDir = join(this.runsDir, runId);
+      const events = new DefaultJournalReader(join(runDir, 'journal.md')).readAll();
+      projectHumanAnswer(runDir, loadLatestRunState(this, runId, events).state);
       this.owned = handle;
       return handle;
     } catch (error: unknown) {
@@ -59,6 +66,7 @@ export class ResumeStatePersistence extends DefaultStatePersistence {
       throw new Error('Cannot save a restored run without owning its lock');
     }
     await super.save(state);
+    projectHumanAnswer(join(this.runsDir, state.runId), state);
   }
 
   override releaseLock(handle: LockHandle): void {

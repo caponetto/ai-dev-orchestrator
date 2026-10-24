@@ -161,6 +161,10 @@ export function applyHumanResponse(
   ctx: RebuildContext,
   event: JournalEvent & { type: 'human_approval' | 'human_rejection' | 'human_input_received' },
 ): void {
+  if (event.type === 'human_input_received' && event.data.action === 'answer_checkpointed') {
+    // The earlier accepted checkpoint owns wait/continuation state; this is diagnostic only.
+    return;
+  }
   if (
     event.type === 'human_input_received' &&
     event.data.action === 'session_resumed' &&
