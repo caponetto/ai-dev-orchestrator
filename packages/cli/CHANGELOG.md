@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.1.13](https://github.com/caponetto/ai-dev-orchestrator/compare/cli-v0.1.12...cli-v0.1.13) (2026-10-24)
+
+
+### Bug Fixes
+
+* **runner:** retry agents that exit without output and show failed dispatches ([#82](https://github.com/caponetto/ai-dev-orchestrator/issues/82)) ([1881fdf](https://github.com/caponetto/ai-dev-orchestrator/commit/1881fdf18074d43702d5ff249e71ca8a6b3aae72))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @ai-dev-orchestrator/config-templates bumped to 0.1.10
+    * @ai-dev-orchestrator/dashboard-server bumped to 0.1.5
+    * @ai-dev-orchestrator/execution-analytics bumped to 0.1.4
+    * @ai-dev-orchestrator/runner bumped to 0.1.7
+    * @ai-dev-orchestrator/workflow bumped to 0.1.6
+
 ## [0.1.12](https://github.com/caponetto/ai-dev-orchestrator/compare/cli-v0.1.11...cli-v0.1.12) (2026-10-24)
 
 

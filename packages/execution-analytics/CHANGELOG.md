@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/caponetto/ai-dev-orchestrator/compare/execution-analytics-v0.1.3...execution-analytics-v0.1.4) (2026-10-24)
+
+
+### Bug Fixes
+
+* **runner:** retry agents that exit without output and show failed dispatches ([#82](https://github.com/caponetto/ai-dev-orchestrator/issues/82)) ([1881fdf](https://github.com/caponetto/ai-dev-orchestrator/commit/1881fdf18074d43702d5ff249e71ca8a6b3aae72))
+
 ## [0.1.3](https://github.com/caponetto/ai-dev-orchestrator/compare/execution-analytics-v0.1.2...execution-analytics-v0.1.3) (2026-10-24)
 
 
