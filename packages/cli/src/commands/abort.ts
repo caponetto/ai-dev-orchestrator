@@ -5,6 +5,7 @@ import { DefaultStatePersistence } from '@ai-dev-orchestrator/core';
 import { RUN_LOCK_FILENAME } from '@ai-dev-orchestrator/schemas';
 
 import { TERMINAL_STATES, abortRunState } from '../abort-run';
+import type { AbortRunResult } from '../abort-run';
 import { ExitCode, toCLIError } from '../output/exit-codes';
 import type { OutputFormatter } from '../output/formatter';
 import { readLockMetadata, recoverRunState, terminateRunFromLock } from '../run-state-recovery';
@@ -67,26 +68,33 @@ export async function abortCommand(
     return ExitCode.GENERAL_ERROR;
   }
 
-  if (TERMINAL_STATES.has(state.currentState)) {
+  let result: AbortRunResult;
+  if (TERMINAL_STATES.has(state.currentState) && !state.pendingTerminalState) {
+    result = {
+      outcome: 'already_terminal',
+      finalState: state.currentState,
+      previousState: state.previousState,
+    };
+  } else {
+    const lockPath = join(runDir, RUN_LOCK_FILENAME);
+    const lock = recovered.lock ?? readLockMetadata(lockPath);
+    terminateRunFromLock(lock);
+    try {
+      result = await abortRunState(statePersistence, runsDir, runId, state, 'Aborted via CLI');
+    } catch (error: unknown) {
+      formatter.error(toCLIError(error));
+      return ExitCode.GENERAL_ERROR;
+    }
+  }
+  if (result.outcome === 'already_terminal') {
     if (options.json) {
       process.stdout.write(
-        JSON.stringify({ runId, status: 'already_terminal', state: state.currentState }) + '\n',
+        JSON.stringify({ runId, status: 'already_terminal', state: result.finalState }) + '\n',
       );
     } else {
-      formatter.info(`Run ${runId} is already in terminal state: ${state.currentState}`);
+      formatter.info(`Run ${runId} is already in terminal state: ${result.finalState}`);
     }
     return ExitCode.SUCCESS;
-  }
-
-  const lockPath = join(runDir, RUN_LOCK_FILENAME);
-  const lock = recovered.lock ?? readLockMetadata(lockPath);
-  terminateRunFromLock(lock);
-
-  try {
-    await abortRunState(statePersistence, runsDir, runId, state, 'Aborted via CLI');
-  } catch (error: unknown) {
-    formatter.error(toCLIError(error));
-    return ExitCode.GENERAL_ERROR;
   }
 
   if (options.json) {
@@ -94,11 +102,12 @@ export async function abortCommand(
       JSON.stringify({
         runId,
         status: 'aborted',
-        previousState: state.currentState,
+        previousState: result.previousState,
+        finalState: result.finalState,
       }) + '\n',
     );
   } else {
-    formatter.success(`Run ${runId} aborted (was in state: ${state.currentState}).`);
+    formatter.success(`Run ${runId} aborted (was in state: ${result.previousState}).`);
   }
 
   return ExitCode.RUN_ABORTED;

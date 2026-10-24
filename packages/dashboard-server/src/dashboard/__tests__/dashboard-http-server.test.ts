@@ -788,6 +788,37 @@ describe('DashboardHttpServer', () => {
       expect(res.status).toBe(404);
     });
 
+    it.each(['started', 'aborted', 'already_terminal'] as const)(
+      'preserves the observed %s outcome in action responses',
+      async (outcome) => {
+        eventStream = new SseEventStream();
+        const result: DashboardActionResult = {
+          success: true,
+          outcome,
+          ...(outcome === 'started'
+            ? {}
+            : { finalState: outcome === 'aborted' ? 'ABORTED' : 'DONE' }),
+        };
+        server = new DashboardHttpServer({
+          config: { port: 0 },
+          dataProvider: createMockProvider(),
+          eventStream,
+          actionHandler: createMockActionHandler({
+            abort: () => Promise.resolve(result),
+            retry: () => Promise.resolve(result),
+          }),
+        });
+        await server.start();
+        const res = await httpPost(
+          server.getPort(),
+          `/api/runs/run-1/${outcome === 'started' ? 'retry' : 'abort'}`,
+          {},
+        );
+        expect(res.status).toBe(200);
+        expect(JSON.parse(res.body)).toEqual(result);
+      },
+    );
+
     it('action route returns 400 when handler reports failure', async () => {
       eventStream = new SseEventStream();
       const handler = createMockActionHandler({

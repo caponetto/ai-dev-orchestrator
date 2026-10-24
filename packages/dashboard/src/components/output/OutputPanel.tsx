@@ -127,10 +127,9 @@ export function AgentOutputPanel({
   const containerRef = useRef<HTMLDivElement>(null);
   const [showDebug, setShowDebug] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const [actionTakenKey, setActionTakenKey] = useState<string | null>(null);
 
   const waitingKey = waitingContext
-    ? `${waitingContext.requestingState}:${waitingContext.waitingSince}`
+    ? `${runId ?? ''}:${waitingContext.requestingState}:${waitingContext.waitingSince}`
     : null;
 
   const allLines = useMemo(() => mergeAllLines(groups), [groups]);
@@ -381,14 +380,9 @@ export function AgentOutputPanel({
           groups,
           dispatchLabelMap,
         )}
-        {!isTerminal &&
-          messageGroups.length > 0 &&
-          !(waitingContext && runId && onAction && actionTakenKey !== waitingKey) && (
-            <TypingIndicator
-              lastTimestamp={allLines.at(-1)?.timestamp}
-              currentState={currentState}
-            />
-          )}
+        {!isTerminal && messageGroups.length > 0 && !(waitingContext && runId && onAction) && (
+          <TypingIndicator lastTimestamp={allLines.at(-1)?.timestamp} currentState={currentState} />
+        )}
         {!isRunActive && abortPresentation && (
           <AbortMessage
             timestamp={abortPresentation.timestamp}
@@ -399,19 +393,17 @@ export function AgentOutputPanel({
         {allLines.length === 0 && !sources?.length && (
           <div className="text-muted-foreground">Waiting for output...</div>
         )}
-        {waitingContext && runId && onAction && actionTakenKey !== waitingKey && (
+        {waitingContext && runId && onAction && (
           <div className="mb-3">
             <div className="mb-1 flex items-baseline text-2xs font-medium text-amber-400">
               <span>Human Approval</span>
             </div>
             <ActionBar
+              key={waitingKey}
               runId={runId}
               waitingContext={waitingContext}
               onAction={() => {
                 onAction();
-              }}
-              onSubmitting={() => {
-                setActionTakenKey(waitingKey);
               }}
               onViewArtifact={onViewArtifact}
             />

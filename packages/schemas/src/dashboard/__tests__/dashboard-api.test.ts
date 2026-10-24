@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { healthResponseSchema, runSummaryViewArraySchema } from '../dashboard-api';
+import {
+  dashboardActionResultSchema,
+  healthResponseSchema,
+  runSummaryViewArraySchema,
+} from '../dashboard-api';
 import { workflowStateViewSchema } from '../dashboard-domain';
 
 describe('array schemas', () => {
@@ -99,5 +103,21 @@ describe('workflowStateViewSchema', () => {
     };
     const parsed = workflowStateViewSchema.safeParse(data);
     expect(parsed.success).toBe(true);
+  });
+});
+
+describe('control action outcomes', () => {
+  it.each(['started', 'aborted', 'already_terminal'])(
+    'retains an additive %s outcome while accepting legacy responses',
+    (outcome) => {
+      const result = { success: true, outcome, finalState: 'DONE' };
+      expect(dashboardActionResultSchema.parse(result)).toEqual(result);
+      expect(dashboardActionResultSchema.parse({ success: true })).toEqual({ success: true });
+    },
+  );
+  it('rejects unsupported stages rather than interpreting them as successful completion', () => {
+    expect(
+      dashboardActionResultSchema.safeParse({ success: true, outcome: 'completed' }).success,
+    ).toBe(false);
   });
 });

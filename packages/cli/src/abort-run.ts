@@ -73,6 +73,14 @@ export function writeAbortJournalEntries(
   });
 }
 
+export type AbortRunResult =
+  | { readonly outcome: 'aborted'; readonly finalState: 'ABORTED'; readonly previousState: string }
+  | {
+      readonly outcome: 'already_terminal';
+      readonly finalState: string;
+      readonly previousState: string | null;
+    };
+
 export async function abortRunState(
   statePersistence: StatePersistence,
   runsDir: string,
@@ -80,7 +88,7 @@ export async function abortRunState(
   state: PersistedState,
   reason: string,
   options?: { expectedSessionId?: string; onOwned?: (latest: PersistedState) => Promise<void> },
-): Promise<void> {
+): Promise<AbortRunResult> {
   // SIGTERM is asynchronous. Never overwrite an owner that is still checkpointing
   // or cleaning up, and re-read durable progress only after acquiring ownership.
   for (let attempt = 0; attempt < 20; attempt++) {
@@ -93,8 +101,12 @@ export async function abortRunState(
   try {
     const events = new DefaultJournalReader(getJournalPath(join(runsDir, runId))).readAll();
     const latest = loadLatestRunState(statePersistence, state.runId, events).state ?? state;
-    if (TERMINAL_STATES.has(latest.currentState)) {
-      return;
+    if (TERMINAL_STATES.has(latest.currentState) && !latest.pendingTerminalState) {
+      return {
+        outcome: 'already_terminal',
+        finalState: latest.currentState,
+        previousState: latest.previousState,
+      };
     }
     if (
       options?.expectedSessionId &&
@@ -111,6 +123,7 @@ export async function abortRunState(
     } catch {
       // The committed aborted checkpoint remains authoritative if journaling fails.
     }
+    return { outcome: 'aborted', finalState: 'ABORTED', previousState: latest.currentState };
   } finally {
     statePersistence.releaseLock(lock);
   }

@@ -103,11 +103,21 @@ export function ActionBar({
         <div className="flex items-center gap-2">
           <span className={isApproved ? 'text-emerald-400' : 'text-red-400'}>
             {isApproved
-              ? `✓ Approved ${waitingContext.requestingState.replaceAll('_', ' ').toLowerCase()}`
-              : `✗ Rejected ${waitingContext.requestingState.replaceAll('_', ' ').toLowerCase()}`}
+              ? `Approval requested for ${waitingContext.requestingState.replaceAll('_', ' ').toLowerCase()}`
+              : `Rejection requested for ${waitingContext.requestingState.replaceAll('_', ' ').toLowerCase()}`}
           </span>
           {message && <span className="text-muted-foreground">— {message}</span>}
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setOutcome(null);
+            setShowRejectForm(false);
+          }}
+        >
+          Send another response
+        </Button>
       </div>
     );
   }

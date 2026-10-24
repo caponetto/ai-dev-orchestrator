@@ -79,6 +79,11 @@ test('browser approval, abort and retry reach production server and action handl
     ]) {
       const runId = `browser-${action}`;
       await page.goto(`/runs/${runId}`);
+      const actionResponse = page.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname === `/api/runs/${runId}/${action}` &&
+          response.request().method() === 'POST',
+      );
       if (action === 'approve') {
         await page.getByRole('button', { name: 'Approve', exact: true }).click();
       } else {
@@ -93,6 +98,15 @@ test('browser approval, abort and retry reach production server and action handl
           })
           .click();
       }
+      const response = await actionResponse;
+      expect(response.status()).toBe(200);
+      expect((await response.json()) as unknown).toMatchObject({
+        success: true,
+        outcome: action === 'abort' ? 'aborted' : 'started',
+      });
+      if (action === 'retry') {
+        await expect(page.getByText('Retry requested', { exact: true })).toBeVisible();
+      }
       await expect
         .poll(
           async () => {
@@ -104,6 +118,14 @@ test('browser approval, abort and retry reach production server and action handl
         )
         .toBe(expected);
     }
+    const completedAbort = await request.post(`${backend}/api/runs/browser-approve/abort`, {
+      data: {},
+    });
+    expect((await completedAbort.json()) as unknown).toMatchObject({
+      success: true,
+      outcome: 'already_terminal',
+      finalState: 'DONE',
+    });
   } catch (error) {
     const logs = ['approve', 'abort', 'retry']
       .map((action) => {

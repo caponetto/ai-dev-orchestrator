@@ -13,6 +13,8 @@ export const dashboardActionResultSchema = z
   .object({
     success: z.boolean(),
     error: z.string().optional(),
+    outcome: z.enum(['started', 'aborted', 'already_terminal']).optional(),
+    finalState: z.string().optional(),
     runId: z.string().optional(),
   })
   .loose();

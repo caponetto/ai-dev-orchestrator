@@ -53,6 +53,26 @@ afterEach(() => {
   }
 });
 describe('abort ownership and current state validation', () => {
+  it.each(['DONE', 'ABORTED'])(
+    'does not call %s finished while terminal cleanup is pending',
+    async (currentState) => {
+      const h = await setup();
+      await h.persistence.save({
+        ...h.state,
+        currentState,
+        pendingTerminalState: currentState,
+        terminalRecoveryState: 'WORK',
+      });
+      expect(
+        await abortRunState(h.persistence, h.root, h.id, h.state, 'stop pending cleanup'),
+      ).toMatchObject({
+        outcome: 'aborted',
+        finalState: 'ABORTED',
+        previousState: currentState,
+      });
+      expect(h.persistence.load(h.id)?.pendingTerminalState).toBeUndefined();
+    },
+  );
   it.each([true, false])(
     'rejects stale session identity under the lock (replacement exists: %s)',
     async (replacement) => {
@@ -86,7 +106,10 @@ describe('abort ownership and current state validation', () => {
       cumulativeInputTokens: 110,
     });
     const cancel = vi.fn(() => Promise.resolve());
-    await abortRunState(h.persistence, h.root, h.id, h.state, 'abort', { onOwned: cancel });
+    const result = await abortRunState(h.persistence, h.root, h.id, h.state, 'abort', {
+      onOwned: cancel,
+    });
+    expect(result).toMatchObject({ outcome: 'already_terminal', finalState: 'DONE' });
     expect(cancel).not.toHaveBeenCalled();
     expect(h.persistence.load(h.id)).toMatchObject({
       currentState: 'DONE',
@@ -102,9 +125,14 @@ describe('abort ownership and current state validation', () => {
       expect(latest.cumulativeInputTokens).toBe(110);
       return Promise.resolve();
     });
-    await abortRunState(h.persistence, h.root, h.id, h.state, 'abort', {
+    const result = await abortRunState(h.persistence, h.root, h.id, h.state, 'abort', {
       expectedSessionId: 'old-session',
       onOwned: cancel,
+    });
+    expect(result).toMatchObject({
+      outcome: 'aborted',
+      finalState: 'ABORTED',
+      previousState: 'WAITING_FOR_HUMAN',
     });
     expect(cancel).toHaveBeenCalledTimes(1);
     expect(h.persistence.load(h.id)).toMatchObject({

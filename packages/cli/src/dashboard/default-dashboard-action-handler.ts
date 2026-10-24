@@ -1,5 +1,4 @@
-import { spawn } from 'node:child_process';
-import { closeSync, existsSync, openSync, rmSync } from 'node:fs';
+import { existsSync, rmSync } from 'node:fs';
 import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -7,6 +6,7 @@ import { DefaultStatePersistence } from '@ai-dev-orchestrator/core';
 import { projectWorkflowPreview } from '@ai-dev-orchestrator/dashboard-server';
 import type {
   AgentStreamBus,
+  AgentStreamEvent,
   AgentSessionSupervisor,
   CreateRunResult,
   DashboardActionHandler,
@@ -21,45 +21,21 @@ import type {
 } from '@ai-dev-orchestrator/schemas';
 
 import { TERMINAL_STATES, abortRunState } from '../abort-run';
+import type { AbortRunResult } from '../abort-run';
 import { loadAllWorkflows, loadWorkflowByName, preflightSelectedModels } from '../composition-root';
 import { readLockMetadata, recoverRunState, terminateRunFromLock } from '../run-state-recovery';
 import { getRunsDir, getStatePath } from '../workspace-paths';
 
+import { spawnDetachedCli } from './detached-cli-launch';
 import { runCreationParamsToCliArgs } from './run-creation-args';
-
-function getCliEntryPath(): string {
-  return process.argv[1];
-}
-
-function spawnDetachedCli(
-  baseDir: string,
-  args: string[],
-  logPath?: string,
-  modelPreflightReceipt?: string,
-): void {
-  const entry = getCliEntryPath();
-  const cwd = existsSync(baseDir) ? baseDir : tmpdir();
-  let stderrFd: number | undefined;
-  if (logPath) {
-    stderrFd = openSync(logPath, 'a');
-  }
-  const child = spawn(process.execPath, [entry, ...args], {
-    cwd,
-    detached: true,
-    stdio: ['ignore', 'ignore', stderrFd ?? 'ignore'],
-    ...(modelPreflightReceipt
-      ? { env: { ...process.env, AI_ORCHESTRATOR_MODEL_PREFLIGHT: modelPreflightReceipt } }
-      : {}),
-  });
-  child.unref();
-  if (stderrFd !== undefined) {
-    closeSync(stderrFd);
-  }
-}
 
 export class DefaultDashboardActionHandler implements DashboardActionHandler {
   private readonly sessionSupervisor?: AgentSessionSupervisor;
   private readonly streamBus?: AgentStreamBus;
+  private readonly launches = new Map<
+    string,
+    { key: string; result: Promise<DashboardActionResult> }
+  >();
 
   constructor(sessionSupervisor?: AgentSessionSupervisor, streamBus?: AgentStreamBus) {
     this.sessionSupervisor = sessionSupervisor;
@@ -127,8 +103,8 @@ export class DefaultDashboardActionHandler implements DashboardActionHandler {
       };
     }
 
-    if (TERMINAL_STATES.has(state.currentState)) {
-      return { success: true };
+    if (TERMINAL_STATES.has(state.currentState) && !state.pendingTerminalState) {
+      return { success: true, outcome: 'already_terminal', finalState: state.currentState };
     }
 
     // v1: session abort = run abort (single session per wait).
@@ -151,8 +127,9 @@ export class DefaultDashboardActionHandler implements DashboardActionHandler {
 
     const abortReason = options.reason ?? 'Aborted via dashboard';
 
+    let result: AbortRunResult;
     try {
-      await abortRunState(statePersistence, runsDir, runId, state, abortReason, {
+      result = await abortRunState(statePersistence, runsDir, runId, state, abortReason, {
         expectedSessionId: options.sessionId,
         onOwned: async (latest) => {
           const liveSessionId = latest.waitingContext?.liveSessionId;
@@ -169,23 +146,26 @@ export class DefaultDashboardActionHandler implements DashboardActionHandler {
       return { success: false, error: e instanceof Error ? e.message : String(e) };
     }
 
-    if (this.streamBus) {
-      this.streamBus.publish({
+    if (result.outcome === 'aborted') {
+      this.publishStatus({
         runId,
-        stateId: state.currentState,
+        stateId: result.finalState,
         roleId: 'human',
         dispatchId: `human-${String(Date.now())}`,
         timestamp: new Date().toISOString(),
         type: 'status',
         content: abortReason,
-        structuredData: { action: 'aborted', reason: abortReason },
+        structuredData: {
+          action: 'aborted',
+          reason: abortReason,
+          previousState: result.previousState,
+          finalState: result.finalState,
+        },
       });
     }
-
-    return { success: true };
+    return { success: true, outcome: result.outcome, finalState: result.finalState };
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await -- Keep the async handler contract; validation and spawning are synchronous.
   async retry(runId: string): Promise<DashboardActionResult> {
     const runsDir = getRunsDir();
     const runDir = join(runsDir, runId);
@@ -244,30 +224,20 @@ export class DefaultDashboardActionHandler implements DashboardActionHandler {
       };
     }
 
-    if (this.streamBus) {
-      this.streamBus.publish({
-        runId,
-        stateId: retryState,
-        roleId: 'human',
-        dispatchId: `human-${String(Date.now())}`,
-        timestamp: new Date().toISOString(),
-        type: 'status',
-        content: `Retrying from ${retryState.replaceAll('_', ' ').toLowerCase()}`,
-        structuredData: { action: 'retrying', fromState: retryState },
-      });
+    const args = ['retry', runId];
+    if (state.repoRoot) {
+      args.push('--repo', state.repoRoot);
     }
-
-    try {
-      const args = ['retry', runId];
-      if (state.repoRoot) {
-        args.push('--repo', state.repoRoot);
-      }
-      const logFile = join(runDir, 'cli-stderr.log');
-      spawnDetachedCli(state.repoRoot ?? process.cwd(), args, logFile);
-      return { success: true };
-    } catch (e: unknown) {
-      return { success: false, error: e instanceof Error ? e.message : String(e) };
-    }
+    return this.launchControl(runId, 'retry', state.repoRoot ?? process.cwd(), args, () => ({
+      runId,
+      stateId: state.currentState,
+      roleId: 'human',
+      dispatchId: `human-${String(Date.now())}`,
+      timestamp: new Date().toISOString(),
+      type: 'status',
+      content: `Retry requested from ${retryState.replaceAll('_', ' ').toLowerCase()}`,
+      structuredData: { action: 'retry_requested', outcome: 'started', fromState: retryState },
+    }));
   }
 
   async deleteRun(runId: string): Promise<DashboardActionResult> {
@@ -318,9 +288,9 @@ export class DefaultDashboardActionHandler implements DashboardActionHandler {
     try {
       const preflight = await preflightSelectedModels(repoRoot ?? tmpdir());
       const args = runCreationParamsToCliArgs({ ...options, prompt });
-      spawnDetachedCli(repoRoot ?? tmpdir(), args, undefined, preflight.receipt);
+      await spawnDetachedCli(repoRoot ?? tmpdir(), args, undefined, preflight.receipt);
 
-      return { success: true, runId: '' };
+      return { success: true, runId: '', outcome: 'started' };
     } catch (e: unknown) {
       return { success: false, error: e instanceof Error ? e.message : String(e) };
     }
@@ -355,94 +325,124 @@ export class DefaultDashboardActionHandler implements DashboardActionHandler {
     content: string,
     sessionId?: string,
   ): Promise<DashboardActionResult> {
-    const runsDir = getRunsDir();
-    const runDir = join(runsDir, runId);
-    if (!existsSync(runDir)) {
-      return { success: false, error: `Run directory not found: ${runId}` };
-    }
-
-    if (!existsSync(getStatePath(runDir))) {
-      return { success: false, error: `No state found for run: ${runId}` };
-    }
-
-    if (sessionId) {
-      const statePersistence = new DefaultStatePersistence(runsDir);
-      const state = statePersistence.load(runId as RunId);
-      const liveSessionId = state?.waitingContext?.liveSessionId;
-      if (liveSessionId && liveSessionId !== sessionId) {
-        return {
-          success: false,
-          error: `Session ID mismatch: expected ${liveSessionId}, got ${sessionId}`,
-        };
-      }
-    }
-
-    await this.ensureLockReleased(runId);
-
     try {
-      if (this.streamBus) {
+      const runsDir = getRunsDir();
+      const runDir = join(runsDir, runId);
+      if (!existsSync(runDir)) {
+        return { success: false, error: `Run directory not found: ${runId}` };
+      }
+
+      if (!existsSync(getStatePath(runDir))) {
+        return { success: false, error: `No state found for run: ${runId}` };
+      }
+
+      if (sessionId) {
         const statePersistence = new DefaultStatePersistence(runsDir);
         const state = statePersistence.load(runId as RunId);
-        const stateId = state?.currentState ?? 'WAITING_FOR_HUMAN';
-        const actionMap = {
-          approval: 'approved',
-          rejection: 'rejected',
-          text: 'answered',
-        } as const;
-        const reqState = state?.waitingContext?.requestingState.replaceAll('_', ' ').toLowerCase();
-        const contentMap = {
-          approval: reqState ? `Approved ${reqState}` : 'Approved',
-          rejection: reqState ? `Rejected ${reqState}` : 'Rejected',
-          text: content,
+        const liveSessionId = state?.waitingContext?.liveSessionId;
+        if (liveSessionId && liveSessionId !== sessionId) {
+          return {
+            success: false,
+            error: `Session ID mismatch: expected ${liveSessionId}, got ${sessionId}`,
+          };
+        }
+      }
+
+      await this.ensureLockReleased(runId);
+
+      const statePersistence = new DefaultStatePersistence(runsDir);
+      const state = statePersistence.load(runId as RunId);
+      if (
+        state &&
+        !state.pendingTerminalState &&
+        (TERMINAL_STATES.has(state.currentState) || state.currentState === 'FAILED')
+      ) {
+        return {
+          success: false,
+          error: `Run ${runId} is already in terminal state: ${state.currentState}`,
         };
-        this.streamBus.publish({
+      }
+      if (sessionId && state?.waitingContext?.liveSessionId !== sessionId) {
+        return {
+          success: false,
+          error: `Session ID mismatch: expected ${state?.waitingContext?.liveSessionId ?? 'no live session'}, got ${sessionId}`,
+        };
+      }
+      const reqState = state?.waitingContext?.requestingState.replaceAll('_', ' ').toLowerCase();
+      const args =
+        type === 'text'
+          ? ['answer', runId, content]
+          : ['approve', runId, ...(type === 'rejection' ? ['--reject'] : []), '--message', content];
+      return await this.launchControl(
+        runId,
+        JSON.stringify([type, content, sessionId]),
+        process.cwd(),
+        args,
+        () => ({
           runId,
-          stateId,
+          stateId: state?.currentState ?? 'WAITING_FOR_HUMAN',
           roleId: 'human',
           dispatchId: `human-${String(Date.now())}`,
           timestamp: new Date().toISOString(),
           type: 'status',
-          content: contentMap[type],
-          structuredData: {
-            messageType: type === 'text' ? 'clarification_response' : 'permission_response',
-            granted: type !== 'rejection',
-            action: actionMap[type],
-            message: content,
-          },
-        });
-      }
+          content:
+            type === 'text'
+              ? `Answer requested: ${content}`
+              : `${type === 'approval' ? 'Approval' : 'Rejection'} requested${reqState ? ` for ${reqState}` : ''}`,
+          structuredData: { action: `${type}_requested`, outcome: 'started', message: content },
+        }),
+      );
+    } catch (error: unknown) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
 
-      const logFile = join(runDir, 'cli-stderr.log');
-      if (type === 'approval') {
-        spawnDetachedCli(process.cwd(), ['approve', runId, '--message', content], logFile);
-      } else if (type === 'rejection') {
-        spawnDetachedCli(
-          process.cwd(),
-          ['approve', runId, '--reject', '--message', content],
-          logFile,
-        );
-      } else {
-        spawnDetachedCli(process.cwd(), ['answer', runId, content], logFile);
-      }
+  private publishStatus(event: AgentStreamEvent): void {
+    try {
+      this.streamBus?.publish(event);
+    } catch {
+      // Best-effort notification cannot undo a committed abort or acknowledged launch.
+    }
+  }
 
-      return { success: true };
-    } catch (e: unknown) {
-      const errorMessage = e instanceof Error ? e.message : String(e);
-
-      if (this.streamBus) {
-        this.streamBus.publish({
+  private async launchControl(
+    runId: string,
+    key: string,
+    baseDir: string,
+    args: string[],
+    event: () => AgentStreamEvent,
+  ): Promise<DashboardActionResult> {
+    const pending = this.launches.get(runId);
+    if (pending) {
+      return pending.key === key
+        ? pending.result
+        : { success: false, error: `Another control request is already starting for run ${runId}` };
+    }
+    const result = (async (): Promise<DashboardActionResult> => {
+      try {
+        await spawnDetachedCli(baseDir, args, join(getRunsDir(), runId, 'cli-stderr.log'));
+        this.publishStatus(event());
+        return { success: true, outcome: 'started' };
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.publishStatus({
           runId,
-          stateId: 'WAITING_FOR_HUMAN',
+          stateId: event().stateId,
           roleId: 'orchestrator',
           dispatchId: `error-${String(Date.now())}`,
           timestamp: new Date().toISOString(),
           type: 'status',
-          content: `Resume failed: ${errorMessage}`,
-          structuredData: { action: 'error', error: errorMessage },
+          content: `Control request failed: ${message}`,
+          structuredData: { action: 'request_failed', error: message },
         });
+        return { success: false, error: message };
       }
-
-      return { success: false, error: errorMessage };
+    })();
+    this.launches.set(runId, { key, result });
+    try {
+      return await result;
+    } finally {
+      this.launches.delete(runId);
     }
   }
 }

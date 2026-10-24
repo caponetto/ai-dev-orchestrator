@@ -1,5 +1,7 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import type { ChildProcess } from 'node:child_process';
+import { EventEmitter } from 'node:events';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -20,9 +22,14 @@ import { DefaultDashboardActionHandler } from '../default-dashboard-action-handl
 
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal();
+  const { EventEmitter } = await import('node:events');
   return {
     ...(actual as object),
-    spawn: vi.fn().mockReturnValue({ unref: vi.fn() }),
+    spawn: vi.fn().mockImplementation(() => {
+      const child = Object.assign(new EventEmitter(), { unref: vi.fn() });
+      queueMicrotask(() => child.emit('spawn'));
+      return child;
+    }),
   };
 });
 
@@ -115,6 +122,246 @@ describe('DefaultDashboardActionHandler', () => {
       ...state,
     } as unknown as Parameters<typeof persistence.save>[0]);
   }
+
+  it('waits for child spawn before acknowledging retry or publishing its request', async () => {
+    await seedRunState('spawn-stage', { currentState: 'FAILED', previousState: 'WORK' });
+    const child = Object.assign(new EventEmitter(), { unref: vi.fn() });
+    vi.mocked(spawn).mockReturnValueOnce(child as unknown as ChildProcess);
+    const bus = makeStreamBus();
+    const publish = vi.spyOn(bus, 'publish');
+    const handler = new DefaultDashboardActionHandler(undefined, bus);
+    let settled = false;
+    const pending = handler.retry('spawn-stage').then((result) => {
+      settled = true;
+      return result;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    expect(publish).not.toHaveBeenCalled();
+    expect(child.unref).not.toHaveBeenCalled();
+    child.emit('spawn');
+    expect(await pending).toMatchObject({ success: true, outcome: 'started' });
+    expect(child.unref).toHaveBeenCalledOnce();
+  });
+
+  it('reports asynchronous spawn failure without publishing a retry and permits another attempt', async () => {
+    await seedRunState('async-failure', { currentState: 'FAILED', previousState: 'WORK' });
+    const child = Object.assign(new EventEmitter(), { unref: vi.fn() });
+    vi.mocked(spawn).mockReturnValueOnce(child as unknown as ChildProcess);
+    const bus = makeStreamBus();
+    const publish = vi.spyOn(bus, 'publish');
+    const handler = new DefaultDashboardActionHandler(undefined, bus);
+    const pending = handler.retry('async-failure');
+    child.emit('error', new Error('asynchronous launch failure'));
+    expect(await pending).toEqual({ success: false, error: 'asynchronous launch failure' });
+    expect(publish).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        structuredData: { action: 'request_failed', error: 'asynchronous launch failure' },
+        stateId: 'FAILED',
+      }),
+    );
+    expect(await handler.retry('async-failure')).toMatchObject({
+      success: true,
+      outcome: 'started',
+    });
+  });
+
+  it('coalesces duplicate retry clicks while launch is pending and clears the pending entry', async () => {
+    await seedRunState('duplicates', { currentState: 'FAILED', previousState: 'WORK' });
+    vi.mocked(spawn).mockClear();
+    const child = Object.assign(new EventEmitter(), { unref: vi.fn() });
+    vi.mocked(spawn).mockReturnValueOnce(child as unknown as ChildProcess);
+    const handler = new DefaultDashboardActionHandler();
+    const a = handler.retry('duplicates');
+    const b = handler.retry('duplicates');
+    expect(spawn).toHaveBeenCalledOnce();
+    child.emit('spawn');
+    expect(await a).toEqual(await b);
+    expect(await handler.retry('duplicates')).toMatchObject({ success: true, outcome: 'started' });
+    expect(spawn).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects a conflicting control while another launch for the same run is pending', async () => {
+    await seedRunState('conflicting', {});
+    vi.mocked(spawn).mockClear();
+    const child = Object.assign(new EventEmitter(), { unref: vi.fn() });
+    vi.mocked(spawn).mockReturnValueOnce(child as unknown as ChildProcess);
+    const handler = new DefaultDashboardActionHandler();
+    const first = handler.approve('conflicting', {});
+    await Promise.resolve();
+    expect(await handler.reject('conflicting', {})).toMatchObject({
+      success: false,
+      error: expect.stringContaining('already starting') as unknown,
+    });
+    child.emit('spawn');
+    expect(await first).toMatchObject({ success: true, outcome: 'started' });
+    expect(spawn).toHaveBeenCalledOnce();
+  });
+
+  it.each(['launch', 'abort'])(
+    'keeps a successful %s outcome when stream notification fails',
+    async (action) => {
+      await seedRunState('notify-fails', {
+        currentState: action === 'launch' ? 'FAILED' : 'WAITING_FOR_HUMAN',
+        previousState: 'WORK',
+      });
+      const bus = makeStreamBus();
+      const publish = vi.spyOn(bus, 'publish');
+      publish.mockImplementation(() => {
+        throw new Error('stream unavailable');
+      });
+      const handler = new DefaultDashboardActionHandler(undefined, bus);
+      const result =
+        action === 'launch'
+          ? await handler.retry('notify-fails')
+          : await handler.abort('notify-fails', {});
+      expect(result).toMatchObject({
+        success: true,
+        outcome: action === 'launch' ? 'started' : 'aborted',
+      });
+    },
+  );
+
+  it('does not publish an abort when checkpoint persistence fails', async () => {
+    await seedRunState('abort-save-fails', {});
+    const save = vi
+      .spyOn(DefaultStatePersistence.prototype, 'save')
+      .mockRejectedValue(new Error('save unavailable'));
+    try {
+      const bus = makeStreamBus();
+      const publish = vi.spyOn(bus, 'publish');
+      expect(
+        await new DefaultDashboardActionHandler(undefined, bus).abort('abort-save-fails', {}),
+      ).toEqual({ success: false, error: 'save unavailable' });
+      expect(publish).not.toHaveBeenCalled();
+    } finally {
+      save.mockRestore();
+    }
+  });
+
+  it.each(['approve', 'reject', 'answer'])(
+    'rejects a stale %s request after the run has completed',
+    async (action) => {
+      await seedRunState('stale-control', { currentState: 'DONE' });
+      vi.mocked(spawn).mockClear();
+      const handler = new DefaultDashboardActionHandler();
+      const result =
+        action === 'answer'
+          ? await handler.answer('stale-control', { content: 'text' })
+          : action === 'approve'
+            ? await handler.approve('stale-control', {})
+            : await handler.reject('stale-control', {});
+      expect(result).toMatchObject({
+        success: false,
+        error: expect.stringContaining('terminal state') as unknown,
+      });
+      expect(spawn).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([new Error('read unavailable'), 'read unavailable'])(
+    'reports state inspection failure without launching: %s',
+    async (failure) => {
+      await seedRunState('read-fails', {});
+      vi.mocked(spawn).mockClear();
+      const load = vi.spyOn(DefaultStatePersistence.prototype, 'load').mockImplementation(() => {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error -- Exercise non-Error persistence failures.
+        throw failure;
+      });
+      try {
+        expect(await new DefaultDashboardActionHandler().approve('read-fails', {})).toEqual({
+          success: false,
+          error: 'read unavailable',
+        });
+        expect(spawn).not.toHaveBeenCalled();
+      } finally {
+        load.mockRestore();
+      }
+    },
+  );
+
+  it.each(['new-session', undefined])(
+    'rechecks session identity after owner release (%s)',
+    async (liveSessionId) => {
+      await seedRunState('session-moved', { waitingContext: { liveSessionId: 'old-session' } });
+      vi.mocked(spawn).mockClear();
+      const store = new DefaultStatePersistence(getRunsDir());
+      const state = store.load('session-moved' as RunId);
+      if (!state) {
+        throw new Error('missing state');
+      }
+      const waitingContext = state.waitingContext;
+      if (!waitingContext) {
+        throw new Error('missing waiting context');
+      }
+      let reads = 0;
+      const load = vi.spyOn(DefaultStatePersistence.prototype, 'load').mockImplementation(() => {
+        if (reads++ === 0) {
+          return state;
+        }
+        return {
+          ...state,
+          waitingContext: liveSessionId ? { ...waitingContext, liveSessionId } : undefined,
+        };
+      });
+      try {
+        expect(
+          await new DefaultDashboardActionHandler().approve('session-moved', {
+            sessionId: 'old-session',
+          }),
+        ).toMatchObject({
+          success: false,
+          error: expect.stringContaining('Session ID mismatch') as unknown,
+        });
+        expect(spawn).not.toHaveBeenCalled();
+      } finally {
+        load.mockRestore();
+      }
+    },
+  );
+
+  it('reports completion winning an abort race without publishing an aborted event', async () => {
+    const runId = 'completion-wins';
+    await seedRunState(runId, { currentState: 'DONE' });
+    const path = join(getRunDir(runId), 'state.yaml');
+    const done = readFileSync(path, 'utf8');
+    await seedRunState(runId, { currentState: 'WAITING_FOR_HUMAN' });
+    const store = new DefaultStatePersistence(getRunsDir());
+    const acquire = store.acquireLock.bind(store);
+    const lock = vi
+      .spyOn(DefaultStatePersistence.prototype, 'acquireLock')
+      .mockImplementation((id) => {
+        writeFileSync(path, done);
+        return acquire(id);
+      });
+    try {
+      const bus = makeStreamBus();
+      const publish = vi.spyOn(bus, 'publish');
+      expect(
+        await new DefaultDashboardActionHandler(undefined, bus).abort(runId, {}),
+      ).toMatchObject({
+        success: true,
+        outcome: 'already_terminal',
+        finalState: 'DONE',
+      });
+      expect(publish).not.toHaveBeenCalled();
+    } finally {
+      lock.mockRestore();
+    }
+  });
+
+  it('aborts pending terminal cleanup instead of announcing an already-finished run', async () => {
+    await seedRunState('pending-abort', {
+      currentState: 'DONE',
+      pendingTerminalState: 'DONE',
+      terminalRecoveryState: 'WORK',
+    });
+    expect(await new DefaultDashboardActionHandler().abort('pending-abort', {})).toMatchObject({
+      success: true,
+      outcome: 'aborted',
+      finalState: 'ABORTED',
+    });
+  });
 
   it('abort calls supervisor.abort with liveSessionId from state', async () => {
     const abortMock = vi.fn().mockResolvedValue(true);
@@ -557,8 +804,8 @@ describe('DefaultDashboardActionHandler', () => {
           type: 'status',
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           structuredData: expect.objectContaining({
-            action: 'approved',
-            granted: true,
+            action: 'approval_requested',
+            outcome: 'started',
           }),
         }),
       );
@@ -574,7 +821,7 @@ describe('DefaultDashboardActionHandler', () => {
       expect(vi.mocked(streamBus.publish)).toHaveBeenCalledWith(
         expect.objectContaining({
           runId: 'run-no-req',
-          content: 'Approved',
+          content: 'Approval requested',
         }),
       );
     });
@@ -605,7 +852,7 @@ describe('DefaultDashboardActionHandler', () => {
       expect(vi.mocked(streamBus.publish)).toHaveBeenCalledWith(
         expect.objectContaining({
           runId: 'run-rej-noreq',
-          content: 'Rejected',
+          content: 'Rejection requested',
         }),
       );
     });
@@ -629,8 +876,8 @@ describe('DefaultDashboardActionHandler', () => {
           runId: 'run-rej-bus',
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           structuredData: expect.objectContaining({
-            action: 'rejected',
-            granted: false,
+            action: 'rejection_requested',
+            outcome: 'started',
           }),
         }),
       );
@@ -678,8 +925,8 @@ describe('DefaultDashboardActionHandler', () => {
           runId: 'run-ans-bus',
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           structuredData: expect.objectContaining({
-            action: 'answered',
-            messageType: 'clarification_response',
+            action: 'text_requested',
+            outcome: 'started',
           }),
         }),
       );
@@ -728,7 +975,7 @@ describe('DefaultDashboardActionHandler', () => {
           runId: 'run-retry-bus',
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           structuredData: expect.objectContaining({
-            action: 'retrying',
+            action: 'retry_requested',
             fromState: 'IMPLEMENTATION',
           }),
         }),
@@ -917,7 +1164,7 @@ describe('DefaultDashboardActionHandler', () => {
       );
       expect(errorEvent).toBeDefined();
       expect((errorEvent?.[0] as unknown as Record<string, unknown>).structuredData).toEqual(
-        expect.objectContaining({ action: 'error', error: 'spawn failed' }),
+        expect.objectContaining({ action: 'request_failed', error: 'spawn failed' }),
       );
     });
 

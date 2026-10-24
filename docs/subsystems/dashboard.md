@@ -94,3 +94,25 @@ The dashboard's `typecheck` and `lint` commands include E2E files, so typed ESLi
 when lint-staged checks an individual browser test before commit.
 
 `production-actions.e2e.ts` exercises approval, abort and retry through the browser, real HTTP server, production action/data handlers and actual CLI child commands. It uses disposable run/configuration directories and deterministic agents. Dashboard E2E builds CLI development artifacts through its Turbo task dependency before starting this fixture.
+
+## Observed control stages
+
+Action HTTP responses retain their existing success/error fields and HTTP status codes, with
+optional `outcome` (`started`, `aborted`, `already_terminal`) and `finalState` fields. Older
+responses without those fields remain accepted. A successful launched action means the OS
+created its child process; ownership and workflow completion are later observations.
+
+Retry and approval/rejection/answer stream events describe requests (`retry_requested`,
+`approval_requested`, `rejection_requested`, `text_requested`), after spawn acknowledgement.
+They do not synthesize agent permission or clarification responses. Actual workflow and protocol
+events remain the evidence of execution. Failed launches may emit `request_failed`, never a
+successful request event. Stream reporting is best-effort after an outcome is known.
+
+UI feedback follows that distinction: retry and run creation are requested, and approval/rejection
+banners describe requests. Abort displays the explicit committed/terminal outcome; a legacy
+success without an outcome uses acknowledgement wording. Completing during an abort keeps DONE
+and produces an already-terminal response rather than an aborted toast/event. In-flight controls
+remain mounted and disabled while the request is pending. Launch errors stay visible and retryable;
+a requested-stage banner allows another response if the run is still waiting. A new wait resets the
+form. Deduplication covers one handler's spawn window,
+not durable repeated requests after acknowledgement.

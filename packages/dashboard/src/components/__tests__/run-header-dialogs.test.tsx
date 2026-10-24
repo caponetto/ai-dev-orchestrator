@@ -48,6 +48,30 @@ describe('AbortDialog', () => {
     defaultProps.onAborted.mockReset();
   });
 
+  it.each(['DONE', undefined])(
+    'reports an already-terminal abort result (%s)',
+    async (finalState) => {
+      mockAbort.mockResolvedValue({ success: true, outcome: 'already_terminal', finalState });
+      renderWithRouter(<AbortDialog {...defaultProps} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Abort Run' }));
+      await waitFor(() => {
+        expect(mockShowSuccess).toHaveBeenCalledWith(
+          finalState ? `Run already in terminal state: ${finalState}` : 'Run already terminal',
+        );
+      });
+      expect(defaultProps.onAborted).toHaveBeenCalledOnce();
+    },
+  );
+
+  it('uses request acknowledgement wording for a legacy abort response without an outcome', async () => {
+    mockAbort.mockResolvedValue({ success: true });
+    renderWithRouter(<AbortDialog {...defaultProps} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Abort Run' }));
+    await waitFor(() => {
+      expect(mockShowSuccess).toHaveBeenCalledWith('Abort request acknowledged');
+    });
+  });
+
   it('renders title and description when open', () => {
     renderWithRouter(<AbortDialog {...defaultProps} />);
 
@@ -76,7 +100,7 @@ describe('AbortDialog', () => {
   });
 
   it('calls api.abort and handles success with no reason', async () => {
-    mockAbort.mockResolvedValue({ success: true });
+    mockAbort.mockResolvedValue({ success: true, outcome: 'aborted', finalState: 'ABORTED' });
 
     renderWithRouter(<AbortDialog {...defaultProps} />);
 
@@ -92,7 +116,7 @@ describe('AbortDialog', () => {
   });
 
   it('calls api.abort with a custom reason', async () => {
-    mockAbort.mockResolvedValue({ success: true });
+    mockAbort.mockResolvedValue({ success: true, outcome: 'aborted', finalState: 'ABORTED' });
 
     renderWithRouter(<AbortDialog {...defaultProps} />);
 
@@ -212,7 +236,7 @@ describe('RetryDialog', () => {
       expect(mockRetry).toHaveBeenCalledWith('run-456');
     });
 
-    expect(mockShowSuccess).toHaveBeenCalledWith('Run retried');
+    expect(mockShowSuccess).toHaveBeenCalledWith('Retry requested');
     expect(defaultProps.onOpenChange).toHaveBeenCalledWith(false);
     expect(defaultProps.onRetried).toHaveBeenCalled();
   });
@@ -369,7 +393,7 @@ describe('RerunDialog', () => {
       );
     });
 
-    expect(mockShowSuccess).toHaveBeenCalledWith('New run started');
+    expect(mockShowSuccess).toHaveBeenCalledWith('Run creation requested');
     expect(defaultProps.onOpenChange).toHaveBeenCalledWith(false);
     expect(defaultProps.onRerun).toHaveBeenCalled();
   });

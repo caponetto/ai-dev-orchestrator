@@ -129,3 +129,31 @@ These checks fence existing-run CLI composition, not arbitrary external file wri
 side effects. Custom `WorkflowEngine` integrations must provide equivalent freshness/ownership
 semantics through their persistence implementation. Administrative edits and external effects
 without a durable journal/checkpoint record are not an exactly-once contract.
+
+## Control outcome reporting
+
+Abort reports the result observed while owning the run lock. A newly committed abort returns
+`status: aborted`, the observed `previousState` and `finalState: ABORTED` in CLI JSON, with exit
+code 4. If DONE or ABORTED is observed with no pending terminal cleanup, the command reports
+`status: already_terminal` and its `state`, with exit code 0. This applies even when completion
+wins after the initial state inspection. Failed persistence/acquisition reports an error instead
+of claiming an abort. Pending terminal cleanup is not treated as finished solely because its
+checkpoint carries a terminal state name.
+
+Dashboard actions return optional `outcome` and `finalState` fields alongside the existing
+`success`/`error` contract. An abort outcome is either `aborted` or `already_terminal`. Only the
+operation that commits an abort emits an aborted human stream event; it uses the final ABORTED
+state. A repeated or completion-racing abort does not fabricate an aborted event.
+
+Detached retry/approval/rejection/answer/create-run actions acknowledge `outcome: started` after
+the child emits its OS spawn event. Sync and async spawn errors report failure; parent diagnostic
+log descriptors are closed in a finally path. Cleanup and stream-notification failures cannot
+undo an observed launch or committed abort. `started` does not confirm run ownership, validation
+of human input, a run ID, successful execution or completion. Inspect persisted state, the journal
+and child diagnostics for those later outcomes.
+
+One dashboard handler coalesces identical requests during its pending spawn window and rejects
+conflicting launch requests for that run during the same window. Entries clear after success or
+failure. This is not durable/multi-server idempotency and does not define ordering among later
+requests; execution remains protected by run ownership and freshness checks. Stale terminal or
+session-target requests found during validation fail before spawning.
