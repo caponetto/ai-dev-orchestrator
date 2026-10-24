@@ -10,6 +10,7 @@ This directory documents the implementation that exists in the repository today.
 - `subsystems/configuration.md` for `.ai/` files and runtime config assembly
 - `subsystems/dashboard.md` for the local web UI and HTTP surface
 - `subsystems/repository-model.md` for the on-disk runtime layout under `.ai/`
+- `subsystems/artifacts.md` for artifact persistence, partial writes and inventory recovery
 - `subsystems/workflow-engine.md` for built-in workflows and state progression
 - `subsystems/runner-system.md` for agent dispatch, protocol transport, and sessions
 - `subsystems/role-system.md` for role contracts and model assignment behavior

@@ -57,7 +57,7 @@ describe('VersionManager', () => {
     expect(mgr.nextVersion('plan', 'plan')).toBe(4);
   });
 
-  it('ignores meta.yaml files when scanning versions', () => {
+  it('does not double count content and metadata for the same version', () => {
     const dir = tempArtifactsDir();
     createArtifactFiles(dir, 'plan', 'plan', [1]);
     const mgr = new VersionManager(dir);

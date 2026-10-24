@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 
 import { InventoryCorruptionError } from '../../../domain/artifact-system/errors';
+import { computeChecksum } from '../checksum-engine';
 import { InventoryManager } from '../inventory-manager';
 
 function tempRunDir(): string {
@@ -137,7 +138,7 @@ describe('InventoryManager', () => {
 
     writeFileSync(
       join(planDir, 'plan_v1.meta.yaml'),
-      'type: plan\nname: plan\nversion: 1\nchecksum: "sha256:abc"\nproducedBy: planner\npredecessorRef: null\ncreatedAt: "2025-01-15T10:00:00Z"\nsizeBytes: 50\n',
+      `type: plan\nname: plan\nversion: 1\nchecksum: "${computeChecksum('plan content')}"\nproducedBy: planner\npredecessorRef: null\ncreatedAt: "2025-01-15T10:00:00Z"\nsizeBytes: 12\n`,
     );
     writeFileSync(join(planDir, 'plan_v1.md'), 'plan content');
 

@@ -1,12 +1,37 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { join } from 'node:path';
 
 import { DefaultJournalReader } from '@ai-dev-orchestrator/journal';
 
-import { COMPLETION_RUN_ID, createRemoteCompletionHarness } from './remote-completion-harness';
-
 const [mode, root] = process.argv.slice(2);
 assert(root, 'missing fixture root directory');
+// Stop immediately before or after the actual rename used by the atomic writer. The
+// callback confirms the filesystem effect, without adding failure hooks to production code.
+const rename = fs.rename;
+fs.rename = Object.assign(
+  (source: fs.PathLike, destination: fs.PathLike, callback: fs.NoParamCallback) => {
+    const path = String(destination);
+    const isContent = path.endsWith('/planner-output_v1.md');
+    if (mode === 'crash-before-content' && isContent) {
+      process.exit(73);
+    }
+    rename(source, destination, (error) => {
+      if (
+        !error &&
+        ((mode === 'crash-after-content' && isContent) ||
+          (mode === 'crash-after-metadata' && path.endsWith('/planner-output_v1.meta.yaml')) ||
+          (mode === 'crash-after-inventory' && path.endsWith('/inventory.yaml')))
+      ) {
+        process.exit(73);
+      }
+      callback(error);
+    });
+  },
+  { __promisify__: rename.__promisify__ },
+);
+const { COMPLETION_RUN_ID, createRemoteCompletionHarness } =
+  await import('./remote-completion-harness');
 const h = await createRemoteCompletionHarness(root);
 let error: string | undefined;
 if (mode === 'resume') {

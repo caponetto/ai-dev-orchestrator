@@ -98,9 +98,12 @@ failure is surfaced after durable completion; the saved `DONE` state and usage r
 and CLI inspection reconciles a stale interim manifest's running status without executing work.
 Custom report-path failures remain best-effort and do not undo completed output.
 
-Artifact content, metadata, inventory and workflow journal writes are separate effects. Reuse
-applies to completed, indexed artifact writes; process death inside a partial artifact write may
-leave orphan files requiring reconciliation. These boundaries do not provide a transaction across
+Artifact content, metadata, inventory and workflow journal writes are separate effects. The
+artifact store now retains a prepared write record and finishes an interrupted write before
+serving its next operation. Completion lookup can therefore reuse the same indexed reference
+after a crash between content, metadata or inventory writes. Legacy orphan files and corrupt or
+conflicting evidence can still require explicit reconciliation. See [artifact recovery](artifacts.md)
+for the write boundary and repair rules. These boundaries do not provide a transaction across
 all files, external effects or a power-loss guarantee.
 
 ## Execution module boundaries

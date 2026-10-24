@@ -5,7 +5,6 @@ import {
   INVENTORY_FILENAME,
   artifactSummarySchema,
   type ArtifactInventory,
-  type ArtifactMetadata,
   type ArtifactRef,
   type ArtifactSummary,
   type ArtifactType,
@@ -14,7 +13,8 @@ import { parse, stringify } from 'yaml';
 
 import { InventoryCorruptionError } from '../../domain/artifact-system/errors';
 
-import { fileExists, readContent } from './disk-reader';
+import { computeChecksum } from './checksum-engine';
+import { fileExists, readContent, readMetadata } from './disk-reader';
 import { atomicWrite } from './disk-writer';
 
 export class InventoryManager {
@@ -69,9 +69,20 @@ export class InventoryManager {
   }
 
   async rebuild(artifactsDir: string): Promise<ArtifactInventory> {
-    this.artifacts = [];
-
+    // Stage rebuilt entries locally. A failed scan must not replace the previous index.
+    const rebuilt: ArtifactSummary[] = [];
+    if (fileExists(join(artifactsDir, '.pending-write.yaml'))) {
+      throw new InventoryCorruptionError(
+        'Pending artifact write must be recovered through the artifact store before rebuilding inventory',
+      );
+    }
     if (!existsSync(artifactsDir)) {
+      if (this.getInventory().totalCount > 0) {
+        throw new InventoryCorruptionError(
+          `Artifact directory is missing at ${artifactsDir}; restore the files before rebuilding the existing inventory`,
+        );
+      }
+      this.artifacts = rebuilt;
       await this.persist();
       return this.getInventory();
     }
@@ -89,12 +100,23 @@ export class InventoryManager {
         try {
           const metaRef: ArtifactRef = {
             type: typeDir as ArtifactType,
-            name: '',
-            version: 0,
+            name: metaFile.replace(/_v\d+\.meta\.yaml$/, ''),
+            version: Number(/_v(\d+)\.meta\.yaml$/.exec(metaFile)?.[1]),
             checksum: '',
           };
-          const raw = readContent(metaPath, metaRef);
-          const meta = parse(raw) as ArtifactMetadata;
+          const meta = readMetadata(metaPath, metaRef);
+          const expectedName = `${meta.name}_v${String(meta.version)}.meta.yaml`;
+          const contentPath = join(typePath, `${meta.name}_v${String(meta.version)}.md`);
+          const content = readContent(contentPath, metaRef);
+          if (
+            metaFile !== expectedName ||
+            meta.type !== typeDir ||
+            (meta.runId !== undefined && meta.runId !== this.runId) ||
+            meta.checksum !== computeChecksum(content) ||
+            meta.sizeBytes !== Buffer.byteLength(content, 'utf8')
+          ) {
+            throw new Error('metadata identity, content checksum or size mismatch');
+          }
 
           const summary: ArtifactSummary = {
             ref: {
@@ -110,13 +132,16 @@ export class InventoryManager {
             createdAt: meta.createdAt,
             sizeBytes: meta.sizeBytes,
           };
-          this.artifacts.push(summary);
+          rebuilt.push(summary);
         } catch {
-          throw new InventoryCorruptionError(`Failed to parse metadata file: ${metaPath}`);
+          throw new InventoryCorruptionError(
+            `Cannot rebuild from ${metaPath}: invalid metadata, identity or content. Preserve the current inventory and reconcile the artifact files before retrying`,
+          );
         }
       }
     }
 
+    this.artifacts = rebuilt;
     await this.persist();
     return this.getInventory();
   }

@@ -43,7 +43,14 @@ afterEach(() => {
 });
 
 describe('remote completion across fresh processes', () => {
-  it.each(['before-artifact', 'after-artifact'])(
+  it.each([
+    'before-artifact',
+    'after-artifact',
+    'before-content',
+    'after-content',
+    'after-metadata',
+    'after-inventory',
+  ])(
     'recovers a hard exit %s without duplicate artifacts, dispatch or usage',
     async (window) => {
       const baselineRoot = await mkdtemp(join(tmpdir(), 'completion-baseline-'));
