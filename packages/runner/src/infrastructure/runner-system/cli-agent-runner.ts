@@ -134,6 +134,7 @@ export class CliAgentRunner implements SessionCapableRunner {
           generation,
         ),
       onStreamEvent,
+      this.config.retryBaseDelayMs,
     );
   }
 

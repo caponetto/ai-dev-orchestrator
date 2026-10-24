@@ -24,21 +24,21 @@ trap cleanup EXIT
 export HOME="$WORK_DIR/home"
 mkdir -p "$HOME" "$WORK_DIR/prefix"
 
-echo "==> Waiting for $PACKAGE@$VERSION on the npm registry"
+# Installing (rather than just `npm view`) is the readiness check: the CLI packument
+# can appear before its workspace dependencies do, and a successful install proves the
+# whole dependency tree has propagated.
+echo "==> Installing $PACKAGE@$VERSION (waiting for npm registry propagation)"
 for attempt in $(seq 1 "$WAIT_ATTEMPTS"); do
-  if [[ "$(npm view "$PACKAGE@$VERSION" version --prefer-online 2>/dev/null | tail -1)" == *"$VERSION"* ]]; then
+  if npm install --prefix "$WORK_DIR/prefix" "$PACKAGE@$VERSION" --prefer-online --no-audit --no-fund; then
     break
   fi
   if [[ "$attempt" == "$WAIT_ATTEMPTS" ]]; then
-    echo "$PACKAGE@$VERSION not available after waiting" >&2
+    echo "$PACKAGE@$VERSION could not be installed after waiting" >&2
     exit 1
   fi
-  echo "Not available yet (attempt $attempt/$WAIT_ATTEMPTS), retrying in 15s..."
-  sleep 15
+  echo "Install failed (attempt $attempt/$WAIT_ATTEMPTS), retrying in ${SMOKE_SLEEP:-15}s..."
+  sleep "${SMOKE_SLEEP:-15}"
 done
-
-echo "==> Installing $PACKAGE@$VERSION"
-npm install --prefix "$WORK_DIR/prefix" "$PACKAGE@$VERSION" --prefer-online --no-audit --no-fund
 AI="$WORK_DIR/prefix/node_modules/.bin/ai"
 
 echo "==> ai version"

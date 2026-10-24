@@ -128,6 +128,7 @@ describe('CliAgentRunner', () => {
       command: 'bash',
       adapter: createOpencodeCliAdapter(),
       handshakeTimeoutMs: 20,
+      retryBaseDelayMs: 200,
     });
     let enteredBackoff!: () => void;
     const backoff = new Promise<void>((resolve) => {
@@ -917,6 +918,7 @@ fi`,
         command: 'bash',
         adapter: createOpencodeCliAdapter(),
         handshakeTimeoutMs: 100,
+        retryBaseDelayMs: 1,
       });
 
       const result = await runner.dispatch(task, (event) => events.push(event));
@@ -926,6 +928,68 @@ fi`,
       expect(events.some((event) => event.content.includes('Retrying transient opencode'))).toBe(
         true,
       );
+    });
+
+    it('retries when OpenCode exits after a text-only step without writing the artifact', async () => {
+      const counterPath = join(tempDir, 'attempts');
+      const task = makeTask({
+        agentConfig: {
+          command: 'bash',
+          args: [
+            '-c',
+            `count=$(cat ${JSON.stringify(counterPath)} 2>/dev/null || echo 0)
+count=$((count + 1))
+echo "$count" > ${JSON.stringify(counterPath)}
+if [ "$count" -eq 1 ]; then
+  echo '{"type":"text","part":{"text":"Hi, I will review this."}}'
+  echo '{"type":"step_finish","part":{"reason":"stop","tokens":{"input":100,"output":10}}}'
+else
+  echo '{"summary":"done"}' > ${JSON.stringify(join(tempDir, 'output', 'implementation-task-1.json'))}
+  echo '{"type":"step_finish","part":{"reason":"stop"}}'
+fi`,
+          ],
+        },
+      });
+      const events: AgentOutputStreamEvent[] = [];
+      const runner = new CliAgentRunner({
+        command: 'bash',
+        adapter: createOpencodeCliAdapter(),
+        handshakeTimeoutMs: 100,
+        retryBaseDelayMs: 1,
+      });
+
+      const result = await runner.dispatch(task, (event) => events.push(event));
+
+      expect(result.status).toBe('success');
+      expect(await readFile(counterPath, 'utf-8')).toBe('2\n');
+      expect(events.some((event) => event.content.includes('Retrying transient opencode'))).toBe(
+        true,
+      );
+    });
+
+    it('does not retry a missing artifact after the agent used tools', async () => {
+      const counterPath = join(tempDir, 'attempts');
+      const task = makeTask({
+        agentConfig: {
+          command: 'bash',
+          args: [
+            '-c',
+            `echo x >> ${JSON.stringify(counterPath)}
+echo '{"type":"tool_use","part":{"tool":"bash","callID":"c1","state":{"status":"completed","input":{"command":"ls"},"output":"ok"}}}'
+echo '{"type":"step_finish","part":{"reason":"stop"}}'`,
+          ],
+        },
+      });
+      const runner = new CliAgentRunner({
+        command: 'bash',
+        adapter: createOpencodeCliAdapter(),
+        handshakeTimeoutMs: 100,
+      });
+
+      const result = await runner.dispatch(task);
+
+      expect(result.status).toBe('failure');
+      expect(await readFile(counterPath, 'utf-8')).toBe('x\n');
     });
 
     it.each([

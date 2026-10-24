@@ -57,7 +57,10 @@ export function buildStateDispatchMap(
     const mt = line.protocolMessage?.messageType;
     const smt = line.structuredData?.['messageType'] as string | undefined;
     const phase = line.structuredData?.['phase'] as string | undefined;
-    if (mt === 'done' || phase === 'done' || smt === 'script_completed') {
+    if (phase === 'done' && line.structuredData?.['status'] === 'failure') {
+      dispatch.status = 'error';
+      dispatch.summary = line.content;
+    } else if (mt === 'done' || phase === 'done' || smt === 'script_completed') {
       dispatch.status = 'done';
       dispatch.summary = str(line.protocolMessage?.payload.summary);
     } else if (mt === 'error') {
@@ -95,7 +98,8 @@ export function resolveTerminalStatuses(
         for (const stateDispatches of byState.values()) {
           const dispatch = stateDispatches.get(line.dispatchId);
           if (dispatch?.status === 'working') {
-            dispatch.status = mt === 'error' ? 'error' : 'done';
+            const failed = mt === 'error' || line.structuredData?.['status'] === 'failure';
+            dispatch.status = failed ? 'error' : 'done';
             dispatch.summary = str(
               line.protocolMessage?.payload.summary ??
                 line.protocolMessage?.payload.message ??
