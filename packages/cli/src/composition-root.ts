@@ -102,7 +102,6 @@ import {
   HttpAgentRunner,
   LocalAgentSessionSupervisor,
   RemoteAgentSessionSupervisor,
-  WebSocketProtocolTransport,
 } from '@ai-dev-orchestrator/runner';
 import type { LiveRequestStore } from '@ai-dev-orchestrator/runner';
 import type {
@@ -125,6 +124,7 @@ import { LifecycleController } from '@ai-dev-orchestrator/workflow';
 
 import type { ConfigSnapshot } from './config-snapshot';
 import { configSnapshotSchema, resolveRunModelAssignments } from './config-snapshot';
+import { connectRemoteWebSocket } from './connect-remote-websocket';
 import { installShutdownDeadline } from './install-shutdown-deadline';
 import { validateSelectedModels } from './model-preflight';
 import { loadDefaultWorkflow, loadProjectConfig } from './project-config';
@@ -497,34 +497,6 @@ interface InfraResult {
   readonly roleRegistry: DefaultRoleRegistry;
 }
 
-function createWebSocketTransportFactory(supervisor: RemoteAgentSessionSupervisor): void {
-  supervisor.setTransportFactory(async (_ref, meta) => {
-    const baseUrl = meta.websocketUrl ?? meta.reconnectUrl;
-    let wsUrl = baseUrl;
-    if (meta.authHeader) {
-      const headers: Record<string, string> = {};
-      const [key, ...rest] = meta.authHeader.split(':');
-      if (key && rest.length > 0) {
-        headers[key.trim()] = rest.join(':').trim();
-      }
-      const authValue = headers['Authorization'];
-      if (authValue) {
-        wsUrl = `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}auth=${encodeURIComponent(authValue)}`;
-      }
-    }
-    const ws = new globalThis.WebSocket(wsUrl);
-    await new Promise<void>((resolve, reject) => {
-      ws.addEventListener('open', () => {
-        resolve();
-      });
-      ws.addEventListener('error', () => {
-        reject(new Error('WebSocket connection failed'));
-      });
-    });
-    return new WebSocketProtocolTransport(ws);
-  });
-}
-
 async function buildOrchestratorInfra(params: InfraParams): Promise<InfraResult> {
   const { runId, runDir, repoRoot, journalWriter } = params;
   const runsDir = getRunsDir();
@@ -595,7 +567,9 @@ async function buildOrchestratorInfra(params: InfraParams): Promise<InfraResult>
   const sessionRegistry = new AgentSessionRegistry(sessionStore);
   const localSupervisor = new LocalAgentSessionSupervisor(sessionRegistry);
   const remoteSupervisor = new RemoteAgentSessionSupervisor(sessionRegistry);
-  createWebSocketTransportFactory(remoteSupervisor);
+  remoteSupervisor.setTransportFactory((_ref, meta, signal) =>
+    connectRemoteWebSocket(meta, signal),
+  );
   const sessionSupervisor = new CompositeAgentSessionSupervisor([
     localSupervisor,
     remoteSupervisor,

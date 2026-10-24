@@ -61,6 +61,7 @@ interface RemoteSessionHost {
 type RemoteTransportFactory = (
   ref: AgentSessionRef,
   reconnectMeta: RemoteReconnectMeta,
+  signal: AbortSignal,
 ) => Promise<WebSocketProtocolTransport>;
 
 /**
@@ -230,9 +231,11 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
     const epoch = ++owned.reconnectEpoch;
     const previousState = owned.state;
     owned.state = 'reconnecting';
+    const controller = new AbortController();
     const cancellation = new Promise<null>((resolve) => {
       owned.cancelReconnect = () => {
         resolve(null);
+        controller.abort();
       };
     });
     // Start in a microtask so even reentrant factories see the registered attempt.
@@ -242,7 +245,7 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
         if (!this.ownsAttempt(owned, epoch)) {
           return null;
         }
-        transport = await factory(owned.ref, owned.reconnectMeta);
+        transport = await factory(owned.ref, owned.reconnectMeta, controller.signal);
         if (!this.ownsAttempt(owned, epoch) || this.expireHost(owned)) {
           transport.close();
           return null;
@@ -269,7 +272,7 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
         throw error;
       }
     });
-    // The factory has no cancellation port. Release callers immediately and dispose any late result.
+    // Release callers even if a custom factory ignores cancellation; dispose any late result.
     const attempt = Promise.race([work, cancellation]).finally(() => {
       if (owned.reconnectAttempt === attempt) {
         owned.reconnectAttempt = undefined;

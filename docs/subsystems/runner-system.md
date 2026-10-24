@@ -160,9 +160,21 @@ and recoverable after lease expiry. Timers require a responsive Node event loop.
 Expiry/disconnection callbacks observe background snapshot-write rejections. Failure observations
 through `waitForAdvance` retry persistence, so a storage failure does not require reviving the session.
 As with completion, the in-memory state remains available for an explicit retry if saving fails.
-Factory cancellation is local: the current port cannot interrupt a factory that never returns.
-Fencing disposes its late result and does not prove that remote work stopped. Exclusive run ownership
+Each reconnect factory receives an attempt-specific `AbortSignal`. Abort, pause, finalization,
+host replacement, and lease expiry cancel that signal. The production CLI factory closes a pending
+WebSocket when cancelled and bounds connection establishment to 10 seconds. A failed upgrade,
+close before open, timeout, or cancellation removes establishment listeners and timers and closes
+the socket. Successful establishment transfers socket ownership to the session supervisor.
+Custom factories may ignore the signal: callers are still released and fencing disposes late
+results. Cancelling a local socket does not prove that remote work stopped. Exclusive run ownership
 is still required across processes; this adds no remote fencing token or exactly-once delivery contract.
+
+WebSocket protocol negotiation removes its message handler and deadline on success, timeout,
+local/remote close, or socket error. Negotiation returns `null` when acknowledgement cannot be
+sent and after the transport is closed. Message dispatch preserves other observers when negotiation
+removes its own handler. The HTTP runner clears its overall task deadline on every completion path,
+including handshake failure. Connection and handshake deadlines require a responsive event loop;
+they do not provide remote execution cancellation or delivery acknowledgements.
 
 ## CLI execution module boundaries
 

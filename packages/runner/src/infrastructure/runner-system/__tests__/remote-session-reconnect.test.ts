@@ -107,6 +107,50 @@ describe('remote reconnect ownership', () => {
       );
     },
   );
+  it.each(['abort', 'pause', 'finalize', 'replace', 'expiry'])(
+    'signals the pending factory on %s and uses a fresh signal for a retry',
+    async (operation) => {
+      vi.useFakeTimers();
+      await supervisor.createSession(ref, undefined, {
+        ...meta,
+        leaseExpiresAt: new Date(Date.now() + 100).toISOString(),
+      });
+      const signals: AbortSignal[] = [];
+      const gate = deferred<WebSocketProtocolTransport>();
+      supervisor.setTransportFactory((_ref, _meta, signal) => {
+        signals.push(signal);
+        return gate.promise;
+      });
+      const pending = supervisor.reconnect(ref.sessionId);
+      await Promise.resolve();
+      expect(signals[0]?.aborted).toBe(false);
+      if (operation === 'abort') {
+        await supervisor.abort(ref.sessionId, 'shutdown');
+      } else if (operation === 'pause') {
+        await supervisor.pause(ref.sessionId);
+      } else if (operation === 'finalize') {
+        await supervisor.finalize(ref.sessionId);
+      } else if (operation === 'replace') {
+        await supervisor.createSession(ref, undefined, meta);
+      } else {
+        await vi.advanceTimersByTimeAsync(100);
+      }
+      expect(signals[0].aborted).toBe(true);
+      expect(await pending).toBeNull();
+      const late = connection();
+      gate.resolve(late.transport);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(late.close).toHaveBeenCalledOnce();
+      await supervisor.createSession(ref, undefined, meta);
+      const next = connection();
+      supervisor.setTransportFactory((_ref, _meta, signal) => {
+        expect(signal).not.toBe(signals[0]);
+        expect(signal.aborted).toBe(false);
+        return Promise.resolve(next.transport);
+      });
+      expect(await supervisor.reconnect(ref.sessionId)).toMatchObject({ state: 'running' });
+    },
+  );
   it('coalesces concurrent reconnect and attach calls', async () => {
     await supervisor.createSession(ref, undefined, meta);
     const transport = connection();

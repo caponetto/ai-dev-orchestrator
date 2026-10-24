@@ -5,7 +5,11 @@ import { dirname, join } from 'node:path';
 import { generateAll } from '@ai-dev-orchestrator/config-templates';
 import { DefaultStatePersistence } from '@ai-dev-orchestrator/core';
 import { ShutdownCoordinator } from '@ai-dev-orchestrator/recovery';
-import { AgentSessionReaper, DefaultAgentSessionStore } from '@ai-dev-orchestrator/runner';
+import {
+  AgentSessionReaper,
+  DefaultAgentSessionStore,
+  RemoteAgentSessionSupervisor,
+} from '@ai-dev-orchestrator/runner';
 import { AI_CONFIG_DIR_NAME } from '@ai-dev-orchestrator/schemas';
 import type { PersistedState, RunId, WorkflowDefinition } from '@ai-dev-orchestrator/schemas';
 import { LifecycleController } from '@ai-dev-orchestrator/workflow';
@@ -142,6 +146,35 @@ describe('composition-root orchestrator creation', () => {
     mockGlobalConfigPath.value = '';
   });
 
+  it('wires remote reconnect cancellation into the production connection factory', async () => {
+    vi.stubEnv('AI_ORCHESTRATOR_FIXTURE', '1');
+    const factory = vi.spyOn(RemoteAgentSessionSupervisor.prototype, 'setTransportFactory');
+    const context = await createOrchestrator(baseDir);
+    try {
+      const controller = new AbortController();
+      controller.abort();
+      const connect = factory.mock.calls[0][0];
+      await expect(
+        connect(
+          {
+            sessionId: 'remote',
+            runId: 'run',
+            stateId: 'WORK',
+            role: 'planner',
+            transport: 'remote',
+          },
+          {
+            type: 'remote',
+            remoteSessionId: 'server-session',
+            reconnectUrl: 'ws://localhost/socket',
+          },
+          controller.signal,
+        ),
+      ).rejects.toThrow('WebSocket connection cancelled');
+    } finally {
+      context.shutdownCoordinator?.uninstall();
+    }
+  });
   it('keeps orphan session files unchanged while constructing an unowned resume context', async () => {
     vi.stubEnv('AI_ORCHESTRATOR_FIXTURE', '1');
     const original = await createOrchestrator(baseDir);

@@ -178,8 +178,7 @@ describe('WebSocketProtocolTransport', () => {
       const capabilities = await transport.negotiate('sess-1', undefined, 50);
       expect(capabilities).toBeNull();
 
-      // The handshakeHandler is still in messageHandlers (timeout doesn't remove it).
-      // Sending a handshake now should hit the `if (settled) return` guard.
+      // Timed-out negotiation must not acknowledge a later handshake.
       ws.simulateMessage(
         serializeMessage(
           createProtocolMessage('handshake', { capabilities: ['permission_request'] }),
@@ -225,6 +224,98 @@ describe('WebSocketProtocolTransport', () => {
         'file_write',
         'shell_execute',
       ]);
+    });
+  });
+
+  describe('negotiation resource cleanup', () => {
+    it.each(['local close', 'remote close', 'error'])(
+      'settles immediately on %s',
+      async (event) => {
+        vi.useFakeTimers();
+        try {
+          const resolved = vi.fn();
+          const pending = transport.negotiate('session').then(resolved);
+          if (event === 'local close') {
+            transport.close();
+          } else if (event === 'remote close') {
+            ws.simulateClose();
+          } else {
+            ws.simulateError(new Error('offline'));
+          }
+          await vi.advanceTimersByTimeAsync(0);
+          expect(resolved).toHaveBeenCalledWith(null);
+          expect(vi.getTimerCount()).toBe(0);
+          await pending;
+        } finally {
+          vi.useRealTimers();
+        }
+      },
+    );
+    it('does not allocate a timer after closure', async () => {
+      vi.useFakeTimers();
+      try {
+        transport.close();
+        const resolved = vi.fn();
+        void transport.negotiate('session').then(resolved);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(resolved).toHaveBeenCalledWith(null);
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+    it('does not acknowledge success when sending the acknowledgement fails', async () => {
+      ws.send = () => {
+        throw new Error('offline');
+      };
+      const pending = transport.negotiate('session');
+      ws.simulateMessage(
+        serializeMessage(createProtocolMessage('handshake', { capabilities: [] })),
+      );
+      expect(await pending).toBeNull();
+    });
+    it('keeps cancellation terminal if acknowledgement triggers a connection error', async () => {
+      ws.send = () => {
+        ws.simulateError(new Error('offline'));
+      };
+      const pending = transport.negotiate('session');
+      ws.simulateMessage(
+        serializeMessage(createProtocolMessage('handshake', { capabilities: [] })),
+      );
+      expect(await pending).toBeNull();
+    });
+    it('ignores a negotiation callback captured before another observer closed the transport', async () => {
+      transport.onMessage(() => {
+        transport.close();
+      });
+      const pending = transport.negotiate('session');
+      ws.simulateMessage(
+        serializeMessage(createProtocolMessage('handshake', { capabilities: [] })),
+      );
+      expect(await pending).toBeNull();
+      expect(ws.sentMessages).toHaveLength(0);
+    });
+    it('settles all concurrent negotiations and leaves no timers', async () => {
+      vi.useFakeTimers();
+      try {
+        const first = transport.negotiate('first');
+        const second = transport.negotiate('second');
+        transport.close();
+        expect(await Promise.all([first, second])).toEqual([null, null]);
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+    it('does not skip observers registered after a negotiation handler', async () => {
+      const pending = transport.negotiate('session');
+      const observed = vi.fn();
+      transport.onMessage(observed);
+      ws.simulateMessage(
+        serializeMessage(createProtocolMessage('handshake', { capabilities: [] })),
+      );
+      await pending;
+      expect(observed).toHaveBeenCalledOnce();
     });
   });
 
@@ -283,6 +374,16 @@ describe('WebSocketProtocolTransport', () => {
       // Second handler still received the message despite first throwing
       expect(received).toHaveLength(1);
       expect(received[0].type).toBe('progress');
+    });
+
+    it('notifies later error observers even when an earlier observer closes the transport', () => {
+      const observed = vi.fn();
+      transport.onError(() => {
+        transport.close();
+      });
+      transport.onError(observed);
+      ws.simulateError(new Error('offline'));
+      expect(observed).toHaveBeenCalledOnce();
     });
 
     it('swallows error handler errors and continues dispatching', () => {
