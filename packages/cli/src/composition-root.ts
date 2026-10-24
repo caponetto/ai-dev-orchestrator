@@ -744,7 +744,10 @@ export async function resumeOrchestrator(
 
   const journalReader = new DefaultJournalReader(journalPath);
   const existingEvents = journalReader.readAll();
-  const startSequence = existingEvents.length;
+  const startSequence = existingEvents.reduce(
+    (maximum, event) => Math.max(maximum, event.sequence),
+    0,
+  );
 
   const journalWriter = new DefaultJournalWriter(journalPath, runId, startSequence);
 

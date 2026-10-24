@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { hostname, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -15,7 +15,11 @@ const realFs = vi.hoisted(() => ({
 vi.mock('node:fs', async (importOriginal) => {
   const mod = await importOriginal<Record<string, unknown>>();
   realFs.writeFileSync = mod.writeFileSync as typeof writeFileSync;
-  return { ...mod, writeFileSync: vi.fn(mod.writeFileSync as typeof writeFileSync) };
+  return {
+    ...mod,
+    writeFileSync: vi.fn(mod.writeFileSync as typeof writeFileSync),
+    unlinkSync: vi.fn(mod.unlinkSync as typeof unlinkSync),
+  };
 });
 
 const TEST_DIR = join(tmpdir(), `lock-manager-test-${String(Date.now())}`);
@@ -25,11 +29,154 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.mocked(writeFileSync).mockRestore();
+  vi.mocked(unlinkSync).mockRestore();
   rmSync(TEST_DIR, { recursive: true, force: true });
 });
 
 describe('LockManager', () => {
+  it('fails closed if a stale reclamation was interrupted before unlinking', () => {
+    const manager = new LockManager(TEST_DIR);
+    const handle = manager.acquire(createRunId('run-interrupted-reaper'));
+    writeFileSync(handle.lockPath, stringify({ ...handle, pid: 999999 }));
+    vi.spyOn(process, 'kill').mockImplementation(() => {
+      throw Object.assign(new Error('dead'), { code: 'ESRCH' });
+    });
+    vi.mocked(unlinkSync).mockImplementationOnce(() => {
+      throw new Error('cannot unlink');
+    });
+    expect(() => manager.acquire(handle.runId)).toThrow('cannot unlink');
+    expect(() => manager.acquire(handle.runId)).toThrow('reclamation already claimed');
+    expect(readFileSync(handle.lockPath, 'utf8')).toContain('999999');
+  });
+
+  it('does not let a delayed stale reaper delete a competing acquisition', () => {
+    const manager = new LockManager(TEST_DIR);
+    const runId = createRunId('run-competing-reapers');
+    const stale = manager.acquire(runId);
+    writeFileSync(stale.lockPath, stringify({ ...stale, pid: 999999 }));
+    let winner: ReturnType<LockManager['acquire']> | undefined;
+    let nested = false;
+    vi.spyOn(process, 'kill').mockImplementation((pid) => {
+      if (pid !== 999999) {
+        return true;
+      }
+      if (!nested) {
+        nested = true;
+        winner = manager.acquire(runId);
+      }
+      throw Object.assign(new Error('no process'), { code: 'ESRCH' });
+    });
+
+    expect(() => manager.acquire(runId)).toThrow();
+    expect(winner).toBeDefined();
+    expect(readFileSync(stale.lockPath, 'utf8')).toBe(stringify(winner));
+  });
+
+  it.each([
+    ['runId', 'different-run'],
+    ['pid', process.pid + 1],
+    ['hostname', 'different-host'],
+    ['acquiredAt', '2020-01-01T00:00:00Z'],
+    ['lockPath', '/different/run.lock'],
+  ])('does not release a replacement with different %s ownership metadata', (field, value) => {
+    const manager = new LockManager(TEST_DIR);
+    const handle = manager.acquire(createRunId('run-owner-metadata'));
+    const replacement = stringify({ ...handle, [field]: value });
+    writeFileSync(handle.lockPath, replacement);
+
+    manager.release(handle);
+
+    expect(readFileSync(handle.lockPath, 'utf8')).toBe(replacement);
+  });
+
+  it('releases a matching legacy lock without an ownership token', () => {
+    const manager = new LockManager(TEST_DIR);
+    const { ownershipToken: _ownershipToken, ...legacy } = manager.acquire(
+      createRunId('run-legacy'),
+    );
+    writeFileSync(legacy.lockPath, stringify(legacy));
+    manager.release(legacy);
+    expect(existsSync(legacy.lockPath)).toBe(false);
+  });
+
+  it('tolerates a lock disappearing between ownership verification and removal', () => {
+    const manager = new LockManager(TEST_DIR);
+    const handle = manager.acquire(createRunId('run-disappearing'));
+    vi.mocked(unlinkSync).mockImplementationOnce(() => {
+      throw Object.assign(new Error('no such file'), { code: 'ENOENT' });
+    });
+    expect(() => {
+      manager.release(handle);
+    }).not.toThrow();
+  });
+
+  it('reports removal failures other than an already missing lock', () => {
+    const manager = new LockManager(TEST_DIR);
+    const handle = manager.acquire(createRunId('run-release-error'));
+    vi.mocked(unlinkSync).mockImplementationOnce(() => {
+      throw Object.assign(new Error('cannot remove lock'), { code: 'EACCES' });
+    });
+    expect(() => {
+      manager.release(handle);
+    }).toThrow('cannot remove lock');
+    expect(existsSync(handle.lockPath)).toBe(true);
+  });
+
+  it('does not let a delayed release delete a newer acquisition in the same millisecond', () => {
+    vi.useFakeTimers({ now: new Date('2026-10-23T00:00:00Z'), toFake: ['Date'] });
+    try {
+      const manager = new LockManager(TEST_DIR);
+      const first = manager.acquire(createRunId('run-delayed-release'));
+      manager.release(first);
+      const second = manager.acquire(first.runId);
+
+      manager.release(first);
+
+      expect(existsSync(second.lockPath)).toBe(true);
+      expect(() => manager.acquire(first.runId)).toThrow('already active');
+      manager.release(second);
+      expect(existsSync(second.lockPath)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('preserves a replaced unreadable lock on release', () => {
+    const manager = new LockManager(TEST_DIR);
+    const handle = manager.acquire(createRunId('run-replaced-release'));
+    writeFileSync(handle.lockPath, '{{damaged-owner');
+
+    manager.release(handle);
+
+    expect(readFileSync(handle.lockPath, 'utf8')).toBe('{{damaged-owner');
+  });
+
+  it('does not steal a lock when checking its owner fails with EPERM', () => {
+    const manager = new LockManager(TEST_DIR);
+    const handle = manager.acquire(createRunId('run-protected'));
+    const content = readFileSync(handle.lockPath, 'utf8');
+    vi.spyOn(process, 'kill').mockImplementation(() => {
+      throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' });
+    });
+
+    expect(manager.probe(handle.runId).pidRunning).toBe(true);
+    expect(() => manager.acquire(handle.runId)).toThrow('already active');
+    expect(readFileSync(handle.lockPath, 'utf8')).toBe(content);
+  });
+
+  it('does not assume an owner is dead on an unexpected liveness probe error', () => {
+    const manager = new LockManager(TEST_DIR);
+    const handle = manager.acquire(createRunId('run-unknown'));
+    vi.spyOn(process, 'kill').mockImplementation(() => {
+      throw new Error('unexpected process probe failure');
+    });
+
+    expect(() => manager.acquire(handle.runId)).toThrow('already active');
+    expect(existsSync(handle.lockPath)).toBe(true);
+  });
+
   it('acquires a lock for a run', () => {
     const manager = new LockManager(TEST_DIR);
     const handle = manager.acquire(createRunId('run-001'));

@@ -26,6 +26,26 @@ function makeBudget(maxInput = 1000, reservedOutput = 200): TokenBudget {
 }
 
 describe('TokenBudgetManager', () => {
+  it('reports zero retained tokens when even a summary cannot fit', () => {
+    const artifact = makeArtifact('implementation', 'x'.repeat(4000));
+    const result = new TokenBudgetManager(new DefaultTokenEstimator()).applyBudget([artifact], 0, {
+      maxInputTokens: 1,
+      reservedOutputTokens: 0,
+      artifactPriority: [
+        { artifactType: 'implementation', priority: 5, truncationStrategy: 'summary' },
+      ],
+    });
+    expect(result.artifacts).toEqual([]);
+    expect(result.truncations).toEqual([
+      {
+        artifactType: 'implementation',
+        originalTokens: artifact.tokenEstimate,
+        truncatedTokens: 0,
+        strategy: 'summary',
+      },
+    ]);
+  });
+
   it('returns artifacts unchanged when within budget', () => {
     const manager = new TokenBudgetManager(new DefaultTokenEstimator());
     const artifacts = [makeArtifact('implementation', 'short')];

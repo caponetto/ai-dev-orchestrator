@@ -1,9 +1,10 @@
 import { join } from 'node:path';
 
-import { DefaultJournalWriter } from '@ai-dev-orchestrator/journal';
+import { DefaultJournalReader, DefaultJournalWriter } from '@ai-dev-orchestrator/journal';
 import type { StatePersistence } from '@ai-dev-orchestrator/ports';
 import type { PersistedState } from '@ai-dev-orchestrator/schemas';
 
+import { loadLatestRunState } from './run-state-recovery';
 import { getJournalPath } from './workspace-paths';
 
 export const TERMINAL_STATES = new Set(['DONE', 'ABORTED']);
@@ -16,6 +17,8 @@ export function buildAbortedState(state: PersistedState): PersistedState {
     terminalRecoveryState: undefined,
     entryActionContinuation: undefined,
     interruptedActionResults: undefined,
+    waitingContext: undefined,
+    executionPaused: false,
     previousState: state.currentState,
     stateHistory: [...state.stateHistory, 'ABORTED'],
     transitionCount: state.transitionCount + 1,
@@ -30,7 +33,11 @@ export function writeAbortJournalEntries(
   reason: string,
 ): void {
   const runDir = join(runsDir, runId);
-  const journalWriter = new DefaultJournalWriter(getJournalPath(runDir), runId);
+  const journalPath = getJournalPath(runDir);
+  const lastSequence = new DefaultJournalReader(journalPath)
+    .readAll()
+    .reduce((maximum, event) => Math.max(maximum, event.sequence), 0);
+  const journalWriter = new DefaultJournalWriter(journalPath, runId, lastSequence);
   const abortDurationMs = state.stateEnteredAt
     ? Date.now() - new Date(state.stateEnteredAt).getTime()
     : 0;
@@ -73,11 +80,28 @@ export async function abortRunState(
   state: PersistedState,
   reason: string,
 ): Promise<void> {
-  await statePersistence.save(buildAbortedState(state));
-
+  // SIGTERM is asynchronous. Never overwrite an owner that is still checkpointing
+  // or cleaning up, and re-read durable progress only after acquiring ownership.
+  for (let attempt = 0; attempt < 20; attempt++) {
+    if (!statePersistence.probeLock(state.runId).pidRunning) {
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  const lock = statePersistence.acquireLock(state.runId);
   try {
-    writeAbortJournalEntries(runsDir, runId, state, reason);
-  } catch {
-    // Journal write failure is non-fatal for abort
+    const events = new DefaultJournalReader(getJournalPath(join(runsDir, runId))).readAll();
+    const latest = loadLatestRunState(statePersistence, state.runId, events).state ?? state;
+    if (TERMINAL_STATES.has(latest.currentState)) {
+      return;
+    }
+    await statePersistence.save(buildAbortedState(latest));
+    try {
+      writeAbortJournalEntries(runsDir, runId, latest, reason);
+    } catch {
+      // The committed aborted checkpoint remains authoritative if journaling fails.
+    }
+  } finally {
+    statePersistence.releaseLock(lock);
   }
 }

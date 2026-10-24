@@ -2,6 +2,11 @@
 
 Journal writer and reader for persisting orchestration events to disk. Formats workflow events into human-readable, append-only journal files that serve as the audit trail for a run.
 
+Appends call `fsync` before reporting success. A sync failure raises `JournalWriteError` and
+closes the file descriptor; callers must treat the append as having an uncertain durable
+outcome, since the bytes may already be present. Appending again is not a rollback or a
+guarantee that the earlier event was absent.
+
 ## Architecture Layer
 
 **Domain** -- handles serialization, formatting, and file I/O for the event journal.
@@ -37,3 +42,7 @@ src/
 - `formatEvents` -- formats a batch of events
 - `formatJournalHeader` -- produces the header block for a new journal file
 - `flushToFile` -- writes buffered journal content to disk
+
+## Replay input validation
+
+Readers skip malformed event envelopes (including non-object YAML, invalid sequences and non-object data) while retaining compatible legacy event kinds. Resume and external abort writers seed from the maximum persisted sequence, including journals with gaps, rather than the number of parsed events. Semantic recovery still depends on the relevant event payload/checkpoint schemas.

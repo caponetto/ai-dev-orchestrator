@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { DefaultStatePersistence } from '@ai-dev-orchestrator/core';
 import { RUN_LOCK_FILENAME } from '@ai-dev-orchestrator/schemas';
 
-import { TERMINAL_STATES, buildAbortedState, writeAbortJournalEntries } from '../abort-run';
+import { TERMINAL_STATES, abortRunState } from '../abort-run';
 import { ExitCode, toCLIError } from '../output/exit-codes';
 import type { OutputFormatter } from '../output/formatter';
 import { readLockMetadata, recoverRunState, terminateRunFromLock } from '../run-state-recovery';
@@ -83,16 +83,10 @@ export async function abortCommand(
   terminateRunFromLock(lock);
 
   try {
-    await statePersistence.save(buildAbortedState(state));
+    await abortRunState(statePersistence, runsDir, runId, state, 'Aborted via CLI');
   } catch (error: unknown) {
     formatter.error(toCLIError(error));
     return ExitCode.GENERAL_ERROR;
-  }
-
-  try {
-    writeAbortJournalEntries(runsDir, runId, state, 'Aborted via CLI');
-  } catch {
-    // Journal write failure is non-fatal for abort
   }
 
   if (options.json) {

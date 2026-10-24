@@ -1,5 +1,7 @@
-import { mkdir, readFile, writeFile, readdir, unlink } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { link, mkdir, readFile, writeFile, readdir, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 
 import { safeJsonParse } from '@ai-dev-orchestrator/artifacts';
 import type { LiveRequestKind } from '@ai-dev-orchestrator/schemas';
@@ -57,6 +59,7 @@ export class FileBackedLiveRequestStore implements LiveRequestStore {
   }
 
   async writeRequest(request: LiveRequest): Promise<void> {
+    this.validateIdentifier(request.messageId);
     const dir = this.requestsDir(request.runId);
     await mkdir(dir, { recursive: true });
     const filePath = join(dir, `${request.messageId}.json`);
@@ -64,10 +67,28 @@ export class FileBackedLiveRequestStore implements LiveRequestStore {
   }
 
   async writeResponse(response: LiveResponse): Promise<void> {
+    this.validateIdentifier(response.messageId);
     const dir = this.responsesDir(response.runId);
     await mkdir(dir, { recursive: true });
     const filePath = join(dir, `${response.messageId}.json`);
-    await writeFile(filePath, JSON.stringify(response, null, 2));
+    const temporary = `${filePath}.${randomUUID()}.tmp`;
+    try {
+      await writeFile(temporary, JSON.stringify(response, null, 2), { flag: 'wx', flush: true });
+      try {
+        // Linking a complete file publishes it atomically without replacing an earlier answer.
+        await link(temporary, filePath);
+      } catch (error: unknown) {
+        if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) {
+          throw error;
+        }
+        const previous = await this.readResponse(response.runId, response.messageId);
+        if (!previous || !isDeepStrictEqual(previous.payload, response.payload)) {
+          throw new Error(`Request ${response.messageId} already has a response`);
+        }
+      }
+    } finally {
+      await unlink(temporary).catch(() => undefined);
+    }
   }
 
   async awaitResponse(
@@ -75,22 +96,16 @@ export class FileBackedLiveRequestStore implements LiveRequestStore {
     messageId: string,
     timeoutMs: number,
   ): Promise<LiveResponse | null> {
-    const filePath = join(this.responsesDir(runId), `${messageId}.json`);
     const deadline = Date.now() + timeoutMs;
 
     while (Date.now() < deadline) {
-      try {
-        const content = await readFile(filePath, 'utf-8');
-        const result = safeJsonParse(content, liveResponseSchema);
-        if (result.success) {
-          return result.data;
-        }
-      } catch {
-        // file doesn't exist yet
+      const response = await this.readResponse(runId, messageId);
+      if (response) {
+        return response;
       }
       await sleep(Math.min(POLL_INTERVAL_MS, deadline - Date.now()));
     }
-    return null;
+    return this.readResponse(runId, messageId);
   }
 
   async listPendingRequests(runId: string): Promise<readonly LiveRequest[]> {
@@ -117,7 +132,7 @@ export class FileBackedLiveRequestStore implements LiveRequestStore {
       if (!file.endsWith('.json')) {
         continue;
       }
-      if (responseFiles.has(file)) {
+      if (responseFiles.has(file) && (await this.readResponse(runId, file.slice(0, -5)))) {
         continue;
       }
       try {
@@ -127,6 +142,9 @@ export class FileBackedLiveRequestStore implements LiveRequestStore {
           continue;
         }
         const request = parsed.data as LiveRequest;
+        if (request.runId !== runId || file !== `${request.messageId}.json`) {
+          continue;
+        }
         if (request.expiresAt && request.expiresAt < now) {
           continue;
         }
@@ -165,6 +183,9 @@ export class FileBackedLiveRequestStore implements LiveRequestStore {
       if (!responseFiles.has(file)) {
         continue;
       }
+      if (!(await this.readResponse(runId, file.slice(0, -5)))) {
+        continue;
+      }
       try {
         await unlink(join(reqDir, file));
         await unlink(join(respDir, file));
@@ -176,11 +197,32 @@ export class FileBackedLiveRequestStore implements LiveRequestStore {
     return cleaned;
   }
 
+  private async readResponse(runId: string, messageId: string): Promise<LiveResponse | null> {
+    try {
+      this.validateIdentifier(messageId);
+      const content = await readFile(join(this.responsesDir(runId), `${messageId}.json`), 'utf8');
+      const parsed = safeJsonParse(content, liveResponseSchema);
+      return parsed.success && parsed.data.runId === runId && parsed.data.messageId === messageId
+        ? parsed.data
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
   private requestsDir(runId: string): string {
+    this.validateIdentifier(runId);
     return join(this.baseDir, runId, 'live-requests');
   }
 
   private responsesDir(runId: string): string {
+    this.validateIdentifier(runId);
     return join(this.baseDir, runId, 'live-responses');
+  }
+
+  private validateIdentifier(value: string): void {
+    if (!value || value === '.' || value === '..' || /[/\\]/.test(value)) {
+      throw new Error('Live request identifier must be a non-empty path segment');
+    }
   }
 }

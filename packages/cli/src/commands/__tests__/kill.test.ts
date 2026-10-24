@@ -101,6 +101,19 @@ function mockPsResponses(commResult: string = 'node', etimeResult: string = '00:
   });
 }
 
+function mockProcessTermination() {
+  const terminated = new Set<number>();
+  return vi.spyOn(process, 'kill').mockImplementation((pid, signal) => {
+    if (signal === 0 && terminated.has(Math.abs(pid))) {
+      throw Object.assign(new Error('terminated'), { code: 'ESRCH' });
+    }
+    if (signal === 'SIGTERM') {
+      terminated.add(Math.abs(pid));
+    }
+    return true;
+  });
+}
+
 describe('killCommand', () => {
   let baseDir: string;
   let stdoutChunks: string[];
@@ -191,7 +204,7 @@ describe('killCommand', () => {
     const lockPath = join(runsDir, runId, 'run.lock');
     writeLock(lockPath, runId, 424242);
 
-    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
+    const killSpy = mockProcessTermination();
     mockPsResponses('node', '00:30');
 
     const formatter = new OutputFormatter({ noColor: true });
@@ -215,7 +228,7 @@ describe('killCommand', () => {
     writeLock(join(runsDir, runId1, 'run.lock'), runId1, 111111);
     writeLock(join(runsDir, runId2, 'run.lock'), runId2, 222222);
 
-    vi.spyOn(process, 'kill').mockImplementation(() => true);
+    mockProcessTermination();
     mockPsResponses('node', '00:30');
 
     const formatter = new OutputFormatter({ noColor: true });
@@ -233,7 +246,7 @@ describe('killCommand', () => {
     const lockPath = join(runsDir, runId, 'run.lock');
     writeLock(lockPath, runId, 424242);
 
-    vi.spyOn(process, 'kill').mockImplementation(() => true);
+    mockProcessTermination();
     mockPsResponses('node', '00:30');
 
     const formatter = new OutputFormatter({ json: true });
@@ -260,7 +273,7 @@ describe('killCommand', () => {
     const lockPath = join(runsDir, runId, 'run.lock');
     writeLock(lockPath, runId, 424242);
 
-    vi.spyOn(process, 'kill').mockImplementation(() => true);
+    mockProcessTermination();
     mockPsResponses('node', '00:30');
 
     const formatter = new OutputFormatter({ noColor: true });
@@ -281,7 +294,7 @@ describe('killCommand', () => {
     const lockPath = join(runsDir, runId, 'run.lock');
     writeLock(lockPath, runId, 424242);
 
-    vi.spyOn(process, 'kill').mockImplementation(() => true);
+    mockProcessTermination();
     mockPsResponses('node', '00:30');
 
     const formatter = new OutputFormatter({ noColor: true });
@@ -319,7 +332,7 @@ describe('killCommand', () => {
       const lockPath = join(runsDir, runId, 'run.lock');
       writeLock(lockPath, runId, 424242);
 
-      vi.spyOn(process, 'kill').mockImplementation(() => true);
+      mockProcessTermination();
       mockPsResponses('node', '00:30');
 
       const formatter = new OutputFormatter({ noColor: true });
@@ -336,7 +349,7 @@ describe('killCommand', () => {
       const lockPath = join(runsDir, runId, 'run.lock');
       writeLock(lockPath, runId, 424242);
 
-      vi.spyOn(process, 'kill').mockImplementation(() => true);
+      mockProcessTermination();
       mockPsResponses('node', '00:30');
 
       const formatter = new OutputFormatter({ noColor: true });
@@ -353,7 +366,7 @@ describe('killCommand', () => {
       const lockPath = join(runsDir, runId, 'run.lock');
       writeLock(lockPath, runId, 424242);
 
-      vi.spyOn(process, 'kill').mockImplementation(() => true);
+      mockProcessTermination();
       mockPsResponses('firefox', '00:30');
 
       const formatter = new OutputFormatter({ noColor: true });
@@ -371,7 +384,7 @@ describe('killCommand', () => {
       const lockPath = join(runsDir, runId, 'run.lock');
       writeLock(lockPath, runId, 424242, oldTimestamp);
 
-      vi.spyOn(process, 'kill').mockImplementation(() => true);
+      mockProcessTermination();
       // Process has only been running 30 seconds, but lock is from months ago
       mockPsResponses('node', '00:30');
 
@@ -389,7 +402,7 @@ describe('killCommand', () => {
       const lockPath = join(runsDir, runId, 'run.lock');
       writeLock(lockPath, runId, 424242);
 
-      const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
+      const killSpy = mockProcessTermination();
       mockPsResponses('node', '00:30');
 
       const formatter = new OutputFormatter({ noColor: true });
@@ -407,7 +420,7 @@ describe('killCommand', () => {
       const lockPath = join(runsDir, runId, 'run.lock');
       writeLock(lockPath, runId, 424242);
 
-      vi.spyOn(process, 'kill').mockImplementation(() => true);
+      mockProcessTermination();
       mockPsResponses('/usr/local/bin/node', '00:30');
 
       const formatter = new OutputFormatter({ noColor: true });
@@ -424,7 +437,7 @@ describe('killCommand', () => {
       const lockPath = join(runsDir, runId, 'run.lock');
       writeLock(lockPath, runId, 424242);
 
-      const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
+      const killSpy = mockProcessTermination();
       mockPsResponses('node', '01:30:45');
 
       const formatter = new OutputFormatter({ noColor: true });
@@ -442,7 +455,7 @@ describe('killCommand', () => {
       const lockPath = join(runsDir, runId, 'run.lock');
       writeLock(lockPath, runId, 424242);
 
-      const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
+      const killSpy = mockProcessTermination();
       mockPsResponses('node', '2-01:30:45');
 
       const formatter = new OutputFormatter({ noColor: true });
@@ -460,7 +473,7 @@ describe('killCommand', () => {
       const lockPath = join(runsDir, runId, 'run.lock');
       writeLock(lockPath, runId, 424242);
 
-      vi.spyOn(process, 'kill').mockImplementation(() => true);
+      mockProcessTermination();
       mockPsResponses('node', 'invalid');
 
       const formatter = new OutputFormatter({ noColor: true });
@@ -477,7 +490,7 @@ describe('killCommand', () => {
       const lockPath = join(runsDir, runId, 'run.lock');
       writeLock(lockPath, runId, 424242);
 
-      vi.spyOn(process, 'kill').mockImplementation(() => true);
+      mockProcessTermination();
       mockPsResponses('node', 'ab:cd');
 
       const formatter = new OutputFormatter({ noColor: true });

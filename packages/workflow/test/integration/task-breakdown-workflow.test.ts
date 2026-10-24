@@ -39,11 +39,11 @@ describe('built-in task-breakdown workflow', () => {
         decomposition_reviewer: 'decomposition_review',
       },
     });
-    const readLatest = vi.mocked(artifactStore).getLatest.getMockImplementation();
-    assert(readLatest);
-    vi.mocked(artifactStore).getLatest.mockImplementation(async (type, name) => {
-      const artifact = await readLatest(type, name);
-      return artifact && type === 'decomposition_review'
+    const readExact = vi.mocked(artifactStore).get.getMockImplementation();
+    assert(readExact);
+    vi.mocked(artifactStore).get.mockImplementation(async (ref) => {
+      const artifact = await readExact(ref);
+      return ref.type === 'decomposition_review'
         ? { ...artifact, content: JSON.stringify({ approved: false, findings: [] }) }
         : artifact;
     });

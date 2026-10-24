@@ -6,6 +6,7 @@ import type { ArtifactSummary } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 
+import { InventoryCorruptionError } from '../../../domain/artifact-system/errors';
 import { InventoryManager } from '../inventory-manager';
 
 function tempRunDir(): string {
@@ -30,6 +31,31 @@ function makeSummary(type: string, name: string, version: number): ArtifactSumma
 }
 
 describe('InventoryManager', () => {
+  it.each(['{{invalid-yaml', 'null', 'artifacts: [null]', 'artifacts: [{type: unknown}]'])(
+    'fails closed on invalid inventory data: %s',
+    (content) => {
+      const dir = tempRunDir();
+      writeFileSync(join(dir, 'inventory.yaml'), content);
+      expect(() => new InventoryManager(dir, 'run-test').getInventory()).toThrow(
+        InventoryCorruptionError,
+      );
+    },
+  );
+
+  it('rejects inconsistent summary identity instead of returning the wrong artifact ref', () => {
+    const dir = tempRunDir();
+    const summary = makeSummary('plan', 'main', 1);
+    writeFileSync(
+      join(dir, 'inventory.yaml'),
+      JSON.stringify({
+        artifacts: [{ ...summary, ref: { ...summary.ref, name: 'different' } }],
+      }),
+    );
+    expect(() => new InventoryManager(dir, 'run-test').getInventory()).toThrow(
+      InventoryCorruptionError,
+    );
+  });
+
   it('starts with empty inventory', () => {
     const dir = tempRunDir();
     const mgr = new InventoryManager(dir, 'run-test');

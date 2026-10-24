@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 
 import type { JournalReader } from '@ai-dev-orchestrator/ports';
 import type { JournalEvent, JournalFilter } from '@ai-dev-orchestrator/schemas';
+import { isObject } from '@ai-dev-orchestrator/utils';
 import { parse } from 'yaml';
 
 /** Default journal reader that parses YAML blocks from a Markdown journal file. */
@@ -47,8 +48,21 @@ export class DefaultJournalReader implements JournalReader {
     let match: RegExpExecArray | null = yamlBlockRegex.exec(content);
     while (match !== null) {
       try {
-        const event = parse(match[1]) as JournalEvent;
-        events.push(event);
+        const event: unknown = parse(match[1]);
+        if (
+          isObject(event) &&
+          typeof event.runId === 'string' &&
+          typeof event.timestamp === 'string' &&
+          typeof event.type === 'string' &&
+          typeof event.sequence === 'number' &&
+          Number.isSafeInteger(event.sequence) &&
+          event.sequence >= 0 &&
+          isObject(event.data)
+        ) {
+          // Keep legacy event kinds and unknown fields, while rejecting corrupt envelopes that
+          // would poison sequence ordering or cause replay/query to dereference null values.
+          events.push(event as unknown as JournalEvent);
+        }
       } catch {
         // Skip malformed blocks
       }

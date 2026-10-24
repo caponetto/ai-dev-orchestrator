@@ -1,17 +1,22 @@
-import { type Dirent, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
+import { type Dirent, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
+import { DefaultStatePersistence } from '@ai-dev-orchestrator/core';
+import { DefaultJournalReader, DefaultJournalWriter } from '@ai-dev-orchestrator/journal';
+import { createRunId } from '@ai-dev-orchestrator/ports';
+import type { WorkflowDefinition } from '@ai-dev-orchestrator/schemas';
+import { describe, expect, it, beforeEach, afterEach, vi, assert } from 'vitest';
 
 import { ExitCode } from '../../output/exit-codes';
 import { OutputFormatter } from '../../output/formatter';
-import { getAiDir, getRunDir, getRunsDir } from '../../workspace-paths';
+import { getAiDir, getJournalPath, getRunDir, getRunsDir } from '../../workspace-paths';
 import { answerCommand } from '../answer';
 import { approveCommand } from '../approve';
 import { artifactsCommand } from '../artifacts';
 import { inspectCommand } from '../inspect';
 import { listCommand } from '../list';
+import { retryCommand } from '../retry';
 import { runCommand } from '../run';
 import { statusCommand } from '../status';
 
@@ -75,6 +80,99 @@ describe('CLI E2E — User Journeys (real composition, fixture driver)', { timeo
       rmSync(baseDir, { recursive: true, force: true });
     }
   });
+
+  it.each(['FAILED', 'ABORTED'])(
+    'direct retry recovers a %s checkpoint with real composition',
+    async (terminal) => {
+      const formatter = new OutputFormatter({ noColor: true });
+      expect(
+        await runCommand(
+          baseDir,
+          {
+            sources: ['Verify retry'],
+            verbose: false,
+            json: false,
+            dryRun: false,
+          },
+          formatter,
+        ),
+      ).toBe(ExitCode.SUCCESS);
+      const runId = findRunId();
+      const persistence = new DefaultStatePersistence(getRunsDir());
+      const checkpoint = persistence.load(createRunId(runId));
+      assert(checkpoint);
+      const definition: WorkflowDefinition = {
+        name: 'retry-test',
+        version: '1',
+        initialState: 'WORK',
+        terminalStates: ['DONE', terminal],
+        states: {
+          WORK: {
+            type: 'action',
+            description: 'Retry worker',
+            entryActions: [{ type: 'dispatch_worker', params: { role: 'planner' } }],
+            transitions: [
+              {
+                target: 'DONE',
+                trigger: 'completion',
+                guards: [],
+                priority: 0,
+                governanceRequired: false,
+              },
+            ],
+          },
+          DONE: { type: 'terminal', description: '', transitions: [] },
+          [terminal]: { type: 'terminal', description: '', transitions: [] },
+        },
+      };
+      writeFileSync(join(getRunDir(runId), 'workflow-definition.json'), JSON.stringify(definition));
+      await persistence.save({
+        ...checkpoint,
+        currentState: terminal,
+        previousState: 'WORK',
+        workflowName: definition.name,
+        workflowVersion: definition.version,
+        stateHistory: ['WORK', terminal],
+        waitingContext: undefined,
+        pendingTerminalState: undefined,
+        terminalRecoveryState: undefined,
+        executionPaused: false,
+        entryActionContinuation: undefined,
+        interruptedActionResults: undefined,
+        persistedAt: new Date().toISOString(),
+      });
+      const journalPath = getJournalPath(getRunDir(runId));
+      new DefaultJournalWriter(journalPath, runId, 90).append({
+        timestamp: new Date().toISOString(),
+        runId,
+        sequence: 0,
+        type: 'error',
+        data: {
+          kind: 'error',
+          errorCode: 'fixture_gap',
+          message: 'Sparse sequence fixture',
+          recoverable: true,
+        },
+      });
+
+      const code = await retryCommand(baseDir, { runId, verbose: false, json: false }, formatter);
+
+      expect(code, stderrChunks.join('')).toBe(ExitCode.SUCCESS);
+      expect(persistence.load(createRunId(runId))).toMatchObject({
+        currentState: 'DONE',
+        stateHistory: ['WORK', terminal, 'WORK', 'DONE'],
+        repoRoot: baseDir,
+      });
+      expect(persistence.probeLock(createRunId(runId)).exists).toBe(false);
+      const sequences = new DefaultJournalReader(journalPath)
+        .readAll()
+        .map((event) => event.sequence);
+      expect(sequences.at(-1)).toBeGreaterThan(91);
+      expect(
+        sequences.every((sequence, index) => index === 0 || sequence > sequences[index - 1]),
+      ).toBe(true);
+    },
+  );
 
   it('happy path: run → approve → status → list → inspect → artifacts', async () => {
     const formatter = new OutputFormatter({ noColor: true });

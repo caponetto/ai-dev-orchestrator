@@ -47,3 +47,7 @@ src/
 - `loadTemplateFromMarkdown` -- parses a template from a Markdown file
 - `validateOutput` -- validates agent output against an expected schema
 - `RenderContext` -- type describing the variables available during rendering
+
+## Truncation accounting
+
+When an artifact is replaced with a summary placeholder, retained-token accounting includes the placeholder only when it actually fits the remaining budget. An omitted placeholder contributes zero retained tokens.

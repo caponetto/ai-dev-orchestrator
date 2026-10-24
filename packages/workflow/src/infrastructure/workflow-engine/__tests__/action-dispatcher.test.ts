@@ -92,6 +92,30 @@ function makeGate(): AgreementGate {
 }
 
 describe('ActionDispatcher', () => {
+  it('fails dynamic completion when its required aggregate cannot be stored', async () => {
+    const store = makeStore();
+    vi.mocked(store).store.mockRejectedValue(new Error('aggregate write failed'));
+    const dispatcher = new ActionDispatcher(makeRunner(), store, makeJournal());
+    const result = await dispatcher.finalizeDynamicResult({
+      action: {
+        type: 'dispatch_dynamic_workers',
+        params: { role: 'task_spec_writer', sourceArtifact: 'task_breakdown', itemsPath: 'tasks' },
+      },
+      success: true,
+      workerResults: [
+        {
+          taskId: 'A',
+          role: 'task_spec_writer',
+          success: true,
+          artifactRef: { type: 'canonical_specification', name: 'A', version: 1, checksum: 'abc' },
+        },
+      ],
+    });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('aggregate write failed');
+    expect(result.workerResults?.[0]?.taskId).toBe('A');
+  });
+
   it.each(['failure', 'awaiting_human'] as const)(
     'stops later entry actions after %s',
     async (outcome) => {

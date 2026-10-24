@@ -29,6 +29,7 @@ import {
 import type { LiveRequestStore } from '../file-backed-live-request-store';
 import type { PermissionApprovalStore } from '../permission-approval-store';
 import { serializeMessage } from '../protocol-serializer';
+import { StdioProtocolTransport } from '../stdio-protocol-transport';
 
 let tempDir: string;
 
@@ -73,6 +74,73 @@ function protocolScript(messages: string[]): string {
 }
 
 describe('CliAgentRunner', () => {
+  it('does not fall back to a new dispatch after cancellation during handshake', async () => {
+    const runner = new CliAgentRunner({ command: 'bash', args: ['-c', 'sleep 1'] });
+    const fallback = vi.spyOn(runner, 'dispatch');
+    const handshake = vi
+      .spyOn(StdioProtocolTransport.prototype, 'negotiate')
+      .mockImplementationOnce(() => {
+        runner.killAll();
+        return Promise.resolve(null);
+      });
+    try {
+      const result = await runner.dispatchWithSession(makeTask());
+      expect(result.kind === 'terminal' && result.result.error).toContain('cancelled');
+      expect(fallback).not.toHaveBeenCalled();
+    } finally {
+      handshake.mockRestore();
+      fallback.mockRestore();
+      runner.killAll();
+    }
+  });
+
+  it.each(['dispatch', 'dispatchWithSession'] as const)(
+    '%s does not launch after cancellation during task-file preparation',
+    async (method) => {
+      const marker = join(tempDir, 'launched');
+      const task = makeTask({
+        agentConfig: { command: 'bash', args: ['-c', `echo launched > ${JSON.stringify(marker)}`] },
+      });
+      const runner = new CliAgentRunner({ command: 'bash', handshakeTimeoutMs: 20 });
+      const pending = runner[method](task);
+      runner.killAll();
+      const result = await pending;
+      expect(
+        'kind' in result ? result.kind === 'terminal' && result.result.status : result.status,
+      ).toBe('failure');
+      await expect(readFile(marker, 'utf8')).rejects.toThrow('ENOENT');
+      await preWriteOutput(task, { summary: 'later requested work' });
+      expect((await runner.dispatch(task)).status).toBe('success');
+      expect(await readFile(marker, 'utf8')).toBe('launched\n');
+    },
+  );
+
+  it('does not relaunch when cancelled during transient retry backoff', async () => {
+    const marker = join(tempDir, 'attempts');
+    const task = makeTask({
+      agentConfig: {
+        command: 'bash',
+        args: [
+          '-c',
+          `echo attempt >> ${JSON.stringify(marker)}; echo '{"type":"error","error":{"data":{"message":"Unexpected server error"}}}'`,
+        ],
+      },
+    });
+    const runner = new CliAgentRunner({
+      command: 'bash',
+      adapter: createOpencodeCliAdapter(),
+      handshakeTimeoutMs: 20,
+    });
+    const result = await runner.dispatch(task, (event) => {
+      if (event.content.includes('Retrying transient')) {
+        runner.killAll();
+      }
+    });
+    expect(result.status).toBe('failure');
+    expect(result.error).toContain('cancelled');
+    expect(await readFile(marker, 'utf8')).toBe('attempt\n');
+  });
+
   it('reports an unavailable OpenCode model before starting the agent', async () => {
     const task = makeTask({ modelHint: 'opencode/mimo-v2.5-free' });
     const runner = new CliAgentRunner({

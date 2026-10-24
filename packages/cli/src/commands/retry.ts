@@ -18,9 +18,8 @@ export interface RetryOptions {
 /**
  * Retry a terminal (aborted/failed) run from the state that caused the failure.
  *
- * Expects the checkpoint to have been rewritten by the caller (e.g. the dashboard
- * action handler) so that `currentState` already points to the non-terminal state
- * where the failure occurred.
+ * The engine selects and checkpoints the source state under the run lock. Pending
+ * terminal cleanup retains its cursor instead of repeating completed work.
  */
 export async function retryCommand(
   repoRoot: string,

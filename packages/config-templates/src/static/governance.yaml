@@ -51,7 +51,7 @@ budget:
 #   1. Deny rules (first match wins)
 #   2. Grant rules (first match wins)
 #   3. Previously approved operations (approval store)
-#   4. Auto-grant for .ai/ run directory operations
+#   4. Auto-grant for file writes inside the current run directory (not all .ai/)
 #   5. Auto-grant for read-only operations (all trust levels):
 #      - file_read actions
 #      - Read-only tools (Read, Glob, Grep, etc.)

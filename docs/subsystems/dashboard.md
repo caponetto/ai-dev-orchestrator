@@ -40,6 +40,16 @@ The current HTTP action surface supports:
 
 These actions are handled through `DefaultDashboardActionHandler` in the CLI package and surfaced by `dashboard-http-server.ts`.
 
+When an abort request supplies a session ID, the handler checks it against the current live
+session before signalling the run process or aborting the session. A mismatched ID is rejected
+without those side effects, so a stale dashboard view cannot terminate a newer session.
+
+Retry starts the CLI without rewriting the checkpoint or journal in the dashboard process.
+The engine acquires the run lock before selecting and persisting the retry state. A spawn
+failure therefore leaves execution state intact. Retry refuses completed successful runs and
+runs whose lock owner is live, foreign, or unverifiable; it does not terminate a live cleanup
+process to force a retry.
+
 ## Settings
 
 The settings page loads and writes project settings through `FilesystemSettingsProvider`.
@@ -76,3 +86,11 @@ Prefer:
 - `packages/dashboard/src/pages/RunDetailPage.tsx`
 - `packages/dashboard/src/pages/NewRunPage.tsx`
 - `packages/dashboard/src/components/WorkflowGraph.tsx`
+
+## Production action coverage
+
+E2E tests have a dedicated TypeScript project at `packages/dashboard/e2e/tsconfig.json`.
+The dashboard's `typecheck` and `lint` commands include E2E files, so typed ESLint also works
+when lint-staged checks an individual browser test before commit.
+
+`production-actions.e2e.ts` exercises approval, abort and retry through the browser, real HTTP server, production action/data handlers and actual CLI child commands. It uses disposable run/configuration directories and deterministic agents. Dashboard E2E builds CLI development artifacts through its Turbo task dependency before starting this fixture.

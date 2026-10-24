@@ -23,6 +23,11 @@ The top-level command currently supports:
 
 The `--repo <path>` flag is available on `run`, `resume`, and `retry` to specify the repository context.
 
+`ai retry <runId>` retries failed or aborted runs directly; no manual checkpoint edit is
+required. The engine selects and checkpoints the previous action state while holding the
+run lock. It preserves the saved repository and prior usage. Pending terminal cleanup resumes
+its saved cursor. Completed successful runs and pending human gates are not retry targets.
+
 ## Implemented Commands
 
 - `ai init [--force]`
@@ -91,3 +96,7 @@ Prefer:
 - `packages/cli/src/index.ts`
 - `packages/cli/src/commands/`
 - `packages/cli/src/composition-root.ts`
+
+## External abort ownership
+
+CLI, dashboard and kill-command checkpoint aborts wait briefly for a signalled owner to exit, then acquire the run lock and reload the latest checkpoint/journal progress before writing. If ownership remains live, foreign or unreadable, the abort checkpoint is refused; retry after resolving ownership. A run that completed while termination was pending keeps its terminal checkpoint. Aborted checkpoints clear stale human-wait and manual-pause flags. Process termination remains best-effort and the force-abort path does not run workflow terminal entry actions; use engine/session cancellation for graceful cleanup, and inspect temporary/external resources after a forced termination.

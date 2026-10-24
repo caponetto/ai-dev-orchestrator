@@ -640,7 +640,11 @@ export class ActionDispatcher {
       this.logger.warn(
         `[action-dispatcher] Failed to store task_specifications aggregate: ${getErrorMessage(error)}`,
       );
-      return result;
+      return {
+        ...result,
+        success: false,
+        error: `Failed to store task_specifications aggregate: ${getErrorMessage(error)}`,
+      };
     }
   }
 

@@ -117,5 +117,6 @@ export const lockHandleSchema = z.object({
   acquiredAt: z.string(),
   lockPath: z.string(),
   hostname: z.string(),
+  ownershipToken: z.uuid().optional(),
 });
 export type LockHandle = z.infer<typeof lockHandleSchema>;

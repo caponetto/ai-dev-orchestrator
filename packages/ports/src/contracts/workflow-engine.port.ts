@@ -17,7 +17,7 @@ export interface WorkflowEngine {
   /** Resume a paused run with human input. */
   resume(input: HumanInput): Promise<RunResult>;
 
-  /** Retry a restored run from its current (non-terminal) state. */
+  /** Retry interrupted work or unfinished cleanup; rewind a completed FAILED/ABORTED run to its source state. */
   retry(): Promise<RunResult>;
 
   /** Abort the current run. */

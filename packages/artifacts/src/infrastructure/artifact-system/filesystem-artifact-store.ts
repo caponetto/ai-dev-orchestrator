@@ -1,4 +1,4 @@
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 import type {
   ArtifactStore,
@@ -38,13 +38,11 @@ const FAIL_SAFE_ARTIFACT_TYPES: ReadonlySet<ArtifactType> = new Set([
   'judge_decision',
 ]);
 
-/**
- * Filesystem-backed artifact store using synchronous I/O.
- *
- * Sync operations are accepted here: artifacts are small text files written once
- * and read infrequently, so async I/O adds complexity without measurable benefit.
- * Async migration is deferred to S14 if profiling shows contention.
- */
+// One run owner can dispatch several workers and construct more than one store. Keep version
+// allocation, content/metadata writes and inventory updates in the same process in order.
+const pendingWrites = new Map<string, Promise<void>>();
+
+/** Filesystem-backed artifact store with serialized writes within the run owner process. */
 export class FilesystemArtifactStore implements ArtifactStore {
   private readonly artifactsDir: string;
   private readonly versionManager: VersionManager;
@@ -65,7 +63,24 @@ export class FilesystemArtifactStore implements ArtifactStore {
     this.typeValidator = typeValidator;
   }
 
-  async store(input: ArtifactInput): Promise<ArtifactRef> {
+  store(input: ArtifactInput): Promise<ArtifactRef> {
+    const key = resolve(this.artifactsDir);
+    const predecessor = pendingWrites.get(key) ?? Promise.resolve();
+    const result = predecessor.then(() => this.storeVersion(input));
+    const settled = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    pendingWrites.set(key, settled);
+    void settled.then(() => {
+      if (pendingWrites.get(key) === settled) {
+        pendingWrites.delete(key);
+      }
+    });
+    return result;
+  }
+
+  private async storeVersion(input: ArtifactInput): Promise<ArtifactRef> {
     if (!this.ownershipRegistry.isAuthorized(input.producedBy, input.type)) {
       const owner = this.ownershipRegistry.getOwner(input.type);
       throw new OwnershipViolationError(input.producedBy, input.type, owner ?? 'unknown');
@@ -86,6 +101,8 @@ export class FilesystemArtifactStore implements ArtifactStore {
       }
     }
 
+    // Fail before creating files when the existing index is known to be corrupt.
+    this.inventoryManager.getInventory();
     const version = this.versionManager.nextVersion(input.type, input.name);
 
     const existingPath = this.artifactContentPath(input.type, input.name, version);

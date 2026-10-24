@@ -1025,14 +1025,26 @@ export class LifecycleController implements WorkflowEngine {
     if (this.waitingContext) {
       throw new Error('Cannot retry a waiting run — use resume()');
     }
+    let retryState: string | undefined;
     if (definition.terminalStates.includes(this.currentState) && !this.pendingTerminalState) {
-      throw new Error(
-        `Cannot retry from terminal state '${this.currentState}' — checkpoint must be rewritten before retry`,
-      );
+      if (this.currentState !== 'FAILED' && this.currentState !== 'ABORTED') {
+        throw new Error(`Cannot retry from terminal state '${this.currentState}'`);
+      }
+      const source = this.previousState;
+      if (!source || !Object.hasOwn(definition.states, source)) {
+        throw new Error(`Run has no previous workflow state to retry from`);
+      }
+      if (
+        definition.terminalStates.includes(source) ||
+        definition.states[source].type === 'terminal'
+      ) {
+        throw new Error(`Cannot retry from terminal state '${source}'`);
+      }
+      if (definition.states[source].type === 'wait') {
+        throw new Error(`Cannot retry from waiting state '${source}' without human input`);
+      }
+      retryState = source;
     }
-
-    this.aborted = false;
-    this.startedAt = Date.now();
 
     this.dispatcher.setUserPrompt(this.config.sources[0]);
     this.dispatcher.setWorkflowMetadata(definition.name, definition.version);
@@ -1043,6 +1055,20 @@ export class LifecycleController implements WorkflowEngine {
     this.lockHandle = this.statePersistence.acquireLock(this.runId);
 
     try {
+      this.aborted = false;
+      this.startedAt = Date.now();
+      if (retryState) {
+        this.previousState = this.currentState;
+        this.currentState = retryState;
+        this.stateEnteredAt = new Date().toISOString();
+        this.transitionCount += 1;
+        this.stateHistory.record(retryState);
+        this.entryActionContinuation = null;
+        this.interruptedActionResults = null;
+        // Make the retry target durable before executing its actions. Pending terminal
+        // cleanup uses its existing cursor and never enters this rewind path.
+        await this.saveCheckpoint();
+      }
       this.journalWriter.append({
         timestamp: new Date().toISOString(),
         runId: this.runId,

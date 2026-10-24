@@ -208,7 +208,12 @@ describe('abortCommand', () => {
     const runDir = getRunDir(runId);
     const lockPath = join(runDir, 'run.lock');
     mkdirSync(runDir, { recursive: true });
-    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation((_pid, signal) => {
+      if (signal === 0) {
+        throw Object.assign(new Error('terminated'), { code: 'ESRCH' });
+      }
+      return true;
+    });
 
     writeFileSync(
       lockPath,

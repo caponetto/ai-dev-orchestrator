@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import type { ArtifactType } from '@ai-dev-orchestrator/schemas';
 
-const VERSION_PATTERN = /_v(\d+)\.\w+$/;
+const VERSION_PATTERN = /^_v(\d+)\.\w+$/;
 
 /** Manages monotonically increasing version numbers for artifacts. */
 export class VersionManager {
@@ -38,7 +38,7 @@ export class VersionManager {
       if (file.endsWith('.meta.yaml')) {
         continue;
       }
-      const match = VERSION_PATTERN.exec(file);
+      const match = VERSION_PATTERN.exec(file.slice(name.length));
       if (match?.[1]) {
         versions.push(Number(match[1]));
       }

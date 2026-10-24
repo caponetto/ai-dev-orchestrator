@@ -2,9 +2,15 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import writeFileAtomic from 'write-file-atomic';
 
 import { atomicWriteState } from '../atomic-writer';
+
+vi.mock('write-file-atomic', async (importOriginal) => {
+  const original = await importOriginal<{ default: typeof writeFileAtomic }>();
+  return { default: vi.fn(original.default) };
+});
 
 const TEST_DIR = join(tmpdir(), `state-persistence-test-${String(Date.now())}`);
 
@@ -13,10 +19,46 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.mocked(writeFileAtomic).mockRestore();
   rmSync(TEST_DIR, { recursive: true, force: true });
 });
 
 describe('atomicWriteState', () => {
+  it('keeps the current checkpoint readable while the replacement is being written', async () => {
+    const filePath = join(TEST_DIR, 'state.yaml');
+    await atomicWriteState(filePath, 'version: 1');
+    const original = await vi.importActual<{ default: typeof writeFileAtomic }>(
+      'write-file-atomic',
+    );
+    vi.mocked(writeFileAtomic).mockImplementation(async (...args) => {
+      expect(readFileSync(filePath, 'utf8')).toBe('version: 1');
+      return original.default(...args);
+    });
+
+    await atomicWriteState(filePath, 'version: 2');
+    expect(readFileSync(filePath, 'utf8')).toBe('version: 2');
+  });
+
+  it('preserves the current checkpoint when writing its replacement fails', async () => {
+    const filePath = join(TEST_DIR, 'state.yaml');
+    await atomicWriteState(filePath, 'version: 1');
+    const original = await vi.importActual<{ default: typeof writeFileAtomic }>(
+      'write-file-atomic',
+    );
+    vi.mocked(writeFileAtomic).mockImplementation(async (...args) => {
+      if (args[0] === filePath) {
+        throw new Error('EIO: checkpoint write failed');
+      }
+      return original.default(...args);
+    });
+
+    await expect(atomicWriteState(filePath, 'version: 2')).rejects.toThrow(
+      'checkpoint write failed',
+    );
+    expect(readFileSync(filePath, 'utf8')).toBe('version: 1');
+    expect(readFileSync(`${filePath}.bak`, 'utf8')).toBe('version: 1');
+  });
+
   it('writes content to the target file', async () => {
     const filePath = join(TEST_DIR, 'state.yaml');
     await atomicWriteState(filePath, 'runId: run-001');

@@ -213,6 +213,20 @@ describe('stateValidationResultSchema', () => {
 });
 
 describe('lockHandleSchema', () => {
+  it('preserves an acquisition token while accepting legacy handles without one', () => {
+    const data = {
+      runId: 'run-123',
+      pid: 12345,
+      acquiredAt: '2026-01-01T00:00:00Z',
+      lockPath: '/tmp/lock',
+      hostname: 'dev-machine',
+    };
+    expect(lockHandleSchema.parse(data)).toEqual(data);
+    const tokenized = { ...data, ownershipToken: 'f3d2b1a0-1234-4234-9234-123456789abc' };
+    expect(lockHandleSchema.parse(tokenized)).toEqual(tokenized);
+    expect(lockHandleSchema.safeParse({ ...data, ownershipToken: '' }).success).toBe(false);
+  });
+
   it('validates a lock handle', () => {
     const data = {
       runId: 'run-123',

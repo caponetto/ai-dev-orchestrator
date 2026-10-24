@@ -28,8 +28,6 @@ export function flushToFile(filePath: string, content: string, header?: string):
     const fd = openSync(filePath, 'a');
     try {
       fsyncSync(fd);
-    } catch {
-      // Best-effort fsync
     } finally {
       closeSync(fd);
     }

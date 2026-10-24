@@ -83,12 +83,14 @@ export class CliAgentRunner implements SessionCapableRunner {
   private codexPermissionBridge?: CodexPermissionBridgeConfig;
   private sessionSupervisor?: LocalAgentSessionSupervisor;
   private readonly activeSubprocesses = new Set<{ pid?: number; kill: () => boolean }>();
+  private cancellationGeneration = 0;
 
   constructor(config: CliAgentRunnerConfig) {
     this.config = config;
   }
 
   killAll(): void {
+    this.cancellationGeneration += 1;
     for (const proc of this.activeSubprocesses) {
       try {
         proc.kill();
@@ -97,6 +99,16 @@ export class CliAgentRunner implements SessionCapableRunner {
       }
     }
     this.activeSubprocesses.clear();
+  }
+
+  private cancelledResult(task: AgentTask, startTime: number): AgentResult {
+    return {
+      taskId: task.taskId,
+      status: 'failure',
+      error: 'Agent dispatch cancelled',
+      recoverable: false,
+      durationMs: Date.now() - startTime,
+    };
   }
 
   setPermissionPolicy(policy: PermissionPolicy): void {
@@ -140,6 +152,7 @@ export class CliAgentRunner implements SessionCapableRunner {
     }
 
     const startTime = Date.now();
+    const generation = this.cancellationGeneration;
     const timeoutMs =
       task.constraints.timeout || this.config.defaultTimeoutMs || DEFAULT_TIMEOUT_MS;
 
@@ -153,6 +166,9 @@ export class CliAgentRunner implements SessionCapableRunner {
     const baseArgs = cliConfig?.args ?? (adapter ? adapter.args : (this.config.args ?? []));
     const args = buildInvocationArgs(task, taskFilePath, baseArgs, adapter);
 
+    if (generation !== this.cancellationGeneration) {
+      return { kind: 'terminal', result: this.cancelledResult(task, startTime) };
+    }
     const subprocess = execa(command, args, {
       cwd: task.repoRoot,
       timeout: timeoutMs,
@@ -189,6 +205,10 @@ export class CliAgentRunner implements SessionCapableRunner {
 
     const capabilities = await transport.negotiate(task.taskId, undefined, handshakeTimeoutMs);
 
+    if (generation !== this.cancellationGeneration) {
+      transport.close();
+      return { kind: 'terminal', result: this.cancelledResult(task, startTime) };
+    }
     if (capabilities === null) {
       transport.close();
       try {
@@ -259,10 +279,12 @@ export class CliAgentRunner implements SessionCapableRunner {
     }
     const timeoutMs =
       task.constraints.timeout || this.config.defaultTimeoutMs || DEFAULT_TIMEOUT_MS;
+    const generation = this.cancellationGeneration;
     return dispatchWithTransientRetry(
       this.config.adapter?.name,
       timeoutMs,
-      (remainingTimeoutMs, onEvent) => this.dispatchOnce(task, onEvent, remainingTimeoutMs),
+      (remainingTimeoutMs, onEvent) =>
+        this.dispatchOnce(task, onEvent, remainingTimeoutMs, generation),
       onStreamEvent,
     );
   }
@@ -271,8 +293,12 @@ export class CliAgentRunner implements SessionCapableRunner {
     task: AgentTask,
     onStreamEvent?: (event: AgentOutputStreamEvent) => void,
     timeoutOverrideMs?: number,
+    generation = this.cancellationGeneration,
   ): Promise<AgentResult> {
     const startTime = Date.now();
+    if (generation !== this.cancellationGeneration) {
+      return this.cancelledResult(task, startTime);
+    }
     const timeoutMs =
       timeoutOverrideMs ??
       (task.constraints.timeout || this.config.defaultTimeoutMs || DEFAULT_TIMEOUT_MS);
@@ -318,6 +344,9 @@ export class CliAgentRunner implements SessionCapableRunner {
     }
 
     try {
+      if (generation !== this.cancellationGeneration) {
+        return this.cancelledResult(task, startTime);
+      }
       const subprocess = execa(command, args, {
         cwd: task.repoRoot,
         timeout: timeoutMs,

@@ -1,3 +1,4 @@
+import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -24,6 +25,7 @@ export class LockManager {
       acquiredAt: new Date().toISOString(),
       lockPath,
       hostname: hostname(),
+      ownershipToken: randomUUID(),
     };
 
     mkdirSync(dirname(lockPath), { recursive: true });
@@ -60,7 +62,7 @@ export class LockManager {
       throw new RunAlreadyActiveError(runId, existing.pid);
     }
 
-    this.removeStaleLock(lockPath);
+    this.removeStaleLock(lockPath, existing, runId);
     try {
       writeFileSync(lockPath, data, { encoding: 'utf8', flag: 'wx' });
     } catch (retryErr: unknown) {
@@ -71,8 +73,24 @@ export class LockManager {
   }
 
   release(handle: LockHandle): void {
-    if (existsSync(handle.lockPath)) {
+    const existing = this.readLock(handle.lockPath);
+    if (
+      !existing ||
+      existing.runId !== handle.runId ||
+      existing.pid !== handle.pid ||
+      existing.hostname !== handle.hostname ||
+      existing.acquiredAt !== handle.acquiredAt ||
+      existing.lockPath !== handle.lockPath ||
+      existing.ownershipToken !== handle.ownershipToken
+    ) {
+      return;
+    }
+    try {
       unlinkSync(handle.lockPath);
+    } catch (error: unknown) {
+      if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) {
+        throw error;
+      }
     }
   }
 
@@ -124,8 +142,10 @@ export class LockManager {
     try {
       process.kill(pid, 0);
       return true;
-    } catch {
-      return false;
+    } catch (error: unknown) {
+      // Only ESRCH establishes that the owner is gone. EPERM means it exists but
+      // cannot be signalled; other probe failures must also preserve its lock.
+      return !(error instanceof Error && 'code' in error && error.code === 'ESRCH');
     }
   }
 
@@ -140,11 +160,30 @@ export class LockManager {
     throw new LockAcquisitionError(runId, message);
   }
 
-  private removeStaleLock(lockPath: string): void {
+  private removeStaleLock(lockPath: string, observed: LockHandle, runId: RunId): void {
+    // A permanent claim for this dead acquisition prevents two delayed reapers
+    // from unlinking each other's successor. Never recycle a claim: if its owner
+    // crashes before removal, recovery must fail closed for operator inspection.
+    const fingerprint = createHash('sha256').update(stringify(observed)).digest('hex');
+    const claimPath = `${lockPath}.reclaim-${fingerprint}`;
+    try {
+      mkdirSync(claimPath);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new LockAcquisitionError(
+        runId,
+        `Stale lock reclamation already claimed or unavailable: ${message}`,
+      );
+    }
+    const current = this.readLock(lockPath);
+    if (!current || stringify(current) !== stringify(observed)) {
+      throw new LockAcquisitionError(runId, 'Lock owner changed during stale lock reclamation');
+    }
     try {
       unlinkSync(lockPath);
-    } catch {
-      // Best-effort cleanup
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new LockAcquisitionError(runId, message);
     }
   }
 }

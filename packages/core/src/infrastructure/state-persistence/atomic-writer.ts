@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, renameSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import { getErrorMessage } from '@ai-dev-orchestrator/utils';
@@ -14,7 +14,9 @@ export async function atomicWriteState(filePath: string, content: string): Promi
     mkdirSync(dir, { recursive: true });
 
     if (existsSync(filePath)) {
-      renameSync(filePath, bakPath);
+      // Preserve the primary until write-file-atomic replaces it. Readers and failed writes
+      // must continue to see the last committed checkpoint throughout backup creation.
+      await writeFileAtomic(bakPath, readFileSync(filePath, 'utf8'), { encoding: 'utf8' });
     }
 
     await writeFileAtomic(filePath, content, { encoding: 'utf8' });

@@ -16,7 +16,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -87,22 +87,23 @@ if (isMainModule) {
       cwd: tempDir,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
+
+    const message = `Cloned ${repoSlug} and checked out PR #${String(source.prNumber)} at ${tempDir}`;
+    console.log(message);
+
+    if (scriptResultPath) {
+      writeFileSync(
+        scriptResultPath,
+        JSON.stringify({
+          message,
+          directives: { repoRoot: tempDir },
+        }),
+        'utf-8',
+      );
+    }
   } catch (err) {
+    rmSync(tempDir, { recursive: true, force: true });
     console.error(`Failed to clone/checkout: ${String(err)}`);
     process.exit(1);
-  }
-
-  const message = `Cloned ${repoSlug} and checked out PR #${String(source.prNumber)} at ${tempDir}`;
-  console.log(message);
-
-  if (scriptResultPath) {
-    writeFileSync(
-      scriptResultPath,
-      JSON.stringify({
-        message,
-        directives: { repoRoot: tempDir },
-      }),
-      'utf-8',
-    );
   }
 }

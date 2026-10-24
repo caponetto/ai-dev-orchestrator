@@ -19,7 +19,7 @@ import type {
 } from '@ai-dev-orchestrator/ports';
 import { createRunId } from '@ai-dev-orchestrator/ports';
 import { DefaultRoleRegistry } from '@ai-dev-orchestrator/role-system';
-import type { RunManifest, WorkflowDefinition } from '@ai-dev-orchestrator/schemas';
+import type { ArtifactRef, RunManifest, WorkflowDefinition } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi } from 'vitest';
 
 import { LifecycleController } from '@ai-dev-orchestrator/workflow';
@@ -70,13 +70,13 @@ function makeRunner(): RunnerSystem {
 }
 
 function makeArtifactStore(): ArtifactStore {
-  return {
+  const store: ArtifactStore = {
     store: vi.fn().mockResolvedValue({ type: 'plan', name: 'plan', version: 1, checksum: 'abc' }),
     get: vi.fn().mockImplementation((ref: { type: string; content?: string }) => {
       if (ref.content) {
         return Promise.resolve(ref);
       }
-      return Promise.resolve(null);
+      return store.getLatest(ref.type as ArtifactRef['type'], ref.type);
     }),
     getLatest: vi.fn().mockImplementation((type: string) => {
       if (type === 'clarification_questions') {
@@ -114,6 +114,7 @@ function makeArtifactStore(): ArtifactStore {
     verify: vi.fn().mockResolvedValue({ valid: true }),
     inventory: vi.fn().mockResolvedValue({ artifacts: [], totalSize: 0 }),
   };
+  return store;
 }
 
 function makeGovernance(): GovernanceEngine {

@@ -32,9 +32,9 @@ The OpenCode runner invokes `opencode run --format json --auto`, forwarding the 
 
 At startup, the OpenCode capability probe records the models reported by `opencode models`. Before dispatch, the runner rejects a configured model missing from that list and emits an actionable error in the run stream. The dashboard shows the failure reason in the run's Chat tab. If model discovery returns no usable list, dispatch proceeds and OpenCode reports its own errors.
 
-Claude Code, Codex, Cursor, and OpenCode use a shared retry policy for transient service errors. The CLI runner retries once after a short delay only when the agent has not used a tool or reported token usage. Both attempts share the task's original timeout, and the retry appears in the run stream. Cursor can report a service failure by exiting without a final result event; the runner also checks stderr from a nonzero exit in that case. Errors after tool work begins are returned without an automatic retry to avoid repeating side effects.
+Claude Code, Codex, Cursor, and OpenCode use a shared retry policy for transient service errors. The CLI runner retries once after a short delay only when the agent has not used a tool or reported token usage. Both attempts share the task's original timeout, and the retry appears in the run stream. Cursor can report a service failure by exiting without a final result event; the runner also checks stderr from a nonzero exit in that case. Errors after tool work begins are returned without an automatic retry to avoid repeating side effects. Cancellation invalidates pending task-file preparation, handshake fallback and transient retry attempts as well as stopping active subprocesses; a cancelled dispatch cannot launch another attempt after a delay. New dispatches requested later can use the runner again.
 
-Codex approval prompts are bridged to the orchestrator dashboard through a Codex `PermissionRequest` hook. Before each Codex dispatch, the runner writes a per-run hook launcher under `.ai/runs/<run-id>/` and passes a `-c hooks.PermissionRequest=...` override plus `--dangerously-bypass-hook-trust`. The hook invokes `ai codex-permission-hook`, which maps Codex approval requests into the same `DefaultPermissionPolicy` and `FileBackedLiveRequestStore` flow used by Claude Code and Cursor. Writes under `~/.ai/` are auto-granted; other operations surface as dashboard permission prompts.
+Codex approval prompts are bridged to the orchestrator dashboard through a Codex `PermissionRequest` hook. Before each Codex dispatch, the runner writes a per-run hook launcher under `.ai/runs/<run-id>/` and passes a `-c hooks.PermissionRequest=...` override plus `--dangerously-bypass-hook-trust`. The hook invokes `ai codex-permission-hook`, which maps Codex approval requests into the same `DefaultPermissionPolicy` and `FileBackedLiveRequestStore` flow used by Claude Code and Cursor. File writes inside the current run's `~/.ai/runs/<run-id>/` (or repository-local equivalent) are auto-granted after resolving existing symlinks. Cross-run/global configuration writes and paths containing `..` do not receive this exemption. Other operations follow explicit rules, saved approvals and role trust.
 
 ## Protocol and Sessions
 
@@ -47,7 +47,9 @@ The session model currently includes:
 - `RemoteAgentSessionSupervisor` for reconnectable remote sessions
 - `CompositeAgentSessionSupervisor` for unified session handling
 
-Live requests are stored under `.ai/runs/<run-id>/live-requests/` and responses under `.ai/runs/<run-id>/live-responses/`.
+Live requests are stored under `.ai/runs/<run-id>/live-requests/` and responses under `.ai/runs/<run-id>/live-responses/`. Identifiers must be single path components. Readers require the embedded run/request IDs to match the requested file; malformed or mismatched responses leave the request pending. A response is published atomically without overwriting an existing answer. Identical retries are idempotent; conflicting answers are rejected.
+
+Permission heuristics check actual operation types before display labels. Every pipeline segment must qualify as read-only; redirects, substitutions and compound safe-command extensions require the applicable policy/approval. Cached file approvals use path boundaries, and cached shell approvals cannot expand into another command through shell operators. Explicit deny rules retain precedence over grants. These heuristics complement the agent sandbox; they are not a general shell parser.
 
 ## Key Implementation Files
 

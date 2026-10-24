@@ -12,6 +12,7 @@ import type {
 } from '@ai-dev-orchestrator/ports';
 import { ShutdownCoordinator } from '@ai-dev-orchestrator/recovery';
 import type {
+  ArtifactRef,
   GovernanceOutcome,
   RunManifest,
   WorkflowRunConfig,
@@ -83,14 +84,14 @@ function makeReviewRunner(): RunnerSystem {
 }
 
 function makeReviewStore(): ArtifactStore {
-  return {
+  const store: ArtifactStore = {
     store: vi.fn().mockResolvedValue({
       type: 'plan_review',
       name: 'plan_review',
       version: 1,
       checksum: 'abc',
     }),
-    get: vi.fn().mockResolvedValue(null),
+    get: vi.fn((ref: ArtifactRef) => store.getLatest(ref.type, ref.name)),
     getLatest: vi.fn().mockResolvedValue({
       type: 'plan_review',
       name: 'plan_review',
@@ -103,12 +104,13 @@ function makeReviewStore(): ArtifactStore {
     verify: vi.fn().mockResolvedValue({ valid: true }),
     inventory: vi.fn().mockResolvedValue({ artifacts: [], totalSize: 0 }),
   };
+  return store;
 }
 
 function makeStore(): ArtifactStore {
-  return {
+  const store: ArtifactStore = {
     store: vi.fn().mockResolvedValue({ type: 'plan', name: 'plan', version: 1, checksum: 'abc' }),
-    get: vi.fn().mockResolvedValue(null),
+    get: vi.fn((ref: ArtifactRef) => store.getLatest(ref.type, ref.name)),
     getLatest: vi
       .fn()
       .mockResolvedValue({ type: 'plan', name: 'plan', version: 1, checksum: 'abc', content: '' }),
@@ -117,6 +119,7 @@ function makeStore(): ArtifactStore {
     verify: vi.fn().mockResolvedValue({ valid: true }),
     inventory: vi.fn().mockResolvedValue({ artifacts: [], totalSize: 0 }),
   };
+  return store;
 }
 
 function makeGovernance(): GovernanceEngine {
@@ -1453,7 +1456,7 @@ describe('LifecycleController', () => {
       await expect(controller.retry()).rejects.toThrow('No active run to retry');
     });
 
-    it('should throw when current state is terminal', async () => {
+    it('should throw when current state is a completed success terminal', async () => {
       const controller = new LifecycleController({
         runner: makeRunner(),
         artifactStore: makeStore(),
@@ -1466,11 +1469,11 @@ describe('LifecycleController', () => {
       controller.restore(makeConfig(), {
         runId: 'run-001',
         schemaVersion: 2,
-        currentState: 'ABORTED',
+        currentState: 'DONE',
         previousState: 'PLANNING',
         stateEnteredAt: new Date().toISOString(),
         transitionCount: 5,
-        stateHistory: ['INTAKE', 'PLANNING', 'ABORTED'],
+        stateHistory: ['INTAKE', 'PLANNING', 'DONE'],
         iterationCounts: {},
         activeArtifacts: [],
         lastProducedArtifact: null,

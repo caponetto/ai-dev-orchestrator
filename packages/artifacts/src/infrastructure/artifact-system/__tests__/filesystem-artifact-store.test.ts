@@ -9,10 +9,12 @@ import {
   ArtifactNotFoundError,
   OwnershipViolationError,
   TypeValidationError,
+  InventoryCorruptionError,
 } from '../../../domain/artifact-system/errors';
 import { DefaultArtifactTypeValidator } from '../artifact-type-validator';
 import { DefaultOwnershipRegistry } from '../default-ownership-registry';
 import { FilesystemArtifactStore } from '../filesystem-artifact-store';
+import { InventoryManager } from '../inventory-manager';
 
 function createStore(): { store: FilesystemArtifactStore; runDir: string } {
   const runDir = mkdtempSync(join(tmpdir(), 'fs-store-'));
@@ -56,7 +58,60 @@ function validInput(overrides?: Partial<ArtifactInput>): ArtifactInput {
 }
 
 describe('FilesystemArtifactStore', () => {
+  it('reports a corrupt inventory instead of silently losing committed artifacts and permits explicit rebuilding', async () => {
+    const { store, runDir } = createStore();
+    const ref = await store.store(validInput());
+    writeFileSync(join(runDir, 'inventory.yaml'), 'artifacts: not-an-array');
+    const restored = new FilesystemArtifactStore(
+      runDir,
+      'run-test',
+      new DefaultOwnershipRegistry(),
+      new DefaultArtifactTypeValidator(),
+    );
+    await expect(async () => restored.inventory()).rejects.toThrow(InventoryCorruptionError);
+    await new InventoryManager(runDir, 'run-test').rebuild(join(runDir, 'artifacts'));
+    expect((await restored.inventory()).artifacts.map((entry) => entry.ref)).toEqual([ref]);
+  });
+
   describe('store', () => {
+    it('serializes concurrent versions and preserves inventory across stores for the same run', async () => {
+      const { store, runDir } = createStore();
+      const second = new FilesystemArtifactStore(
+        runDir,
+        'run-test',
+        new DefaultOwnershipRegistry(),
+        new DefaultArtifactTypeValidator(),
+      );
+      const contents = ['first', 'second', 'third'];
+      const refs = await Promise.all(
+        contents.map((content, index) =>
+          (index === 1 ? second : store).store(validInput({ content })),
+        ),
+      );
+      expect(refs.map((ref) => ref.version)).toEqual([1, 2, 3]);
+      for (const [index, ref] of refs.entries()) {
+        expect((await store.get(ref)).content).toBe(contents[index]);
+        expect((await store.verify(ref)).valid).toBe(true);
+      }
+      const reloaded = new FilesystemArtifactStore(
+        runDir,
+        'run-test',
+        new DefaultOwnershipRegistry(),
+        new DefaultArtifactTypeValidator(),
+      );
+      expect((await reloaded.inventory()).artifacts.map((entry) => entry.ref)).toEqual(refs);
+      expect((await second.inventory()).artifacts.map((entry) => entry.ref)).toEqual(refs);
+      expect(await second.list({})).toEqual(refs);
+    });
+
+    it('allows later writes after an earlier queued write fails validation', async () => {
+      const { store } = createStore();
+      const failed = store.store(validInput({ producedBy: 'implementer' }));
+      const success = store.store(validInput());
+      await expect(failed).rejects.toThrow(OwnershipViolationError);
+      await expect(success).resolves.toMatchObject({ version: 1 });
+    });
+
     it('stores an artifact and returns a ref', async () => {
       const { store } = createStore();
       const ref = await store.store(validInput());

@@ -61,6 +61,23 @@ describe('FileBackedPermissionApprovalStore', () => {
   });
 
   describe('findMatch', () => {
+    it('does not extend a file approval to sibling prefixes or traversal escapes', async () => {
+      await store.record({ action: 'file_write', resource: '/repo/src' });
+      expect(store.findMatch('file_write', '/repo/src-evil/file.ts')).toBeUndefined();
+      expect(store.findMatch('file_write', '/repo/src/../private/file.ts')).toBeUndefined();
+      expect(store.findMatch('file_write', '/repo/src/nested/file.ts')).toBeDefined();
+    });
+
+    it.each([
+      'npm testing',
+      'npm test && touch /tmp/file',
+      'npm test | sh',
+      'npm test $(touch /tmp/file)',
+    ])('does not extend a command approval to another operation: %s', async (resource) => {
+      await store.record({ action: 'shell_execute', resource: 'npm test' });
+      expect(store.findMatch('shell_execute', resource)).toBeUndefined();
+    });
+
     it('returns undefined when no approvals exist', async () => {
       await store.reload();
       expect(store.findMatch('shell_execute', 'npm test')).toBeUndefined();

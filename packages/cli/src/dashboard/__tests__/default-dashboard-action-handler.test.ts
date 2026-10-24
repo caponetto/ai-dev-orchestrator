@@ -134,6 +134,37 @@ describe('DefaultDashboardActionHandler', () => {
     expect(abortMock).toHaveBeenCalledWith('sess-42', 'Aborted via dashboard');
   });
 
+  it('rejects a stale session abort before signalling the current run process', async () => {
+    const abort = vi.fn().mockResolvedValue(true);
+    const supervisor = makeSupervisor({ abort });
+    const streamBus = makeStreamBus();
+    const publish = vi.spyOn(streamBus, 'publish');
+    const handler = new DefaultDashboardActionHandler(supervisor, streamBus);
+    await seedRunState('run-stale-abort', {
+      waitingContext: { liveSessionId: 'current-session' },
+    });
+    const lockPath = join(getRunDir('run-stale-abort'), 'run.lock');
+    const lockContent = JSON.stringify({ pid: 424242, hostname: hostname() });
+    writeFileSync(lockPath, lockContent);
+    const kill = vi.spyOn(process, 'kill').mockReturnValue(true);
+    try {
+      const result = await handler.abort('run-stale-abort', { sessionId: 'stale-session' });
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Session ID mismatch: expected current-session, got stale-session',
+      });
+      expect(kill).not.toHaveBeenCalled();
+      expect(abort).not.toHaveBeenCalled();
+      expect(publish).not.toHaveBeenCalled();
+      expect(
+        new DefaultStatePersistence(getRunsDir()).load('run-stale-abort' as RunId),
+      ).toMatchObject({ currentState: 'WAITING_FOR_HUMAN' });
+    } finally {
+      kill.mockRestore();
+    }
+  });
+
   it('abort calls supervisor.abort with explicit sessionId', async () => {
     const abortMock = vi.fn().mockResolvedValue(true);
     const supervisor = makeSupervisor({ abort: abortMock });
@@ -215,6 +246,54 @@ describe('DefaultDashboardActionHandler', () => {
   });
 
   describe('retry', () => {
+    it('leaves a failed checkpoint intact when the retry process cannot be started', async () => {
+      await seedRunState('run-spawn-failure', {
+        currentState: 'FAILED',
+        previousState: 'IMPLEMENTATION',
+      });
+      const persistence = new DefaultStatePersistence(getRunsDir());
+      const original = persistence.load('run-spawn-failure' as RunId);
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        throw new Error('cannot start retry process');
+      });
+
+      const result = await new DefaultDashboardActionHandler().retry('run-spawn-failure');
+
+      expect(result).toEqual({ success: false, error: 'cannot start retry process' });
+      expect(persistence.load('run-spawn-failure' as RunId)).toEqual(original);
+    });
+
+    it('rejects retry of a completed success without changing its checkpoint', async () => {
+      await seedRunState('run-completed', { currentState: 'DONE', previousState: 'WRAP_UP' });
+      const result = await new DefaultDashboardActionHandler().retry('run-completed');
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('completed');
+      expect(
+        new DefaultStatePersistence(getRunsDir()).load('run-completed' as RunId)?.currentState,
+      ).toBe('DONE');
+    });
+
+    it('rejects retry while unfinished terminal cleanup has a live owner', async () => {
+      await seedRunState('run-owned-cleanup', {
+        currentState: 'WRAP_UP',
+        previousState: 'WRAP_UP',
+        pendingTerminalState: 'DONE',
+      });
+      const persistence = new DefaultStatePersistence(getRunsDir());
+      const lock = persistence.acquireLock('run-owned-cleanup' as RunId);
+      const kill = vi.spyOn(process, 'kill').mockReturnValue(true);
+      try {
+        const result = await new DefaultDashboardActionHandler().retry('run-owned-cleanup');
+        expect(result.success).toBe(false);
+        expect(result.error).toContain('active');
+        expect(kill).not.toHaveBeenCalledWith(-process.pid, 'SIGTERM');
+        expect(existsSync(lock.lockPath)).toBe(true);
+      } finally {
+        kill.mockRestore();
+        persistence.releaseLock(lock);
+      }
+    });
+
     it('returns error when run directory does not exist', async () => {
       const handler = new DefaultDashboardActionHandler();
       const result = await handler.retry('nonexistent-run');
@@ -284,7 +363,7 @@ describe('DefaultDashboardActionHandler', () => {
       expect(result.error).toContain('terminal state');
     });
 
-    it('rewrites checkpoint and spawns CLI on valid aborted run', async () => {
+    it('spawns retry without rewriting an aborted checkpoint before the child owns its lock', async () => {
       const handler = new DefaultDashboardActionHandler();
       await seedRunState('run-1', {
         currentState: 'ABORTED',
@@ -298,10 +377,10 @@ describe('DefaultDashboardActionHandler', () => {
       const runsDir = getRunsDir();
       const persistence = new DefaultStatePersistence(runsDir);
       const state = persistence.load('run-1' as RunId);
-      expect(state?.currentState).toBe('IMPLEMENTATION');
+      expect(state?.currentState).toBe('ABORTED');
     });
 
-    it('rewrites checkpoint for FAILED runs', async () => {
+    it('preserves a FAILED checkpoint for the engine to retry under its lock', async () => {
       const handler = new DefaultDashboardActionHandler();
       await seedRunState('run-1', {
         currentState: 'FAILED',
@@ -315,7 +394,7 @@ describe('DefaultDashboardActionHandler', () => {
       const runsDir = getRunsDir();
       const persistence = new DefaultStatePersistence(runsDir);
       const state = persistence.load('run-1' as RunId);
-      expect(state?.currentState).toBe('CODE_REVIEW');
+      expect(state?.currentState).toBe('FAILED');
     });
   });
 
@@ -893,7 +972,12 @@ describe('DefaultDashboardActionHandler', () => {
 
   it('force aborts a lock-only run before the first checkpoint exists', async () => {
     const handler = new DefaultDashboardActionHandler();
-    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation((_pid, signal) => {
+      if (signal === 0) {
+        throw Object.assign(new Error('terminated'), { code: 'ESRCH' });
+      }
+      return true;
+    });
     const runId = 'run-1';
     const runDir = getRunDir(runId);
     const lockPath = join(runDir, 'run.lock');

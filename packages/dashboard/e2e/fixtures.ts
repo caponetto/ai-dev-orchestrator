@@ -399,11 +399,11 @@ async function setupDefaultMocks(page: Page) {
  * Intercepts dashboard API calls and returns canned JSON responses so e2e
  * tests can run against the Vite dev server alone (no dashboard-server).
  */
-export const test = base.extend<{ mockApi: void }>({
+export const test = base.extend<{ mockApi: undefined }>({
   mockApi: [
     async ({ page }, use) => {
       await setupDefaultMocks(page);
-      await use();
+      await use(undefined);
     },
     { auto: true },
   ],

@@ -23,6 +23,32 @@ function makeDetector() {
 }
 
 describe('DefaultStalenessDetector', () => {
+  it('refreshes direct checks when newer provenance is recorded between calls', () => {
+    const { provenance, detector } = makeDetector();
+    const spec = ref('canonical_specification', 'spec', 1);
+    const plan = ref('plan', 'plan', 1);
+    provenance.recordDerivation(plan, [spec], 'first');
+    expect(detector.isStale(plan).stale).toBe(false);
+    provenance.recordDerivation(ref('canonical_specification', 'spec', 2), [], 'second');
+    expect(detector.isStale(plan).stale).toBe(true);
+  });
+
+  it('invalidates consumers of the prior version and propagates through unchanged intermediate refs', () => {
+    const { provenance, detector } = makeDetector();
+    const spec = ref('canonical_specification', 'spec', 1);
+    const plan = ref('plan', 'plan', 1);
+    const implementation = ref('implementation', 'implementation', 1);
+    provenance.recordDerivation(plan, [spec], 'planner');
+    provenance.recordDerivation(implementation, [plan], 'implementer');
+    const changed = ref('canonical_specification', 'spec', 2);
+
+    const stale = detector.computeStaleSet(changed);
+
+    expect(stale.staleArtifacts.map((entry) => entry.artifact)).toEqual([plan, implementation]);
+    expect(stale.rebuildOrder).toEqual(['plan', 'implementation']);
+    expect(detector.isStale(implementation).stale).toBe(true);
+  });
+
   it('reports artifact as not stale when inputs are current', () => {
     const { provenance, detector } = makeDetector();
     const spec = ref('canonical_specification', 'spec', 1);

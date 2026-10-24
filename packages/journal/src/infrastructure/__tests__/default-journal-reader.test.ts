@@ -42,6 +42,19 @@ function writeJournal(filePath: string, events: JournalEvent[]): void {
 }
 
 describe('DefaultJournalReader', () => {
+  it('skips syntactically valid YAML blocks that are not event envelopes', () => {
+    const filePath = join(TEST_DIR, 'journal.md');
+    const valid = makeEvent();
+    const corrupt = ['null', '[]', 'not-an-event', 'runId: run-001\nsequence: wrong\ndata: null'];
+    writeFileSync(
+      filePath,
+      [...corrupt, stringify(valid)].map((block) => `\`\`\`yaml\n${block}\n\`\`\`\n`).join(''),
+    );
+    const reader = new DefaultJournalReader(filePath);
+    expect(reader.readAll()).toEqual([valid]);
+    expect(reader.query({ role: 'planner' })).toEqual([valid]);
+  });
+
   it('returns empty array when file does not exist', () => {
     const reader = new DefaultJournalReader(join(TEST_DIR, 'missing.md'));
     expect(reader.readAll()).toEqual([]);

@@ -93,7 +93,8 @@ export class TokenBudgetManager {
       if (strategy === 'summary') {
         const placeholder = `[Content truncated: ${artifact.ref.type} artifact, ${String(artifact.tokenEstimate)} tokens]`;
         const placeholderTokens = this.tokenEstimator.estimate(placeholder);
-        if (placeholderTokens <= remaining) {
+        const included = placeholderTokens <= remaining;
+        if (included) {
           result.push({
             ref: artifact.ref,
             content: placeholder,
@@ -104,8 +105,7 @@ export class TokenBudgetManager {
         truncations.push({
           artifactType: artifact.ref.type,
           originalTokens: artifact.tokenEstimate,
-          truncatedTokens:
-            placeholderTokens <= remaining + placeholderTokens ? placeholderTokens : 0,
+          truncatedTokens: included ? placeholderTokens : 0,
           strategy: 'summary',
         });
         continue;

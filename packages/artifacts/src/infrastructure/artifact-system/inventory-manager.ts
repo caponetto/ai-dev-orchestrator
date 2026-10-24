@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import {
   INVENTORY_FILENAME,
+  artifactSummarySchema,
   type ArtifactInventory,
   type ArtifactMetadata,
   type ArtifactRef,
@@ -24,15 +25,17 @@ export class InventoryManager {
   constructor(runDir: string, runId: string) {
     this.runId = runId;
     this.inventoryPath = join(runDir, INVENTORY_FILENAME);
-    this.loadFromDisk();
   }
 
   async addEntry(summary: ArtifactSummary): Promise<void> {
+    // Another store owned by this run may have committed entries since construction.
+    this.loadFromDisk();
     this.artifacts.push(summary);
     await this.persist();
   }
 
   async removeEntry(ref: ArtifactRef): Promise<void> {
+    this.loadFromDisk();
     this.artifacts = this.artifacts.filter(
       (a) => !(a.ref.type === ref.type && a.ref.name === ref.name && a.ref.version === ref.version),
     );
@@ -40,6 +43,7 @@ export class InventoryManager {
   }
 
   getInventory(): ArtifactInventory {
+    this.loadFromDisk();
     const totalSizeBytes = this.artifacts.reduce((sum, a) => sum + a.sizeBytes, 0);
     return {
       runId: this.runId,
@@ -50,6 +54,7 @@ export class InventoryManager {
   }
 
   listRefs(query?: { type?: ArtifactType; name?: string; producedBy?: string }): ArtifactRef[] {
+    this.loadFromDisk();
     let filtered = this.artifacts;
     if (query?.type) {
       filtered = filtered.filter((a) => a.type === query.type);
@@ -118,6 +123,7 @@ export class InventoryManager {
 
   private loadFromDisk(): void {
     if (!fileExists(this.inventoryPath)) {
+      this.artifacts = [];
       return;
     }
 
@@ -130,20 +136,33 @@ export class InventoryManager {
       };
       const content = readContent(this.inventoryPath, inventoryRef);
       const data = parse(content) as { artifacts?: unknown[] };
-      if (Array.isArray(data.artifacts)) {
-        this.artifacts = (data.artifacts as ArtifactSummary[]).map((raw) => {
-          const r = raw as unknown as Record<string, unknown>;
-          const ref: ArtifactRef = (r.ref as ArtifactRef | undefined) ?? {
-            type: raw.type,
-            name: raw.name,
-            version: raw.version,
-            checksum: typeof r.checksum === 'string' ? r.checksum : '',
-          };
-          return { ...raw, ref };
-        });
+      if (!Array.isArray(data.artifacts)) {
+        throw new InventoryCorruptionError('Expected an artifacts array');
       }
-    } catch {
-      this.artifacts = [];
+      this.artifacts = (data.artifacts as ArtifactSummary[]).map((raw) => {
+        const r = raw as unknown as Record<string, unknown>;
+        const ref: ArtifactRef = (r.ref as ArtifactRef | undefined) ?? {
+          type: raw.type,
+          name: raw.name,
+          version: raw.version,
+          checksum: typeof r.checksum === 'string' ? r.checksum : '',
+        };
+        const summary = artifactSummarySchema.safeParse({ ...raw, ref });
+        if (
+          !summary.success ||
+          ref.type !== raw.type ||
+          ref.name !== raw.name ||
+          ref.version !== raw.version
+        ) {
+          throw new InventoryCorruptionError('Invalid or inconsistent artifact summary');
+        }
+        return summary.data;
+      });
+    } catch (error: unknown) {
+      if (error instanceof InventoryCorruptionError) {
+        throw error;
+      }
+      throw new InventoryCorruptionError(`Failed to parse inventory file: ${this.inventoryPath}`);
     }
   }
 

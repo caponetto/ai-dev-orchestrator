@@ -16,6 +16,12 @@ The current engine:
 
 Start, resume, and retry allow one execution loop per controller. Abort sets `ABORTED` before awaiting cancellation, blocks a new execution until cancellation finishes, and prevents in-flight cleanup from reporting success. Workers cancelled during context or prompt preparation cannot launch an agent afterward; cancellation also stops queued parallel workers. Resume requested during a manual pause waits for the active action to settle and checkpoint its cursor before acquiring the next run lock. Concurrent execution or restore operations are rejected. Starting a new run clears previous usage, worker metrics, feedback, action cursors, and iteration counters.
 
+Retry accepts a restored `FAILED` or `ABORTED` run without an external checkpoint rewrite.
+It acquires the run lock, checkpoints the previous non-terminal action state, and executes
+that state's actions again, preserving prior usage and iteration counters. A missing, terminal,
+or human-wait source is rejected. Completed successful runs cannot be retried. Unfinished
+terminal cleanup retains its cursor and continues without rewinding or rerunning workers.
+
 Governance escalation pauses without advancing the requested transition and releases the run lock for resume. Model escalation evaluates the stronger model's output, reruns dependent entry actions such as agreement generation, preserves feedback and iteration context, tries each available higher tier once per state visit, and waits for a human after the tier ladder is exhausted. Completed redispatch usage counts once, including when it causes a budget pause.
 
 If no transition matches a completed state's trigger and guards, the engine records an error and checkpoints `FAILED` when that terminal state is declared, falling back to `ABORTED` if available. Workflows with neither failure terminal checkpoint the current state and throw `TransitionError`, allowing an explicit retry. All paths release the run lock.
@@ -150,3 +156,13 @@ Prefer:
 - `packages/config-templates/src/static/workflows/dev.yaml`
 - `packages/config-templates/src/static/workflows/pr-review.yaml`
 - `packages/config-templates/src/static/workflows/task-breakdown.yaml`
+
+## Review evidence and partial batches
+
+Review and judge decisions read the exact artifact reference produced by the action, including version/checksum, rather than a later version with the same name. Missing/unreadable evidence or artifacts marked invalid cannot approve. Existing parallel-review policy tolerates provider-failed reviewers when surviving reviewers produce valid approvals; a successful/semantic-failure reviewer missing its required evidence cannot approve. This is partial-review policy, not a guarantee that every configured reviewer ran successfully.
+
+Dynamic batches preserve original task identities when workers fail or pause. They can retain partial successful results, but failure to persist the required aggregate is an action failure; an older aggregate must not make that action appear successful.
+
+The workflow execution timeout applies to one controller execution. Restore and explicit retry start a new execution timeout; token/iteration totals and budget approvals remain persisted. Agent transient retries share their original dispatch timeout.
+
+For PR-review publishing, a crash after `gh gist create` succeeds but before the result/cursor is saved has an uncertain external outcome. Before retrying PUBLISH_FINDINGS, inspect the authenticated account's Gists for `PR Review Findings — run <runId>` and reconcile the existing URL to avoid duplicate publishing. PR-review clone cleanup is best-effort; inspect retained temporary clones after a failed or forced run. Setup failures remove newly allocated clones before a repository directive can be saved.

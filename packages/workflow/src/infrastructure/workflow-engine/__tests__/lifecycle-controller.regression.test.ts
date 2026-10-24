@@ -152,6 +152,108 @@ function workerResult(role: RoleId, type?: ArtifactType): DispatchResult {
 }
 
 describe('LifecycleController escalation regressions', () => {
+  it.each([
+    { source: null, message: 'no previous workflow state' },
+    { source: 'MISSING', message: 'no previous workflow state' },
+    { source: 'DONE', message: 'terminal state' },
+    { source: 'WAITING_FOR_HUMAN', message: 'without human input' },
+  ])(
+    'rejects an unsafe retry target $source without taking a lock',
+    async ({ source, message }) => {
+      const f = createFixture();
+      const c = config();
+      vi.mocked(f.runner).dispatch.mockResolvedValue({
+        ...workerResult('planner'),
+        status: 'failure',
+      });
+      await new LifecycleController(f).start(c);
+      const checkpoint = f.statePersistence.load(createRunId(c.runId));
+      assert(checkpoint);
+      const restored = new LifecycleController(f);
+      restored.restore(c, { ...checkpoint, previousState: source });
+      vi.mocked(f.statePersistence).acquireLock.mockClear();
+
+      await expect(restored.retry()).rejects.toThrow(message);
+      expect(f.statePersistence.acquireLock).not.toHaveBeenCalled();
+      expect(f.runner.dispatch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('does not run retry actions if checkpointing the selected source fails', async () => {
+    const f = createFixture();
+    const c = config();
+    vi.mocked(f.runner).dispatch.mockResolvedValue({
+      ...workerResult('planner'),
+      status: 'failure',
+    });
+    await new LifecycleController(f).start(c);
+    const checkpoint = f.statePersistence.load(createRunId(c.runId));
+    assert(checkpoint);
+    const restored = new LifecycleController(f);
+    restored.restore(c, checkpoint);
+    vi.mocked(f.statePersistence).save.mockRejectedValueOnce(new Error('cannot checkpoint retry'));
+
+    await expect(restored.retry()).rejects.toThrow('cannot checkpoint retry');
+    expect(f.runner.dispatch).toHaveBeenCalledTimes(1);
+    expect(f.statePersistence.releaseLock).toHaveBeenCalledTimes(2);
+    expect(f.statePersistence.load(createRunId(c.runId))).toEqual(checkpoint);
+  });
+
+  it.each(['FAILED', 'ABORTED'])(
+    'retries a restored %s run without an external checkpoint rewrite',
+    async (terminal) => {
+      const f = createFixture();
+      const c = config();
+      c.workflowDefinition.terminalStates = ['DONE', terminal];
+      c.workflowDefinition.states[terminal] = {
+        type: 'terminal',
+        description: '',
+        transitions: [],
+      };
+      c.workflowDefinition.states['WORK'].transitions[1].target = terminal;
+      vi.mocked(f.runner)
+        .dispatch.mockResolvedValueOnce({ ...workerResult('planner'), status: 'failure' })
+        .mockResolvedValue(workerResult('planner'));
+      expect((await new LifecycleController(f).start(c)).finalState).toBe(terminal);
+      const checkpoint = f.statePersistence.load(createRunId(c.runId));
+      assert(checkpoint);
+      const restored = new LifecycleController(f);
+      restored.restore(c, checkpoint);
+
+      expect((await restored.retry()).finalState).toBe('DONE');
+
+      const retried = f.statePersistence.load(createRunId(c.runId));
+      expect(retried?.stateHistory).toEqual(['WORK', terminal, 'WORK', 'DONE']);
+      expect(retried?.cumulativeInputTokens).toBe(20);
+      expect(retried?.cumulativeOutputTokens).toBe(10);
+      expect(f.runner.dispatch).toHaveBeenCalledTimes(2);
+      expect(f.statePersistence.acquireLock).toHaveBeenCalledTimes(2);
+      expect(f.statePersistence.releaseLock).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it('does not rewind a failed run when retry cannot acquire its lock', async () => {
+    const f = createFixture();
+    const c = config();
+    vi.mocked(f.runner).dispatch.mockResolvedValue({
+      ...workerResult('planner'),
+      status: 'failure',
+    });
+    await new LifecycleController(f).start(c);
+    const checkpoint = f.statePersistence.load(createRunId(c.runId));
+    assert(checkpoint);
+    const restored = new LifecycleController(f);
+    restored.restore(c, checkpoint);
+    vi.mocked(f.statePersistence).acquireLock.mockImplementationOnce(() => {
+      throw new Error('Run is already active');
+    });
+
+    await expect(restored.retry()).rejects.toThrow('already active');
+    expect(restored.getState().currentState).toBe('FAILED');
+    expect(f.statePersistence.load(createRunId(c.runId))).toEqual(checkpoint);
+    expect(f.runner.dispatch).toHaveBeenCalledTimes(1);
+  });
+
   it('preserves an abort requested while exit actions are pending', async () => {
     const f = createFixture();
     vi.mocked(f.runner).dispatch.mockResolvedValue(workerResult('planner'));

@@ -15,6 +15,7 @@ import type {
 /** Default implementation of staleness detector with propagation and clearing support. */
 export class DefaultStalenessDetector implements StalenessDetector {
   private readonly cleared = new Map<string, string>();
+  private readonly publishedVersions = new Map<string, ArtifactRef>();
 
   constructor(
     private readonly graph: DependencyGraph,
@@ -25,6 +26,11 @@ export class DefaultStalenessDetector implements StalenessDetector {
   /** @inheritdoc */
   computeStaleSet(newArtifact: ArtifactRef): StaleSet {
     this.latestCache.clear();
+    const publishedKey = `${newArtifact.type}:${newArtifact.name}`;
+    const previous = this.publishedVersions.get(publishedKey);
+    if (!previous || newArtifact.version > previous.version) {
+      this.publishedVersions.set(publishedKey, newArtifact);
+    }
     const staleArtifacts: StaleArtifact[] = [];
     const visited = new Set<string>();
 
@@ -43,6 +49,7 @@ export class DefaultStalenessDetector implements StalenessDetector {
 
   /** @inheritdoc */
   isStale(ref: ArtifactRef): StalenessResult {
+    this.latestCache.clear();
     const key = this.refKey(ref);
     if (this.cleared.has(key)) {
       return {
@@ -100,7 +107,17 @@ export class DefaultStalenessDetector implements StalenessDetector {
     const dependents = this.graph.getDependents(changedArtifact.type);
 
     for (const depType of dependents) {
-      const outputs = this.provenance.getOutputs(changedArtifact);
+      const outputs = this.provenance
+        .allRecords()
+        .filter((record) =>
+          record.inputs.some(
+            (input) =>
+              input.type === changedArtifact.type &&
+              input.name === changedArtifact.name &&
+              input.version <= changedArtifact.version,
+          ),
+        )
+        .map((record) => record.output);
       for (const output of outputs) {
         if (output.type !== depType) {
           continue;
@@ -128,26 +145,32 @@ export class DefaultStalenessDetector implements StalenessDetector {
     }
   }
 
-  private findStaleInputs(ref: ArtifactRef): readonly StaleInput[] {
+  private findStaleInputs(
+    ref: ArtifactRef,
+    visited: ReadonlySet<string> = new Set(),
+  ): readonly StaleInput[] {
+    const key = this.refKey(ref);
+    if (visited.has(key) || this.cleared.has(key)) {
+      return [];
+    }
+    const path = new Set(visited).add(key);
     const inputs = this.provenance.getInputs(ref);
     const staleInputs: StaleInput[] = [];
 
     for (const input of inputs) {
       const latest = this.getLatestSync(input);
-      if (latest && latest.version > input.version) {
-        staleInputs.push({ currentInput: input, latestAvailable: latest });
+      if (
+        (latest && latest.version > input.version) ||
+        this.findStaleInputs(input, path).length > 0
+      ) {
+        staleInputs.push({ currentInput: input, latestAvailable: latest ?? input });
       }
     }
 
     return staleInputs;
   }
 
-  /**
-   * Synchronous latest-version lookup. The ArtifactStore port is async,
-   * but staleness detection runs in-process against an in-memory store
-   * during orchestration. We cache the call result at construction boundary.
-   * For production async stores, wrap this class with an async facade.
-   */
+  /** Latest versions come from announced writes and recorded provenance, not async storage. */
   private latestCache = new Map<string, ArtifactRef | null>();
 
   private getLatestSync(ref: ArtifactRef): ArtifactRef | null {
@@ -156,7 +179,7 @@ export class DefaultStalenessDetector implements StalenessDetector {
       return this.latestCache.get(cacheKey) ?? null;
     }
 
-    let result: ArtifactRef | null = null;
+    let result: ArtifactRef | null = this.publishedVersions.get(cacheKey) ?? null;
     const records = this.provenance.allRecords();
     for (const record of records) {
       if (record.output.type === ref.type && record.output.name === ref.name) {

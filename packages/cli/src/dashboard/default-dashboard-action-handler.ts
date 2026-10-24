@@ -1,11 +1,10 @@
 import { spawn } from 'node:child_process';
 import { closeSync, existsSync, openSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { DefaultStatePersistence } from '@ai-dev-orchestrator/core';
 import { projectWorkflowPreview } from '@ai-dev-orchestrator/dashboard-server';
-import { DefaultJournalWriter } from '@ai-dev-orchestrator/journal';
 import type {
   AgentStreamBus,
   AgentSessionSupervisor,
@@ -21,10 +20,10 @@ import type {
   WorkflowSummary,
 } from '@ai-dev-orchestrator/schemas';
 
-import { TERMINAL_STATES, buildAbortedState, writeAbortJournalEntries } from '../abort-run';
+import { TERMINAL_STATES, abortRunState } from '../abort-run';
 import { loadAllWorkflows, loadWorkflowByName, preflightSelectedModels } from '../composition-root';
 import { readLockMetadata, recoverRunState, terminateRunFromLock } from '../run-state-recovery';
-import { getJournalPath, getRunsDir, getStatePath } from '../workspace-paths';
+import { getRunsDir, getStatePath } from '../workspace-paths';
 
 import { runCreationParamsToCliArgs } from './run-creation-args';
 
@@ -132,12 +131,6 @@ export class DefaultDashboardActionHandler implements DashboardActionHandler {
       return { success: true };
     }
 
-    const lockPath = join(runDir, RUN_LOCK_FILENAME);
-    const lock = recovered.lock ?? readLockMetadata(lockPath);
-    if (lock?.pid && lock.pid !== process.pid) {
-      terminateRunFromLock(lock);
-    }
-
     // v1: session abort = run abort (single session per wait).
     // Validate sessionId to prevent stale UI targeting the wrong session.
     if (options.sessionId) {
@@ -148,6 +141,12 @@ export class DefaultDashboardActionHandler implements DashboardActionHandler {
           error: `Session ID mismatch: expected ${liveSessionId}, got ${options.sessionId}`,
         };
       }
+    }
+
+    const lockPath = join(runDir, RUN_LOCK_FILENAME);
+    const lock = recovered.lock ?? readLockMetadata(lockPath);
+    if (lock?.pid && lock.pid !== process.pid) {
+      terminateRunFromLock(lock);
     }
 
     const liveSessionId = options.sessionId ?? state.waitingContext?.liveSessionId;
@@ -165,15 +164,9 @@ export class DefaultDashboardActionHandler implements DashboardActionHandler {
     const abortReason = options.reason ?? 'Aborted via dashboard';
 
     try {
-      await statePersistence.save(buildAbortedState(state));
+      await abortRunState(statePersistence, runsDir, runId, state, abortReason);
     } catch (e: unknown) {
       return { success: false, error: e instanceof Error ? e.message : String(e) };
-    }
-
-    try {
-      writeAbortJournalEntries(runsDir, runId, state, abortReason);
-    } catch {
-      // Journal write failure is non-fatal for abort
     }
 
     if (this.streamBus) {
@@ -192,6 +185,7 @@ export class DefaultDashboardActionHandler implements DashboardActionHandler {
     return { success: true };
   }
 
+  // eslint-disable-next-line @typescript-eslint/require-await -- Keep the async handler contract; validation and spawning are synchronous.
   async retry(runId: string): Promise<DashboardActionResult> {
     const runsDir = getRunsDir();
     const runDir = join(runsDir, runId);
@@ -207,6 +201,10 @@ export class DefaultDashboardActionHandler implements DashboardActionHandler {
         success: false,
         error: `No state found for run: ${runId}`,
       };
+    }
+
+    if (state.currentState === 'DONE' && !state.pendingTerminalState) {
+      return { success: false, error: `Run ${runId} has already completed successfully` };
     }
 
     if (
@@ -238,41 +236,12 @@ export class DefaultDashboardActionHandler implements DashboardActionHandler {
       };
     }
 
-    await this.ensureLockReleased(runId);
-
-    const retriedState = {
-      ...state,
-      currentState: retryState,
-      previousState: state.previousState,
-      stateEnteredAt: new Date().toISOString(),
-      waitingContext: undefined,
-      persistedAt: new Date().toISOString(),
-    };
-
-    try {
-      await statePersistence.save(retriedState);
-    } catch (e: unknown) {
-      return { success: false, error: e instanceof Error ? e.message : String(e) };
-    }
-
-    const journalPath = getJournalPath(runDir);
-    try {
-      const journalWriter = new DefaultJournalWriter(journalPath, runId);
-      journalWriter.append({
-        timestamp: new Date().toISOString(),
-        runId,
-        sequence: state.transitionCount + 1,
-        type: 'run_resumed',
-        data: {
-          kind: 'run_lifecycle',
-          workflowName: state.workflowName,
-          workflowVersion: state.workflowVersion,
-          status: 'retrying',
-          reason: `Retrying from state '${retryState}'`,
-        },
-      });
-    } catch {
-      // Journal write failure is non-fatal for retry
+    const lock = statePersistence.probeLock(runId as RunId);
+    if (lock.exists && (lock.pidRunning || lock.unreadable || lock.hostname !== hostname())) {
+      return {
+        success: false,
+        error: `Run ${runId} is active or its lock owner cannot be verified`,
+      };
     }
 
     if (this.streamBus) {
