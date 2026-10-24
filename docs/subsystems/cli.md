@@ -90,6 +90,19 @@ The current implementation uses three operator response paths:
 `ai resume` resumes interrupted work and eligible persisted approval waits. Text waits require
 `ai answer`; live permission requests use `ai permit`.
 
+`ai permit` selects permission waits from recovered checkpoint/journal state and preserves the
+selected session and request IDs while restoring the engine. A changed wait fails rather than
+delivering the answer to a replacement request. Its exit status follows the resumed workflow:
+DONE or a new wait returns 0, FAILED returns 3, and ABORTED returns 4. JSON includes the workflow
+outcome, final state and exit code alongside the permission `action` and `messageId`; granting
+permission does not itself establish that the tool ran successfully.
+
+File-backed `ai permit` and `ai answer --message-id` require a cataloged request. Explicit IDs
+support identical retries even after cleanup: `outcome: response_written` means storage committed,
+and `already_responded` means the same decision was already recorded. A conflicting answer fails.
+An untargeted permit with no pending request reports `no_pending_requests`. These acknowledgements
+do not establish that the agent consumed the response. Blank explicit permission IDs are invalid.
+
 ## Source of Truth
 
 Prefer:

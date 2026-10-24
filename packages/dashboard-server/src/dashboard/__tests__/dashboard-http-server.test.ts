@@ -1507,7 +1507,7 @@ describe('DashboardHttpServer', () => {
         granted: true,
       });
       expect(res.status).toBe(200);
-      expect(JSON.parse(res.body)).toEqual({ ok: true });
+      expect(JSON.parse(res.body)).toEqual({ ok: true, outcome: 'response_written' });
       expect(writtenResponse).toEqual({ runId: 'run-1', messageId: 'msg-1' });
     });
   });
@@ -1595,7 +1595,7 @@ describe('DashboardHttpServer', () => {
         answer: 'Use Redis for caching',
       });
       expect(res.status).toBe(200);
-      expect(JSON.parse(res.body)).toEqual({ ok: true });
+      expect(JSON.parse(res.body)).toEqual({ ok: true, outcome: 'response_written' });
       expect(writtenResponse).toEqual({ runId: 'run-1', messageId: 'msg-1' });
     });
   });

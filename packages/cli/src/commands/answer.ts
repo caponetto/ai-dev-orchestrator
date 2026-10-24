@@ -172,39 +172,38 @@ export async function answerCommand(
 
   // Fallback: non-session runs use the file-backed live request store
   const liveStore = new FileBackedLiveRequestStore(runsDir);
-  const pendingRequests = await liveStore.listPendingRequests(runId);
-  const clarificationRequests = pendingRequests.filter((r) => r.kind === 'clarification');
-
   if (options.messageId) {
-    const liveTarget = clarificationRequests.find((r) => r.messageId === options.messageId);
-    if (!liveTarget) {
-      formatter.error({
-        code: ExitCode.GENERAL_ERROR,
-        message: `No pending clarification request with message ID: ${options.messageId}`,
-        remediation: 'Run `ai status` to see pending requests.',
-      });
+    let outcome: 'response_written' | 'already_responded';
+    try {
+      outcome = await liveStore.writeResponse(
+        {
+          runId,
+          messageId: options.messageId,
+          payload: { answer: answerContent },
+          respondedAt: new Date().toISOString(),
+        },
+        { requireRequest: true },
+      );
+    } catch (error: unknown) {
+      formatter.error(toCLIError(error));
       return ExitCode.GENERAL_ERROR;
     }
-    await liveStore.writeResponse({
-      runId,
-      messageId: liveTarget.messageId,
-      payload: { answer: answerContent },
-      respondedAt: new Date().toISOString(),
-    });
 
     if (options.json) {
       process.stdout.write(
         JSON.stringify({
           runId,
-          messageId: liveTarget.messageId,
+          messageId: options.messageId,
           status: 'live_clarification_answered',
-          outcome: 'response_written',
+          outcome,
           exitCode: ExitCode.SUCCESS,
         }) + '\n',
       );
     } else {
       formatter.success(
-        `Live clarification response stored for run ${runId} (${liveTarget.messageId}).`,
+        outcome === 'already_responded'
+          ? `Live clarification response already recorded for run ${runId} (${options.messageId}).`
+          : `Live clarification response stored for run ${runId} (${options.messageId}).`,
       );
     }
     return ExitCode.SUCCESS;

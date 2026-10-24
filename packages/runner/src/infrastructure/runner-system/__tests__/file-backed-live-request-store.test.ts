@@ -37,6 +37,31 @@ describe('FileBackedLiveRequestStore', () => {
     ...overrides,
   });
 
+  it('requires an existing request for user submissions while retaining internal early responses', async () => {
+    await expect(store.writeResponse(makeResponse(), { requireRequest: true })).rejects.toThrow(
+      'not found',
+    );
+    await expect(store.writeResponse(makeResponse())).resolves.toBe('response_written');
+  });
+
+  it('retains an immutable decision through cleanup, restart and attempts to reuse the request ID', async () => {
+    await store.writeRequest(makeRequest());
+    await store.writeResponse(makeResponse());
+    expect(await store.cleanupResolved('run-1')).toBe(1);
+    const restarted = new FileBackedLiveRequestStore(baseDir);
+    expect(await restarted.writeResponse(makeResponse(), { requireRequest: true })).toBe(
+      'already_responded',
+    );
+    await expect(
+      restarted.writeResponse(makeResponse({ payload: { granted: false } }), {
+        requireRequest: true,
+      }),
+    ).rejects.toThrow('already has a response');
+    await expect(restarted.writeRequest(makeRequest())).rejects.toThrow('retired');
+    expect(await restarted.listPendingRequests('run-1')).toEqual([]);
+    expect(await readdir(join(baseDir, 'run-1', 'live-responses'))).toEqual([]);
+  });
+
   describe('writeRequest', () => {
     it('allows identical request replay without extending expiry but rejects reuse for another operation', async () => {
       const original = makeRequest({ expiresAt: '2090-01-01T00:05:00Z' });

@@ -71,8 +71,23 @@ before returning it to the workflow.
 File-backed request IDs identify one run, kind and payload. Identical request replay preserves
 the original creation/expiry times; reuse for a different operation fails. Responses retain the
 first published decision, allow identical retries, and reject conflicting, expired or wrong-kind
-answers for published requests. Terminal timeout records remain writable after expiry. A failure
+answers for published requests. Expiry compares instants, including timezone offsets, and the
+expiry instant itself is expired. Malformed expiry values are rejected. Internal terminal timeout
+records remain writable after expiry; strict public submissions cannot use that bypass. A failure
 to persist a timeout record cannot suppress the agent's default denial or clarification abort.
+
+CLI/HTTP submissions use `writeResponse(..., { requireRequest: true })`; internal streaming callers
+retain the default ability to answer before catalog registration. The file store returns
+`response_written` or `already_responded`. The interface still accepts older adapters returning
+void; HTTP treats their successful return as a new write.
+
+`cleanupResolved` first retains the immutable decision under `live-resolved/<message-id>.json`,
+then removes the active request/response pair. A fresh store can acknowledge the same decision or
+reject a conflicting late writer after cleanup. Retired IDs cannot be registered again. Receipts
+remain until the run directory is removed; cleanup does not garbage-collect decision evidence.
+Interrupted cleanup is retryable, and malformed or unreadable receipts fail closed. Cleanup is
+caller-triggered and should run after consumers no longer need to poll the active response; the
+receipt records storage history, not agent consumption.
 
 Transport send and snapshot persistence are separate effects. If sending succeeds but persisting
 the consumed request fails, the live host rejects a duplicate, but restart can recover the older

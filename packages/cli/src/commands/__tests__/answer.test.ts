@@ -496,6 +496,52 @@ describe('answerCommand', () => {
     expect(code).toBe(ExitCode.RUN_FAILED);
   });
 
+  it.each([true, false])(
+    'acknowledges a live clarification retry after cleanup (JSON: %s)',
+    async (json) => {
+      const runId = createRunId();
+      mkdirSync(getRunDir(runId), { recursive: true });
+      const store = new FileBackedLiveRequestStore(getRunsDir());
+      await store.writeRequest({
+        runId,
+        messageId: 'clar-retry',
+        kind: 'clarification',
+        createdAt: '',
+        payload: {},
+      });
+      await store.writeResponse({
+        runId,
+        messageId: 'clar-retry',
+        respondedAt: '',
+        payload: { answer: 'same' },
+      });
+      await store.cleanupResolved(runId);
+      const formatter = new OutputFormatter({ json, noColor: true });
+      const success = vi.spyOn(formatter, 'success');
+      const options = {
+        runId,
+        inputFile: null,
+        messageId: 'clar-retry',
+        answers: ['same'],
+        json,
+        verbose: false,
+      };
+      expect(await answerCommand(options, formatter)).toBe(ExitCode.SUCCESS);
+      if (json) {
+        expect(JSON.parse(stdoutChunks[0] ?? '')).toMatchObject({
+          outcome: 'already_responded',
+          exitCode: 0,
+        });
+      } else {
+        expect(success).toHaveBeenCalledWith(expect.stringContaining('already recorded'));
+      }
+      expect(await answerCommand({ ...options, answers: ['different'] }, formatter)).toBe(
+        ExitCode.GENERAL_ERROR,
+      );
+      expect(mockResumeOrchestrator).not.toHaveBeenCalled();
+    },
+  );
+
   it('answers targeted live clarification when --message-id matches', async () => {
     const runId = createRunId();
     const runsDir = getRunsDir();

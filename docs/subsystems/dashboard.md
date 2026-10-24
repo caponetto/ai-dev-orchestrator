@@ -76,6 +76,18 @@ The dashboard server currently exposes endpoints for:
 - permission and clarification responses
 - settings read and update
 
+Live permission/clarification POSTs return `{ ok: true, outcome }`, where `outcome` is
+`response_written` or `already_responded`. Both acknowledge a stored decision, not agent
+consumption or workflow completion. Identical retries remain valid after expiry or active-file
+cleanup. Unknown requests return 404, malformed bodies/identifiers and wrong response kinds return
+400, conflicting decisions return 409, unanswered expired requests return 410, and storage failures
+return 500. Public submissions require a cataloged request; they cannot create early responses.
+
+The existing `permission_resolved` and `clarification_resolved` diagnostic events include the
+storage outcome and are emitted only for new writes. Event publication is best-effort: a failed
+notification cannot turn a committed decision into an HTTP failure. These events provide no
+durable delivery or agent-consumption acknowledgement.
+
 ## Source of Truth
 
 Prefer:
