@@ -54,8 +54,12 @@ Permission heuristics check actual operation types before display labels. Every 
 ## Human request identity and delivery
 
 Global worker cancellation attempts every worker and every runner backend, even if one cancellation
-or signal fails. Local CLI subprocesses receive SIGTERM and use the existing five-second forced-kill
-grace period. The workflow also aborts live sessions for its run; remote cancellation is best-effort.
+or signal fails. Local CLI subprocesses own private POSIX process groups and receive SIGTERM with
+a five-second SIGKILL grace period. Dispatch and terminal session results wait for native child
+close and completion of the group termination policy. This also cleans background descendants
+when the parent exits normally or protocol completion arrives before process exit. A failed session
+setup or handshake fallback waits for this cleanup before returning or launching a replacement.
+Repeated cancellation does not reset the grace period; tracking remains until cleanup settles. The workflow also aborts live sessions for its run; remote cancellation is best-effort.
 The CLI's shutdown deadline is a separate bound on the orchestrator process and does not establish
 that remote side effects or arbitrary descendant processes have stopped.
 
@@ -177,3 +181,8 @@ Prefer:
 - `packages/agent-protocol/src/agent-protocol-types.ts`
 - `packages/agent-adapters/src/`
 - `packages/cli/src/composition-root.ts`
+
+On Windows only the direct child is controlled. A descendant that creates a different group/session
+escapes the owned group. Permission failures may prevent signalling. Grandchild zombies are reaped
+by the OS; SIGKILL submission plus native child close completes the local termination policy,
+without proving that arbitrary external effects stopped.

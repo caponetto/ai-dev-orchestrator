@@ -139,6 +139,7 @@ export class LocalAgentSessionSupervisor implements AgentSessionSupervisor {
       return false;
     }
     host.abort(reason);
+    await host.cleanupCompletion;
     await this.persistSnapshot(host);
     return true;
   }
@@ -191,6 +192,9 @@ export class LocalAgentSessionSupervisor implements AgentSessionSupervisor {
       return { kind: 'failed', error: `Session ${sessionId} not found` };
     }
     const result = await host.waitForAdvance();
+    if (result.kind !== 'awaiting_human') {
+      await host.cleanupCompletion;
+    }
     await this.persistSnapshot(host);
     return result;
   }

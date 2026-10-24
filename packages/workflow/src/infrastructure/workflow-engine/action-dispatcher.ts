@@ -118,6 +118,10 @@ export class ActionDispatcher {
     });
   }
 
+  cancelScripts(): Promise<void> {
+    return this.scriptExecutor.cancelAll();
+  }
+
   setUserPrompt(prompt: string | undefined): void {
     this.userPrompt = prompt;
   }

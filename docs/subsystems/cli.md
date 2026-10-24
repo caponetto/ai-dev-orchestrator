@@ -126,7 +126,7 @@ macOS/Linux; deterministic prompt lifecycle tests also run without a terminal.
 Ctrl+C in a live prompt requests workflow shutdown, closes the question and submits no default
 answer. EOF only closes prompting. Process SIGINT/SIGTERM and prompt interrupts use the same
 shutdown coordinator. Requests are idempotent: repeated signals retain the first reason and
-deadline. Cancellation starts for active workers and live sessions belonging to the current run.
+deadline. Cancellation starts independently for active scripts, workers and live sessions belonging to the current run.
 Graceful interruption returns the observed ABORTED outcome with exit code 4; a completed DONE
 result keeps exit code 0. Cleanup/persistence errors remain errors.
 
@@ -276,3 +276,10 @@ and atomic rename; abandoned projection temporaries are removed under ownership.
 replays the saved input rather than replacing it. Legacy checkpoints without an accepted-answer
 receipt remain readable and do not trigger file reconstruction. This covers process interruption;
 it does not add a multi-file hardware/power-loss transaction or turn the file into artifact history.
+
+Owned local script/agent processes share a synchronous process-exit backstop: forced CLI exit
+sends SIGKILL to each still-owned POSIX group (direct children on Windows), including scripts
+started by abort cleanup. This backstop cannot run when the orchestrator itself receives SIGKILL
+or crashes outside normal Node exit handling, cannot reach escaped groups, and cannot override OS
+signal permissions. The deadline still does not claim that cleanup completed or release an active
+lock on behalf of unfinished work.

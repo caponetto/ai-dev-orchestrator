@@ -23,6 +23,10 @@
     "./key-converters": {
       "types": "./dist/key-converters.d.ts",
       "import": "./dist/key-converters.js"
+    },
+    "./owned-process": {
+      "types": "./dist/owned-process.d.ts",
+      "import": "./dist/owned-process.js"
     }
   },
   "files": [

@@ -3,6 +3,26 @@ import { describe, expect, it, vi } from 'vitest';
 import { CliProcessRegistry } from '../cli-process-registry';
 
 describe('CLI process ownership', () => {
+  it('retains an owned process until native cleanup without restarting cancellation', async () => {
+    const registry = new CliProcessRegistry();
+    let close!: () => void;
+    const closed = new Promise<void>((resolve) => {
+      close = resolve;
+    });
+    const kill = vi.fn(() => true);
+    const tracked = { kill, closed };
+    registry.track(tracked);
+    registry.killAll();
+    registry.killAll();
+    expect(kill).toHaveBeenCalledOnce();
+    close();
+    await closed;
+    registry.killAll();
+    expect(kill).toHaveBeenCalledOnce();
+    registry.track(tracked);
+    registry.killAll();
+    expect(kill).toHaveBeenCalledTimes(2);
+  });
   it('invalidates pending attempts even without an active subprocess', () => {
     const registry = new CliProcessRegistry();
     const pendingGeneration = registry.generation;

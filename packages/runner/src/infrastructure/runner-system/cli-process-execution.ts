@@ -11,6 +11,7 @@ import type { AgentOutputStreamEvent, PermissionPolicyConfig } from '@ai-dev-orc
 import type { AgentTask, AgentResult, AgentTokenUsage } from '@ai-dev-orchestrator/schemas';
 import { BUILT_IN_CODING_RUNNER_ID } from '@ai-dev-orchestrator/schemas';
 import { getErrorMessage } from '@ai-dev-orchestrator/utils';
+import { OwnedProcess } from '@ai-dev-orchestrator/utils/owned-process';
 import { execa } from 'execa';
 
 import type { CliHumanRequestHandler } from './cli-human-request-handler';
@@ -103,34 +104,37 @@ export async function executeCliProcess(
     });
   }
 
+  let ownership: OwnedProcess | undefined;
+  let overallTimer: ReturnType<typeof setTimeout> | undefined;
   try {
     if (generation !== processes.generation) {
       return cancelledAgentResult(task, startTime);
     }
     const subprocess = execa(command, args, {
       cwd: task.repoRoot,
+      detached: process.platform !== 'win32',
       timeout: timeoutMs,
       killSignal: 'SIGTERM',
       forceKillAfterDelay: KILL_GRACE_MS,
       stdin: resolveCliSubprocessStdinOption(adapter, args),
     });
 
-    const procHandle = { pid: subprocess.pid, kill: () => subprocess.kill() };
-    const untrack = processes.track(procHandle);
+    const owner = new OwnedProcess(subprocess.nodeChildProcess, {
+      ownsGroup: process.platform !== 'win32',
+      timeoutMs,
+    });
+    ownership = owner;
+    processes.track(owner);
+
+    // Prevent unhandled rejection if subprocess exits before we await it
+    let subprocessError: unknown;
+    subprocess.catch((err: unknown) => {
+      subprocessError = err;
+    });
 
     if (subprocess.stdin) {
       configureCliSubprocessStdin(subprocess.stdin, args, adapter, task, taskFilePath);
     }
-
-    // Prevent unhandled rejection if subprocess exits before we await it
-    let subprocessError: unknown;
-    subprocess
-      .catch((err: unknown) => {
-        subprocessError = err;
-      })
-      .finally(() => {
-        untrack();
-      });
 
     const transport = new StdioProtocolTransport({
       stdin: subprocess.stdin ?? new PassThrough(),
@@ -179,7 +183,7 @@ export async function executeCliProcess(
           },
         });
         try {
-          subprocess.kill('SIGTERM');
+          owner.kill();
         } catch {
           /* already exited */
         }
@@ -187,7 +191,7 @@ export async function executeCliProcess(
       };
     });
 
-    const overallTimer = setTimeout(() => {
+    overallTimer = setTimeout(() => {
       if (protocolFinish) {
         const timeoutMsg = `Agent timed out after ${String(timeoutMs)}ms`;
         onStreamEvent?.({
@@ -225,7 +229,7 @@ export async function executeCliProcess(
         });
       }
       try {
-        subprocess.kill('SIGTERM');
+        owner.kill();
       } catch {
         /* already exited */
       }
@@ -594,6 +598,12 @@ export async function executeCliProcess(
       error: failMsg,
       durationMs,
     };
+  } finally {
+    clearTimeout(overallTimer);
+    if (ownership) {
+      ownership.kill();
+      await ownership.closed;
+    }
   }
 }
 

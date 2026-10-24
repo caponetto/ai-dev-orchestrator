@@ -1162,6 +1162,7 @@ export class LifecycleController implements WorkflowEngine {
       this.sessionSupervisor,
       this.runId,
       reason,
+      () => this.dispatcher.cancelScripts(),
     );
 
     try {

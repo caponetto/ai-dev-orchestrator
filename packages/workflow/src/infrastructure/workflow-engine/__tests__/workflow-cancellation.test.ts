@@ -10,6 +10,19 @@ function snapshot(id: string, state = 'running', run = 'run') {
   return { ref: { sessionId: id, runId: run }, state } as AgentSessionSnapshot;
 }
 describe('workflow cancellation fanout', () => {
+  it('starts script cancellation independently and tolerates its failure', async () => {
+    const cancelAllWorkers = vi.fn().mockResolvedValue(undefined);
+    const cancelScripts = vi.fn().mockRejectedValue(new Error('script failure'));
+    await cancelWorkflowExecution(
+      { cancelAllWorkers } as unknown as RunnerSystem,
+      undefined,
+      runId,
+      'shutdown',
+      cancelScripts,
+    );
+    expect(cancelScripts).toHaveBeenCalledOnce();
+    expect(cancelAllWorkers).toHaveBeenCalledOnce();
+  });
   it('cancels workers without a supervisor', async () => {
     const cancelAllWorkers = vi.fn().mockResolvedValue(undefined);
     await cancelWorkflowExecution(

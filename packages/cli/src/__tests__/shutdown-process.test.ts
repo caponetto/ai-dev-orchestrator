@@ -1,7 +1,7 @@
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -106,6 +106,13 @@ afterEach(async () => {
   }
   await Promise.allSettled(children.splice(0).map(({ exit }) => exit));
   for (const root of roots.splice(0)) {
+    if (existsSync(join(root, 'parent.pid'))) {
+      try {
+        process.kill(-Number(await readFile(join(root, 'parent.pid'), 'utf8')), 'SIGKILL');
+      } catch {
+        /* Owned script group already stopped. */
+      }
+    }
     await rm(root, { recursive: true, force: true });
   }
 });
@@ -142,6 +149,43 @@ describe.skipIf(process.platform === 'win32')(
       expect(run.output()).toContain('"finalState":"ABORTED"');
       expect((await inspect(root)).lock.exists).toBe(false);
     }, 25000);
+    it.each(['run-script', 'run-script-deadline'])(
+      'cleans script descendants on CLI shutdown in %s',
+      async (mode) => {
+        const root = await tempRoot();
+        await mkdir(join(root, '.ai', 'scripts'), { recursive: true });
+        await copyFile(
+          fileURLToPath(new URL('../../../utils/test/fixtures/process-tree.mjs', import.meta.url)),
+          join(root, '.ai', 'scripts', 'tree.ts'),
+        );
+        const run = child(root, mode);
+        await waitFile(root, mode === 'run-script' ? 'leaf.beat' : 'dispatched');
+        run.child.kill('SIGTERM');
+        await waitFile(root, 'leaf.beat');
+        const parent = Number(await readFile(join(root, 'parent.pid'), 'utf8'));
+        const leaf = Number(await readFile(join(root, 'leaf.pid'), 'utf8'));
+        await run.finish(4);
+        await vi.waitFor(() => {
+          for (const pid of [parent, leaf]) {
+            let stat = '';
+            try {
+              stat = execFileSync('ps', ['-o', 'stat=', '-p', String(pid)], {
+                encoding: 'utf8',
+              }).trim();
+            } catch {
+              /* The owned process was reaped. */
+            }
+            expect(stat === '' || stat.startsWith('Z')).toBe(true);
+          }
+        });
+        if (mode === 'run-script-deadline') {
+          expect(run.errors()).toContain('Graceful shutdown timed out');
+        } else {
+          expect((await inspect(root)).lock.exists).toBe(false);
+        }
+      },
+      25000,
+    );
     it('cancels session advancement in a fresh permit process and releases ownership', async () => {
       const root = await tempRoot();
       const seed = child(root, 'seed-session');

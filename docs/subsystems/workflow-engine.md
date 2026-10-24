@@ -48,7 +48,7 @@ by cancellation preserve the interruption result; failed abort cleanup or checkp
 an error with retryable progress. A signal cannot overwrite observed completion or mutate an idle
 controller through a leftover listener.
 
-Worker cancellation and session cancellation start independently. Live sessions are selected from
+Worker, session and active script cancellation start independently. Live sessions are selected from
 the current run, deduplicated by session ID, and terminal/foreign sessions are excluded. One backend
 failure cannot prevent the other cancellation attempts. Ownership remains held while execution
 or abort cleanup is outstanding. The CLI's deadline may terminate the process with that lock still
@@ -303,3 +303,21 @@ Recovery treats that diagnostic as informational; the checkpoint owns waiting/co
 A crash while evaluating a not-yet-accepted answer therefore leaves its text wait intact, and a
 delayed diagnostic cannot clear a newer wait. Targeted resume results include optional
 `answerAccepted` evidence, so governance escalation cannot falsely acknowledge an answer.
+
+## Script process ownership
+
+Workflow cancellation invalidates scripts still preparing and stops active scripts. Later abort
+cleanup actions can start scripts under a fresh cancellation generation. Cancellation and timeout
+fail the action even when the script traps SIGTERM and exits zero. The workflow retains its lock
+while execution and owned process cleanup settle.
+
+On POSIX, scripts launch in private process groups. Completion, timeout and cancellation clean up
+in-group descendants, including background children that retain pipes or outlive the parent.
+Cleanup sends SIGTERM, escalates to SIGKILL after five seconds, and waits for native child close
+and completion of the group termination policy. It clears timers and tracking on completion.
+A successful script therefore cannot leave a background service running in its owned group.
+
+Windows cleanup covers the direct child only. Descendants that create another session/group escape
+this ownership boundary. OS permission failures can prevent termination; the CLI shutdown deadline
+still bounds a responsive orchestrator. SIGKILL acceptance does not prove that arbitrary external
+work has stopped, and grandchild zombies remain the operating system reaper's responsibility.

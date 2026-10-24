@@ -79,6 +79,16 @@ if (mode === 'agent-stubborn') {
       ABORTED: { type: 'terminal', description: '', transitions: [] },
     },
   };
+  const scriptAction = {
+    type: 'run_script',
+    params: {
+      script: 'tree.ts',
+      timeout: 30000,
+      env: { TREE_ROOT: root },
+    },
+  };
+  if (mode === 'run-script') plan.states.WORK.entryActions = [scriptAction];
+  if (mode === 'run-script-deadline') plan.states.ABORTED.entryActions = [scriptAction];
   if (mode === 'inspect') {
     const id = readFileSync(idPath, 'utf8');
     const persistence = new DefaultStatePersistence(runsDir);

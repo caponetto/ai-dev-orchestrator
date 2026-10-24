@@ -17,6 +17,7 @@ import type {
   SessionPendingRequest,
   AgentResult as AgentResultSchema,
 } from '@ai-dev-orchestrator/schemas';
+import type { OwnedProcess } from '@ai-dev-orchestrator/utils/owned-process';
 
 import { extractUsageFromRawLine } from './cli-token-usage';
 import type { StdioProtocolTransport } from './stdio-protocol-transport';
@@ -66,6 +67,7 @@ export class LocalAgentSessionHost {
     process: ChildProcess,
     transport: StdioProtocolTransport,
     startTime: number,
+    private readonly ownership?: OwnedProcess,
   ) {
     this.ref = ref;
     this._process = process;
@@ -96,8 +98,18 @@ export class LocalAgentSessionHost {
     return this._process.pid;
   }
 
+  get cleanupCompletion(): Promise<void> {
+    return this.ownership?.closed ?? Promise.resolve();
+  }
+
   get resultPromise(): Promise<LocalSessionResult> {
-    return this._resultPromise;
+    if (!this.ownership) {
+      return this._resultPromise;
+    }
+    return this._resultPromise.then(async (result) => {
+      await this.cleanupCompletion;
+      return result;
+    });
   }
 
   addStreamHandler(handler: (event: AgentOutputStreamEvent) => void): void {
@@ -202,11 +214,7 @@ export class LocalAgentSessionHost {
           durationMs: Date.now() - this._startTime,
         });
         this.resolveAdvance({ kind: 'failed', error });
-        try {
-          this._process.kill('SIGTERM');
-        } catch {
-          /* already exited */
-        }
+        this.cleanup();
       }
     }, timeoutMs);
   }
@@ -276,6 +284,9 @@ export class LocalAgentSessionHost {
             durationMs: Date.now() - this._startTime,
           };
           this.finishResult(doneResult);
+          if (this.ownership) {
+            this.cleanup();
+          }
           this.resolveAdvance({
             kind: 'completed',
             artifactContent: doneResult.artifactContent,
@@ -287,6 +298,9 @@ export class LocalAgentSessionHost {
         case 'error': {
           this.clearTimer();
           this._state = 'failed';
+          if (this.ownership) {
+            this.cleanup();
+          }
           const errMsg = `Agent error [${message.payload.code}]: ${message.payload.message}`;
           this.finishResult({
             status: 'failure',
@@ -452,11 +466,19 @@ export class LocalAgentSessionHost {
     }
   }
 
+  private stopProcess(): void {
+    if (this.ownership) {
+      this.ownership.kill();
+    } else {
+      this._process.kill('SIGTERM');
+    }
+  }
+
   private cleanup(): void {
     this.clearTimer();
     this._transport.close();
     try {
-      this._process.kill('SIGTERM');
+      this.stopProcess();
     } catch {
       /* already exited */
     }

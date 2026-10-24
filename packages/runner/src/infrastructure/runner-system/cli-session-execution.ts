@@ -4,6 +4,7 @@ import { PassThrough } from 'node:stream';
 
 import type { AgentDispatchResult, AgentOutputStreamEvent } from '@ai-dev-orchestrator/ports';
 import type { AgentResult, AgentSessionRef, AgentTask } from '@ai-dev-orchestrator/schemas';
+import { OwnedProcess } from '@ai-dev-orchestrator/utils/owned-process';
 import { execa } from 'execa';
 
 import {
@@ -62,80 +63,100 @@ export async function createCliSession(
   }
   const subprocess = execa(command, args, {
     cwd: task.repoRoot,
+    detached: process.platform !== 'win32',
     timeout: timeoutMs,
     killSignal: 'SIGTERM',
     forceKillAfterDelay: KILL_GRACE_MS,
     stdin: resolveCliSubprocessStdinOption(adapter, args),
   });
 
-  const procHandle = { pid: subprocess.pid, kill: () => subprocess.kill() };
-  const untrack = processes.track(procHandle);
+  const owner = new OwnedProcess(subprocess.nodeChildProcess, {
+    ownsGroup: process.platform !== 'win32',
+    timeoutMs,
+  });
+  processes.track(owner);
 
-  if (subprocess.stdin) {
-    configureCliSubprocessStdin(subprocess.stdin, args, adapter, task, taskFilePath);
-  }
+  subprocess.catch(() => {
+    /* prevent unhandled rejection even when synchronous setup fails */
+  });
+  let transport: StdioProtocolTransport | undefined;
+  let host: LocalAgentSessionHost | undefined;
+  try {
+    if (subprocess.stdin) {
+      configureCliSubprocessStdin(subprocess.stdin, args, adapter, task, taskFilePath);
+    }
 
-  subprocess
-    .catch(() => {
-      /* prevent unhandled rejection */
-    })
-    .finally(() => {
-      untrack();
+    transport = new StdioProtocolTransport({
+      stdin: subprocess.stdin ?? new PassThrough(),
+      stdout: subprocess.stdout,
+      stderr: subprocess.stderr,
     });
 
-  const transport = new StdioProtocolTransport({
-    stdin: subprocess.stdin ?? new PassThrough(),
-    stdout: subprocess.stdout,
-    stderr: subprocess.stderr,
-  });
+    const handshakeTimeoutMs =
+      cliConfig?.handshakeTimeoutMs ?? config.handshakeTimeoutMs ?? DEFAULT_HANDSHAKE_TIMEOUT_MS;
 
-  const handshakeTimeoutMs =
-    cliConfig?.handshakeTimeoutMs ?? config.handshakeTimeoutMs ?? DEFAULT_HANDSHAKE_TIMEOUT_MS;
+    const capabilities = await transport.negotiate(task.taskId, undefined, handshakeTimeoutMs);
 
-  const capabilities = await transport.negotiate(task.taskId, undefined, handshakeTimeoutMs);
-
-  if (generation !== processes.generation) {
-    transport.close();
-    return { kind: 'terminal', result: cancelledAgentResult(task, startTime) };
-  }
-  if (capabilities === null) {
-    transport.close();
-    try {
-      subprocess.kill('SIGTERM');
-    } catch {
-      /* already exited */
+    if (generation !== processes.generation) {
+      transport.close();
+      owner.kill();
+      await owner.closed;
+      return { kind: 'terminal', result: cancelledAgentResult(task, startTime) };
     }
-    const result = await dispatchFallback();
-    return { kind: 'terminal', result };
-  }
+    if (capabilities === null) {
+      transport.close();
+      try {
+        owner.kill();
+      } catch {
+        /* already exited */
+      }
+      await owner.closed;
+      if (generation !== processes.generation) {
+        return { kind: 'terminal', result: cancelledAgentResult(task, startTime) };
+      }
+      const result = await dispatchFallback();
+      return { kind: 'terminal', result };
+    }
 
-  const ref: AgentSessionRef = {
-    sessionId: `session-${task.taskId}`,
-    runId: task.runId,
-    stateId: task.stateId,
-    role: task.role,
-    transport: 'stdio',
-  };
+    const ref: AgentSessionRef = {
+      sessionId: `session-${task.taskId}`,
+      runId: task.runId,
+      stateId: task.stateId,
+      role: task.role,
+      transport: 'stdio',
+    };
 
-  const host = new LocalAgentSessionHost(ref, subprocess.nodeChildProcess, transport, startTime);
-  const supervisor = getSupervisor() as
-    { registerHost(host: LocalAgentSessionHost): Promise<void> } | undefined;
-  if (supervisor) {
-    await supervisor.registerHost(host);
-  }
-  if (onStreamEvent) {
-    host.addStreamHandler(onStreamEvent);
-  }
-  if (timeoutMs > 0) {
-    host.setTimeout(timeoutMs);
-  }
+    host = new LocalAgentSessionHost(ref, subprocess.nodeChildProcess, transport, startTime, owner);
+    const supervisor = getSupervisor() as
+      { registerHost(host: LocalAgentSessionHost): Promise<void> } | undefined;
+    if (supervisor) {
+      await supervisor.registerHost(host);
+    }
+    if (generation !== processes.generation) {
+      host.abort('Agent dispatch cancelled');
+      await owner.closed;
+      return { kind: 'terminal', result: cancelledAgentResult(task, startTime) };
+    }
+    if (onStreamEvent) {
+      host.addStreamHandler(onStreamEvent);
+    }
+    if (timeoutMs > 0) {
+      host.setTimeout(timeoutMs);
+    }
 
-  return {
-    kind: 'session',
-    handle: {
-      ref: host.ref,
-      state: host.state,
-      pendingRequests: host.pendingRequests,
-    },
-  };
+    return {
+      kind: 'session',
+      handle: {
+        ref: host.ref,
+        state: host.state,
+        pendingRequests: host.pendingRequests,
+      },
+    };
+  } catch (error: unknown) {
+    host?.abort('Session setup failed');
+    transport?.close();
+    owner.kill();
+    await owner.closed;
+    throw error;
+  }
 }

@@ -10,10 +10,10 @@ import { noopLogger } from '@ai-dev-orchestrator/ports';
 import type { ActionResult, RunId, ScriptOutput, ScriptResult } from '@ai-dev-orchestrator/schemas';
 import { AI_CONFIG_DIR_NAME, scriptOutputSchema } from '@ai-dev-orchestrator/schemas';
 import { getErrorMessage } from '@ai-dev-orchestrator/utils';
+import { OwnedProcess } from '@ai-dev-orchestrator/utils/owned-process';
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 const MAX_OUTPUT_BYTES = 1_048_576; // 1 MB
-const KILL_GRACE_MS = 5_000;
 /** Scripts installed by `ai init` into `~/.ai/scripts`. */
 const GLOBAL_SCRIPTS_DIR_NAME = 'scripts';
 const NODE_TS_ARGS = ['--experimental-strip-types', '--experimental-detect-module'] as const;
@@ -62,6 +62,8 @@ export class ScriptExecutor {
   private readonly agentStreamBus?: AgentStreamBus;
   private readonly logger: Logger;
   private readonly globalScriptsDir: string;
+  private generation = 0;
+  private readonly active = new Map<OwnedProcess, () => void>();
 
   constructor(deps: ScriptExecutorDeps) {
     this.journalWriter = deps.journalWriter;
@@ -71,10 +73,24 @@ export class ScriptExecutor {
       deps.globalScriptsDir ?? join(homedir(), AI_CONFIG_DIR_NAME, GLOBAL_SCRIPTS_DIR_NAME);
   }
 
+  async cancelAll(): Promise<void> {
+    this.generation += 1;
+    const active = [...this.active.entries()];
+    for (const [, cancel] of active) {
+      cancel();
+    }
+    await Promise.all(
+      active.map(async ([owner]) => {
+        await owner.closed;
+      }),
+    );
+  }
+
   async execute(
     params: ScriptActionParams,
     context: ScriptExecutionContext,
   ): Promise<ActionResult> {
+    const generation = this.generation;
     const { script, timeout = DEFAULT_TIMEOUT_MS, env: extraEnv } = params;
     const { runId, stateId, repoRoot, artifactsDir, dispatchId, userPrompt } = context;
 
@@ -95,6 +111,10 @@ export class ScriptExecutor {
       }
     }
 
+    if (generation !== this.generation) {
+      return this.failure(params, 'Script cancelled before launch');
+    }
+
     this.recordJournalStart(runId, script, stateId);
     this.emitStreamEvent(runId, stateId, dispatchId, 'script_started', script);
 
@@ -107,6 +127,7 @@ export class ScriptExecutor {
     try {
       result = await this.spawn(scriptPath, {
         timeout,
+        generation,
         env: {
           ...process.env,
           PATH: [...ORCHESTRATOR_BIN_DIRS, process.env.PATH ?? ''].join(PATH_SEP),
@@ -125,6 +146,9 @@ export class ScriptExecutor {
         stateId,
         viaNode,
       });
+      if (generation !== this.generation && result.exitCode === 0) {
+        result = { ...result, exitCode: 143, stderr: 'Script cancelled' };
+      }
       result = {
         ...result,
         output: this.readScriptOutput(resultPath),
@@ -199,6 +223,7 @@ export class ScriptExecutor {
     scriptPath: string,
     options: {
       timeout: number;
+      generation: number;
       env: Record<string, string | undefined>;
       cwd: string;
       dispatchId: string;
@@ -207,52 +232,47 @@ export class ScriptExecutor {
       viaNode: boolean;
     },
   ): Promise<ScriptResult> {
+    if (options.generation !== this.generation) {
+      return Promise.resolve({
+        exitCode: 143,
+        stdout: '',
+        stderr: 'Script cancelled before launch',
+        durationMs: 0,
+      });
+    }
     return new Promise((resolve, reject) => {
       const startTime = Date.now();
       const stdoutChunks: Buffer[] = [];
       const stderrChunks: Buffer[] = [];
       let stdoutSize = 0;
       let stderrSize = 0;
-      let killed = false;
+      let interrupted: string | undefined;
 
       const child = options.viaNode
         ? spawn(process.execPath, [...NODE_TS_ARGS, scriptPath], {
             cwd: options.cwd,
             env: options.env,
             stdio: ['ignore', 'pipe', 'pipe'],
-            detached: true,
+            detached: process.platform !== 'win32',
           })
         : spawn(scriptPath, [], {
             cwd: options.cwd,
             env: options.env,
             stdio: ['ignore', 'pipe', 'pipe'],
-            detached: true,
+            detached: process.platform !== 'win32',
           });
 
+      const owner = new OwnedProcess(child, { ownsGroup: process.platform !== 'win32' });
+      this.active.set(owner, () => {
+        interrupted ??= 'Script cancelled';
+        owner.kill();
+      });
+      void owner.closed.then(() => {
+        this.active.delete(owner);
+      });
       const timeoutHandle = setTimeout(() => {
-        killed = true;
-        if (child.pid) {
-          try {
-            process.kill(-child.pid, 'SIGTERM');
-          } catch {
-            child.kill('SIGTERM');
-          }
-        } else {
-          child.kill('SIGTERM');
-        }
-        setTimeout(() => {
-          if (!child.killed) {
-            if (child.pid) {
-              try {
-                process.kill(-child.pid, 'SIGKILL');
-              } catch {
-                child.kill('SIGKILL');
-              }
-            } else {
-              child.kill('SIGKILL');
-            }
-          }
-        }, KILL_GRACE_MS);
+        interrupted ??= 'Script timed out';
+        owner.kill();
       }, options.timeout);
 
       child.stdout.on('data', (chunk: Buffer) => {
@@ -283,40 +303,45 @@ export class ScriptExecutor {
         );
       });
 
-      child.on('error', (err) => {
+      child.once('error', (err) => {
         clearTimeout(timeoutHandle);
-        reject(err);
+        owner.kill();
+        void owner.closed.then(() => {
+          reject(err);
+        });
       });
 
-      child.on('close', (code) => {
+      child.once('close', (code) => {
         clearTimeout(timeoutHandle);
-        const durationMs = Date.now() - startTime;
+        void owner.closed.then(() => {
+          const durationMs = Date.now() - startTime;
 
-        let stdout = Buffer.concat(stdoutChunks).toString('utf-8');
-        let stderr = Buffer.concat(stderrChunks).toString('utf-8');
+          let stdout = Buffer.concat(stdoutChunks).toString('utf-8');
+          let stderr = Buffer.concat(stderrChunks).toString('utf-8');
 
-        if (stdoutSize > MAX_OUTPUT_BYTES) {
-          stdout = stdout.slice(0, MAX_OUTPUT_BYTES) + '\n[output truncated]';
-        }
-        if (stderrSize > MAX_OUTPUT_BYTES) {
-          stderr = stderr.slice(0, MAX_OUTPUT_BYTES) + '\n[output truncated]';
-        }
+          if (stdoutSize > MAX_OUTPUT_BYTES) {
+            stdout = stdout.slice(0, MAX_OUTPUT_BYTES) + '\n[output truncated]';
+          }
+          if (stderrSize > MAX_OUTPUT_BYTES) {
+            stderr = stderr.slice(0, MAX_OUTPUT_BYTES) + '\n[output truncated]';
+          }
 
-        if (killed) {
+          if (interrupted) {
+            resolve({
+              exitCode: code === null || code === 0 ? 143 : code,
+              stdout,
+              stderr: stderr || interrupted,
+              durationMs,
+            });
+            return;
+          }
+
           resolve({
-            exitCode: code === null || code === 0 ? 143 : code,
+            exitCode: code ?? 1,
             stdout,
-            stderr: stderr || 'Script timed out',
+            stderr,
             durationMs,
           });
-          return;
-        }
-
-        resolve({
-          exitCode: code ?? 1,
-          stdout,
-          stderr,
-          durationMs,
         });
       });
     });
