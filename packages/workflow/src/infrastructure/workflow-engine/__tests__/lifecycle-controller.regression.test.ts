@@ -1516,6 +1516,37 @@ describe('LifecycleController resumable entry actions', () => {
     expect(vi.mocked(f.artifactStore).store).toHaveBeenCalledTimes(1);
   });
 
+  it('preserves cancellation queued between session advancement and controller continuation', async () => {
+    const f = sessionFixture();
+    const controller = new LifecycleController(f);
+    f.c.workflowDefinition.terminalStates = [...f.c.workflowDefinition.terminalStates, 'ABORTED'];
+    f.c.workflowDefinition.states['ABORTED'] = {
+      type: 'terminal',
+      description: '',
+      transitions: [],
+    };
+    await controller.start(f.c);
+    let cancellation: Promise<void> | undefined;
+    vi.mocked(f.sessionSupervisor).waitForAdvance.mockImplementationOnce(() => {
+      const completed = Promise.resolve({
+        kind: 'completed' as const,
+        artifactContent: '{}',
+        durationMs: 0,
+      });
+      void completed.then(() => {
+        queueMicrotask(() => {
+          cancellation = controller.abort('cancel at handoff');
+        });
+      });
+      return completed;
+    });
+    const result = await controller.resume({ type: 'approval', content: 'yes' });
+    await cancellation;
+    expect(result.finalState).toBe('ABORTED');
+    expect(f.artifactStore.stored.has('planning_agreement')).toBe(false);
+    expect(f.statePersistence.load(createRunId(f.c.runId))?.stateHistory.at(-1)).toBe('ABORTED');
+  });
+
   it('preserves abort while waiting for a session to complete', async () => {
     const f = sessionFixture();
     let complete: (() => void) | undefined;

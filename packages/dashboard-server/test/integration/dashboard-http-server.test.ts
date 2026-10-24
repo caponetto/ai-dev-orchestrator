@@ -9,7 +9,7 @@ import type {
   RunSummaryView,
 } from '@ai-dev-orchestrator/schemas';
 import { err, ok } from '@ai-dev-orchestrator/schemas';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { DashboardHttpServer } from '../../src/dashboard/dashboard-http-server';
 import { SseEventStream } from '../../src/dashboard/sse-event-stream';
@@ -176,6 +176,7 @@ describe('Dashboard HTTP Server Integration', () => {
   let eventStream: SseEventStream;
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- server may not be assigned if a test fails before assignment
     if (server) {
       await server.stop();
@@ -370,6 +371,7 @@ describe('Dashboard HTTP Server Integration', () => {
         },
       ];
 
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
       eventStream = new SseEventStream();
       server = new DashboardHttpServer({
         config: { port: 0, host: '127.0.0.1' },
@@ -379,6 +381,7 @@ describe('Dashboard HTTP Server Integration', () => {
         eventStream,
       });
       await server.start();
+      clock.mockReturnValue(1250);
       const port = server.getPort();
 
       const healthRes = await httpGet(port, '/api/health');
@@ -398,7 +401,7 @@ describe('Dashboard HTTP Server Integration', () => {
       };
 
       expect(health.status).toBe('ok');
-      expect(health.uptimeMs).toBeGreaterThan(0);
+      expect(health.uptimeMs).toBe(250);
       expect(health.runStats.total).toBe(3);
       expect(health.runStats.active).toBe(1);
       expect(health.runStats.completed).toBe(1);

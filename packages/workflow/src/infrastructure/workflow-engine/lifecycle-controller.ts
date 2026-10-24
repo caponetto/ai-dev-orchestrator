@@ -1,5 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
+import { basename } from 'node:path';
 
 import { REVIEW_ARTIFACT_TYPES } from '@ai-dev-orchestrator/artifacts';
 import type {
@@ -23,7 +22,6 @@ import type {
 } from '@ai-dev-orchestrator/ports';
 import { createRunId, noopLogger } from '@ai-dev-orchestrator/ports';
 import type { ShutdownCoordinator } from '@ai-dev-orchestrator/recovery';
-import { renderReport } from '@ai-dev-orchestrator/run-manifest';
 import type {
   Action,
   ActionResult,
@@ -36,7 +34,6 @@ import type {
   PersistedState,
   PersistedWaitingContext,
   RunId,
-  RunManifest,
   RunResult,
   ScriptDirectives,
   TransitionTrigger,
@@ -54,11 +51,21 @@ import {
 
 import { ActionDispatcher } from './action-dispatcher';
 import { extractConfidenceReport } from './confidence-extractor';
+import { ExecutionAccounting } from './execution-accounting';
 import { GuardChecker } from './guard-checker';
 import { PostRunContextUpdater } from './post-run-context-updater';
 import { ReviewResultInterpreter } from './review-result-interpreter';
+import { RunReporting } from './run-reporting';
+import type { RunReportingSnapshot } from './run-reporting';
+import {
+  resumeLiveSession,
+  createSessionCompletion,
+  completeSessionAction,
+} from './session-continuation';
 import { StateHistory } from './state-history';
+import { executeTerminalActions } from './terminal-action-executor';
 import { TransitionEvaluator } from './transition-evaluator';
+import { buildWorkflowCheckpoint } from './workflow-checkpoint';
 
 const DEFAULT_TRANSITION_LIMIT = 200;
 
@@ -85,14 +92,13 @@ export interface LifecycleControllerOptions {
 
 /** Main FSM orchestration controller. Implements the WorkflowEngine port. */
 export class LifecycleController implements WorkflowEngine {
+  private readonly reporting: RunReporting;
   private readonly runner: RunnerSystem;
   private readonly artifactStore: ArtifactStore;
   private readonly governanceEngine: GovernanceEngine;
   private readonly contractRegistry: IterationContractRegistry;
   private readonly journalWriter: JournalWriter;
   private readonly statePersistence: StatePersistence;
-  private readonly manifestProducer: ManifestProducer;
-  private readonly manifestWriter?: ManifestWriter;
   private readonly shutdownCoordinator?: ShutdownCoordinator;
   private readonly sessionSupervisor?: AgentSessionSupervisor;
   private readonly agentStreamBus?: AgentStreamBus;
@@ -113,6 +119,7 @@ export class LifecycleController implements WorkflowEngine {
   private terminalRecoveryState: string | null = null;
   private runId: RunId = createRunId('');
   private currentState = '';
+  private readonly accounting = new ExecutionAccounting();
   private previousState: string | null = null;
   private stateEnteredAt = '';
   private transitionCount = 0;
@@ -121,29 +128,13 @@ export class LifecycleController implements WorkflowEngine {
   private startedAt = 0;
   private lockHandle: LockHandle | null = null;
   private waitingContext: PersistedWaitingContext | null = null;
-  private cumulativeInputTokens = 0;
-  private cumulativeOutputTokens = 0;
-  private firedThresholdIndex = -1;
   private lastHumanFeedback: string | null = null;
   private lastReviewContent: string | null = null;
   private lastTrigger: string | null = null;
-  private hasReceivedUsage = false;
   private governanceDecisionCount = 0;
   private escalationCount = 0;
   private aborted = false;
   private stateTimestamps: { stateId: string; enteredAt: string; exitedAt: string }[] = [];
-  private workerMetricsByRole: Record<
-    string,
-    {
-      inputTokens: number;
-      outputTokens: number;
-      dispatches: number;
-      durationMs: number;
-      artifactsProduced: number;
-    }
-  > = {};
-  private workerFailuresByRole: Record<string, { error: string; model?: string }[]> = {};
-  private workerModelByRole: Record<string, string> = {};
   private lastConfidenceScore: number | null = null;
   private budgetApproved = false;
   private executionPaused = false;
@@ -157,13 +148,18 @@ export class LifecycleController implements WorkflowEngine {
     this.contractRegistry = opts.contractRegistry;
     this.journalWriter = opts.journalWriter;
     this.statePersistence = opts.statePersistence;
-    this.manifestProducer = opts.manifestProducer;
-    this.manifestWriter = opts.manifestWriter;
     this.shutdownCoordinator = opts.shutdownCoordinator;
     this.sessionSupervisor = opts.sessionSupervisor;
     this.agentStreamBus = opts.agentStreamBus;
     this.workflowTimeoutMs = opts.workflowTimeoutMs ?? 0;
     this.logger = opts.logger ?? noopLogger;
+    this.reporting = new RunReporting(
+      opts.artifactStore,
+      opts.contractRegistry,
+      opts.manifestProducer,
+      this.logger,
+      opts.manifestWriter,
+    );
     this.guardChecker = new GuardChecker(
       opts.artifactStore,
       opts.contractRegistry,
@@ -246,15 +242,9 @@ export class LifecycleController implements WorkflowEngine {
     this.lastHumanFeedback = state.lastHumanFeedback ?? null;
     this.lastReviewContent = state.lastReviewContent ?? null;
     this.lastTrigger = state.lastTrigger ?? null;
-    this.cumulativeInputTokens = state.cumulativeInputTokens ?? 0;
-    this.cumulativeOutputTokens = state.cumulativeOutputTokens ?? 0;
-    this.firedThresholdIndex = state.firedThresholdIndex ?? -1;
-    this.hasReceivedUsage = state.hasReceivedUsage ?? false;
     this.governanceDecisionCount = state.governanceDecisionCount ?? 0;
     this.escalationCount = state.escalationCount ?? 0;
-    this.workerMetricsByRole = state.workerMetricsByRole
-      ? Object.fromEntries(Object.entries(state.workerMetricsByRole).map(([k, v]) => [k, { ...v }]))
-      : {};
+    this.accounting.restore(state);
     this.stateTimestamps = Array.isArray(state.stateTimestamps)
       ? state.stateTimestamps.map(
           (e: { stateId: string; enteredAt: string; exitedAt: string }) => ({
@@ -406,7 +396,7 @@ export class LifecycleController implements WorkflowEngine {
           runId: this.runId,
           finalState: this.currentState,
           artifactInventory: [],
-          manifest: this.buildEarlyManifest(),
+          manifest: this.reporting.buildEarly(this.reportingSnapshot()),
         };
       }
       const fromState = this.currentState;
@@ -444,76 +434,21 @@ export class LifecycleController implements WorkflowEngine {
       }
 
       const sessionId = savedWaitingContext.liveSessionId;
-      const handle = await this.sessionSupervisor.attach(sessionId);
-
-      if (this.aborted) {
-        return this.interruptedResult();
-      }
-
-      if (!handle) {
-        const snapshot = await this.sessionSupervisor.getSnapshot(sessionId);
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- abort() may fire during session I/O
-        if (this.aborted) {
-          return this.interruptedResult();
-        }
-        if (snapshot && savedWaitingContext.sessionTransport === 'stdio') {
-          return this.handleDeadSession(
-            savedWaitingContext,
-            `Local stdio session ${sessionId} cannot be recovered after process restart — ` +
-              `child process stdin/stdout handles are severed when the parent exits.`,
-          );
-        }
-        if (snapshot && savedWaitingContext.sessionTransport === 'remote') {
-          return this.handleDeadSession(
-            savedWaitingContext,
-            `Remote session ${sessionId} reconnect failed — ` +
-              `transport factory unavailable or lease expired.`,
-          );
-        }
-        return this.handleDeadSession(savedWaitingContext);
-      }
-
-      this.journalWriter.append({
-        timestamp: new Date().toISOString(),
+      const session = await resumeLiveSession(savedWaitingContext, input, sessionId, {
+        supervisor: this.sessionSupervisor,
+        journalWriter: this.journalWriter,
         runId: this.runId,
-        sequence: 0,
-        type: 'human_input_received',
-        data: {
-          kind: 'human',
-          action: 'session_resumed',
-          stateId: this.currentState,
-          sessionId,
-        },
+        getStateId: () => this.currentState,
+        isAborted: () => this.aborted,
       });
-
-      const responsePayload =
-        input.type === 'approval'
-          ? { granted: true, reason: input.content }
-          : input.type === 'rejection'
-            ? { granted: false, reason: input.content }
-            : { answer: input.content };
-
-      const requestId =
-        savedWaitingContext.pendingRequestId ?? handle.pendingRequests[0]?.requestId;
-      if (requestId) {
-        await this.sessionSupervisor.sendHumanResponse(sessionId, requestId, responsePayload);
-      }
-
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- abort() may fire during session I/O
-      if (this.aborted) {
+      // Abort may run during the promise handoff after the helper's final I/O check.
+      if (session.kind === 'interrupted' || this.aborted) {
         return this.interruptedResult();
       }
-      const advance = await this.sessionSupervisor.waitForAdvance(sessionId);
-
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- abort() may fire during session I/O
-      if (this.aborted) {
-        return {
-          runId: this.runId,
-          finalState: this.currentState,
-          artifactInventory: [],
-          manifest: this.buildEarlyManifest(),
-        };
+      if (session.kind === 'unreachable') {
+        return this.handleDeadSession(savedWaitingContext, session.error);
       }
+      const { handle, advance } = session;
 
       if (advance.kind === 'completed') {
         this.recordStateExit();
@@ -525,45 +460,15 @@ export class LifecycleController implements WorkflowEngine {
 
         this.recordTransition(this.previousState, this.currentState, 'human_approved');
         const roleId = handle.ref.role;
-        const sessionAction: Action = { type: 'dispatch_worker', params: { role: roleId } };
-        const outputType = this.roleRegistry?.getRole(roleId)?.ownedArtifacts[0];
-        let sessionActionResult: ActionResult;
-        try {
-          if (!outputType) {
-            throw new Error(`No output artifact contract configured for session role '${roleId}'`);
-          }
-          if (!advance.artifactContent) {
-            throw new Error(`Session for role '${roleId}' completed without output`);
-          }
-          const artifactRef = await this.artifactStore.store({
-            type: outputType,
-            name: `${roleId}-output`,
-            content: advance.artifactContent,
-            producedBy: roleId,
-            runId: this.runId,
-          });
-          sessionActionResult = { action: sessionAction, success: true, artifactRef };
-        } catch (error: unknown) {
-          sessionActionResult = {
-            action: sessionAction,
-            success: false,
-            error: getErrorMessage(error),
-          };
-        }
-        if (advance.tokenUsage) {
-          sessionActionResult = {
-            ...sessionActionResult,
-            usageSnapshot: {
-              totalInputTokens: advance.tokenUsage.inputTokens,
-              totalOutputTokens: advance.tokenUsage.outputTokens,
-              byRole: {
-                [roleId]: { ...advance.tokenUsage, durationMs: advance.durationMs },
-              },
-            },
-          };
-        }
+        const sessionActionResult = await createSessionCompletion(
+          roleId,
+          advance,
+          this.roleRegistry?.getRole(roleId)?.ownedArtifacts[0],
+          this.artifactStore,
+          this.runId,
+        );
 
-        this.accumulateUsage([sessionActionResult]);
+        this.accounting.record([sessionActionResult]);
         const continuation = this.entryActionContinuation ?? {
           stateId: this.currentState,
           completedResults: [],
@@ -585,11 +490,14 @@ export class LifecycleController implements WorkflowEngine {
         const completedResults = await Promise.all(
           sourceResults.map(async (result, index) =>
             index === pendingIndex
-              ? this.completeSessionAction(result, sessionId, sessionActionResult)
+              ? completeSessionAction(result, sessionId, sessionActionResult, (completed) =>
+                  this.dispatcher.finalizeDynamicResult(completed),
+                )
               : result,
           ),
         );
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- abort() may fire while storing a dynamic aggregate
+
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- abort() may run while storing a dynamic aggregate.
         if (this.aborted) {
           return this.interruptedResult();
         }
@@ -666,7 +574,7 @@ export class LifecycleController implements WorkflowEngine {
           runId: this.runId,
           finalState: this.currentState,
           artifactInventory: [],
-          manifest: this.buildEarlyManifest(),
+          manifest: this.reporting.buildEarly(this.reportingSnapshot()),
         };
       }
 
@@ -684,7 +592,7 @@ export class LifecycleController implements WorkflowEngine {
         runId: this.runId,
         finalState: this.currentState,
         artifactInventory: [],
-        manifest: this.buildEarlyManifest(),
+        manifest: this.reporting.buildEarly(this.reportingSnapshot()),
       };
     }
 
@@ -837,9 +745,9 @@ export class LifecycleController implements WorkflowEngine {
           }
         : undefined,
       tokenUsage: {
-        inputTokens: this.cumulativeInputTokens,
-        outputTokens: this.cumulativeOutputTokens,
-        totalTokens: this.cumulativeInputTokens + this.cumulativeOutputTokens,
+        inputTokens: this.accounting.cumulativeInputTokens,
+        outputTokens: this.accounting.cumulativeOutputTokens,
+        totalTokens: this.accounting.cumulativeInputTokens + this.accounting.cumulativeOutputTokens,
       },
       repoRoot: this.config.repoRoot,
     };
@@ -852,7 +760,7 @@ export class LifecycleController implements WorkflowEngine {
           runId: this.runId,
           finalState: this.currentState,
           artifactInventory: [],
-          manifest: this.buildEarlyManifest(),
+          manifest: this.reporting.buildEarly(this.reportingSnapshot()),
         };
       }
       if (evaluated?.governanceDecision === 'escalated') {
@@ -874,7 +782,7 @@ export class LifecycleController implements WorkflowEngine {
           runId: this.runId,
           finalState: this.currentState,
           artifactInventory: [],
-          manifest: this.buildEarlyManifest(),
+          manifest: this.reporting.buildEarly(this.reportingSnapshot()),
         };
       }
       if (evaluated) {
@@ -898,7 +806,7 @@ export class LifecycleController implements WorkflowEngine {
           }
           const results = await this.dispatcher.executeAll([action], this.runId, this.currentState);
           exitResults.push(...results);
-          this.accumulateUsage(results);
+          this.accounting.record(results);
           this.entryActionContinuation = { ...exitContext, completedExitResults: [...exitResults] };
           await this.saveCheckpoint();
           // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- abort() may fire during exit actions or checkpoint I/O
@@ -992,7 +900,7 @@ export class LifecycleController implements WorkflowEngine {
             runId: this.runId,
             finalState: this.currentState,
             artifactInventory: [],
-            manifest: this.buildEarlyManifest(),
+            manifest: this.reporting.buildEarly(this.reportingSnapshot()),
           };
         }
       }
@@ -1161,10 +1069,7 @@ export class LifecycleController implements WorkflowEngine {
 
       await this.saveCheckpoint();
 
-      const manifest = this.buildEarlyManifest();
-      if (this.manifestWriter) {
-        this.manifestWriter.write(this.runId, manifest);
-      }
+      this.reporting.writeEarly(this.reportingSnapshot());
     } finally {
       await cancellation;
       if (!this.executionActive) {
@@ -1289,7 +1194,7 @@ export class LifecycleController implements WorkflowEngine {
                 this.runId,
                 actionState,
               );
-          this.accumulateUsage(newResults);
+          this.accounting.record(newResults);
           waitActionResults = [...(continuation?.completedResults ?? []), ...newResults];
         }
 
@@ -1415,10 +1320,10 @@ export class LifecycleController implements WorkflowEngine {
         actionResults = initialActionResults;
         initialActionResults = undefined;
         if (!skipInitialUsageAccumulation) {
-          this.accumulateUsage(actionResults);
+          this.accounting.record(actionResults);
         }
         skipInitialUsageAccumulation = false;
-        this.checkAlertThresholds();
+        this.accounting.checkAlertThresholds(this.config, this.logger);
       } else if (this.entryActionContinuation?.stateId === this.currentState) {
         const continuation = this.entryActionContinuation;
         this.entryActionContinuation = null;
@@ -1441,9 +1346,9 @@ export class LifecycleController implements WorkflowEngine {
               continuation.previousReviewContent,
               continuation.iterationCount,
             );
-        this.accumulateUsage(remainingResults);
+        this.accounting.record(remainingResults);
         actionResults = [...continuation.completedResults, ...remainingResults];
-        this.checkAlertThresholds();
+        this.accounting.checkAlertThresholds(this.config, this.logger);
       } else if (stateDefinition.entryActions) {
         const feedback = this.lastHumanFeedback ?? undefined;
         this.lastHumanFeedback = null;
@@ -1468,8 +1373,8 @@ export class LifecycleController implements WorkflowEngine {
           reviewContent,
           iterCount,
         );
-        this.accumulateUsage(actionResults);
-        this.checkAlertThresholds();
+        this.accounting.record(actionResults);
+        this.accounting.checkAlertThresholds(this.config, this.logger);
       }
 
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- abort() may fire during action dispatch
@@ -1567,9 +1472,10 @@ export class LifecycleController implements WorkflowEngine {
         stateHistory: [...this.stateHistory.getHistory()],
         artifactRefs: allArtifactRefs,
         tokenUsage: {
-          inputTokens: this.cumulativeInputTokens,
-          outputTokens: this.cumulativeOutputTokens,
-          totalTokens: this.cumulativeInputTokens + this.cumulativeOutputTokens,
+          inputTokens: this.accounting.cumulativeInputTokens,
+          outputTokens: this.accounting.cumulativeOutputTokens,
+          totalTokens:
+            this.accounting.cumulativeInputTokens + this.accounting.cumulativeOutputTokens,
         },
         repoRoot: config.repoRoot,
       };
@@ -1643,7 +1549,7 @@ export class LifecycleController implements WorkflowEngine {
         const escalationKey = `${String(this.transitionCount)}:${this.currentState}:${roleId ?? ''}`;
         const currentModel =
           escalatedModels.get(escalationKey) ??
-          (roleId ? this.workerModelByRole[roleId] : undefined);
+          (roleId ? this.accounting.workerModelByRole[roleId] : undefined);
         const nextTier =
           roleId && this.roleRegistry ? this.roleRegistry.getNextTier(roleId, currentModel) : null;
         const attemptKey = `${escalationKey}:${nextTier?.model ?? ''}`;
@@ -1685,7 +1591,7 @@ export class LifecycleController implements WorkflowEngine {
             dispatchContext.previousReviewContent,
             dispatchContext.iterationCount,
           );
-          this.accumulateUsage(reDispatchResults);
+          this.accounting.record(reDispatchResults);
           const dispatchIndex = stateDefinition.entryActions?.indexOf(dispatchAction) ?? 0;
           const tailResults = reDispatchResults.every(
             (result) => result.success && result.sessionOutcome !== 'awaiting_human',
@@ -1700,7 +1606,7 @@ export class LifecycleController implements WorkflowEngine {
                 dispatchContext.iterationCount,
               )
             : [];
-          this.accumulateUsage(tailResults);
+          this.accounting.record(tailResults);
           const confidenceReport = extractConfidenceReport(reDispatchResults);
           if (confidenceReport) {
             this.lastConfidenceScore = confidenceReport.score;
@@ -1760,7 +1666,7 @@ export class LifecycleController implements WorkflowEngine {
               this.runId,
               this.currentState,
             );
-        this.accumulateUsage(exitResults);
+        this.accounting.record(exitResults);
         completedExitResults = [...completedExitResults, ...exitResults];
         const exitContext = {
           ...dispatchContext,
@@ -1892,48 +1798,29 @@ export class LifecycleController implements WorkflowEngine {
           this.entryActionContinuation?.stateId === terminalState
             ? this.entryActionContinuation
             : null;
-        const terminalResults = [...(continuation?.completedResults ?? [])];
-        this.entryActionContinuation = {
-          stateId: terminalState,
-          completedResults: terminalResults,
-          nextActionIndex: terminalResults.length,
-        };
-        await this.saveCheckpoint();
-        if (await this.pauseForSession(terminalResults)) {
+        const terminal = await executeTerminalActions(
+          terminalState,
+          stateDefinition.entryActions,
+          continuation,
+          {
+            execute: (action) => this.dispatcher.executeAll([action], this.runId, terminalState),
+            recordUsage: (results) => {
+              this.accounting.record(results);
+            },
+            persist: async (cursor) => {
+              this.entryActionContinuation = cursor;
+              await this.saveCheckpoint();
+            },
+            pauseForSession: (results) => this.pauseForSession(results),
+            pauseForBudget: (results) => this.pauseForBudget(results),
+            shouldStop: () =>
+              this.executionPaused || (this.aborted && this.currentState !== terminalState),
+            deadlineExceeded: () => !this.aborted && this.isDeadlineExceeded(),
+          },
+        );
+        const terminalResults = terminal.results;
+        if (terminal.pausedBeforeActions) {
           break;
-        }
-        if (!terminalResults.some((result) => !result.success)) {
-          for (const action of stateDefinition.entryActions.slice(
-            continuation?.nextActionIndex ?? 0,
-          )) {
-            const newResults = await this.dispatcher.executeAll(
-              [action],
-              this.runId,
-              terminalState,
-            );
-            this.accumulateUsage(newResults);
-            terminalResults.push(...newResults);
-            this.entryActionContinuation = {
-              stateId: terminalState,
-              completedResults: [...terminalResults],
-              nextActionIndex: terminalResults.length,
-            };
-            await this.saveCheckpoint();
-            if (
-              (await this.pauseForSession(terminalResults)) ||
-              (await this.pauseForBudget(terminalResults))
-            ) {
-              break;
-            }
-            if (
-              this.executionPaused ||
-              (this.aborted && this.currentState !== terminalState) ||
-              newResults.some((result) => !result.success) ||
-              (!this.aborted && this.isDeadlineExceeded())
-            ) {
-              break;
-            }
-          }
         }
         if (
           !this.executionPaused &&
@@ -1988,52 +1875,9 @@ export class LifecycleController implements WorkflowEngine {
 
     this.recordStateExit();
 
-    const iterationSummaries = this.contractRegistry.listContracts().map((c) => {
-      const s = this.contractRegistry.getIterationState(c.id);
-      return {
-        contractId: c.id,
-        totalIterations: s.currentIteration,
-        judgeArbitrations: s.judgeArbitrations,
-        finalStatus: s.status,
-        findingsTotal: s.findingsTotal,
-        findingsResolved: s.findingsResolved,
-      };
-    });
-
-    const { refs: artifactRefs, summaries: artifactSummaries } =
-      await this.collectArtifactInventory();
-
-    const manifest = this.manifestProducer.produce({
-      runId: this.runId,
-      config: {
-        startedAt: new Date(this.startedAt).toISOString(),
-        completedAt: new Date().toISOString(),
-        governanceDecisions: this.governanceDecisionCount,
-        escalations: this.escalationCount,
-        iterations: iterationSummaries,
-        stateTimestamps: this.stateTimestamps,
-        repoRoot: this.config?.repoRoot,
-      },
-      stateHistory: [...this.stateHistory.getHistory()],
-      artifactInventory: artifactRefs,
-      artifactSummaries: artifactSummaries,
-      journalPath: this.config?.runDir ? join(this.config.runDir, 'journal.jsonl') : '',
-      workerMetrics: { ...this.workerMetricsByRole },
-      workflowName: this.config?.workflowDefinition.name,
-      workflowVersion: this.config?.workflowDefinition.version,
-      reportPath: this.config?.runDir ? join(this.config.runDir, 'report.md') : undefined,
-    });
-
-    if (this.manifestWriter) {
-      this.manifestWriter.write(this.runId, manifest);
-    }
-
-    if (this.config?.runDir) {
-      this.writeReportTo(join(this.config.runDir, 'report.md'), manifest);
-    }
-    if (this.config?.reportOutputPath) {
-      this.writeReportTo(this.config.reportOutputPath, manifest);
-    }
+    const { manifest, artifactRefs } = await this.reporting.complete(() =>
+      this.reportingSnapshot(),
+    );
 
     if (definition.terminalStates.includes(this.currentState) && this.contextUpdater) {
       const outcome = this.mapTerminalStateToOutcome(this.currentState);
@@ -2053,16 +1897,19 @@ export class LifecycleController implements WorkflowEngine {
           );
         });
 
-      const workerOutcomes = Object.entries(this.workerMetricsByRole).map(([role, metrics]) => {
-        const failures = this.workerFailuresByRole[role] as { error: string }[] | undefined;
-        return {
-          role,
-          success: !failures?.length,
-          error: failures?.at(0)?.error,
-          dispatches: metrics.dispatches,
-          model: this.workerModelByRole[role],
-        };
-      });
+      const workerOutcomes = Object.entries(this.accounting.workerMetricsByRole).map(
+        ([role, metrics]) => {
+          const failures = this.accounting.workerFailuresByRole[role] as
+            readonly { error: string }[] | undefined;
+          return {
+            role,
+            success: !failures?.length,
+            error: failures?.at(0)?.error,
+            dispatches: metrics.dispatches,
+            model: this.accounting.workerModelByRole[role],
+          };
+        },
+      );
       await this.contextUpdater
         .recordWorkerOutcomes(workerOutcomes, this.runId)
         .catch((err: unknown) => {
@@ -2072,13 +1919,13 @@ export class LifecycleController implements WorkflowEngine {
         });
 
       if (this.executionAnalytics) {
-        const analyticsOutcomes = Object.entries(this.workerMetricsByRole).map(
+        const analyticsOutcomes = Object.entries(this.accounting.workerMetricsByRole).map(
           ([role, metrics]) => {
-            const failures = this.workerFailuresByRole[role] as
-              { error: string; model?: string }[] | undefined;
+            const failures = this.accounting.workerFailuresByRole[role] as
+              readonly { error: string; model?: string }[] | undefined;
             return {
               roleId: role,
-              model: this.workerModelByRole[role] ?? '',
+              model: this.accounting.workerModelByRole[role] ?? '',
               inputTokens: metrics.inputTokens,
               outputTokens: metrics.outputTokens,
               durationMs: metrics.durationMs,
@@ -2165,40 +2012,6 @@ export class LifecycleController implements WorkflowEngine {
           this.contractRegistry.getIterationState(contract.id)[counter],
         ]),
     );
-  }
-
-  private async completeSessionAction(
-    result: ActionResult,
-    sessionId: string,
-    completion: ActionResult,
-  ): Promise<ActionResult> {
-    if (!result.workerResults) {
-      return completion;
-    }
-    const workerResults = result.workerResults.map((worker) =>
-      worker.sessionRef?.sessionId === sessionId
-        ? {
-            ...worker,
-            success: completion.success,
-            error: completion.error,
-            artifactRef: completion.artifactRef,
-            sessionOutcome: 'completed' as const,
-            pendingRequest: undefined,
-          }
-        : worker,
-    );
-    const pending = workerResults.find((worker) => worker.sessionOutcome === 'awaiting_human');
-    return this.dispatcher.finalizeDynamicResult({
-      ...result,
-      success: workerResults.some((worker) => worker.success),
-      workerResults,
-      artifactRefs: workerResults.flatMap((worker) =>
-        worker.artifactRef ? [worker.artifactRef] : [],
-      ),
-      sessionOutcome: pending ? 'awaiting_human' : 'completed',
-      sessionRef: pending?.sessionRef,
-      pendingRequest: pending?.pendingRequest,
-    });
   }
 
   private async failActions(
@@ -2366,80 +2179,48 @@ export class LifecycleController implements WorkflowEngine {
     this.releaseLockIfHeld();
   }
 
-  private async collectArtifactInventory(): Promise<{
-    refs: ArtifactRef[];
-    summaries: { ref: ArtifactRef; producedBy: string; createdAt: string; sizeBytes: number }[];
-  }> {
-    try {
-      const inv = await this.artifactStore.inventory();
-      return {
-        refs: inv.artifacts.map((a) => a.ref),
-        summaries: inv.artifacts.map((a) => ({
-          ref: a.ref,
-          producedBy: a.producedBy,
-          createdAt: a.createdAt,
-          sizeBytes: a.sizeBytes,
-        })),
-      };
-    } catch (err: unknown) {
-      this.logger.debug(
-        `[LifecycleController] Inventory collection failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
-      return { refs: [], summaries: [] };
-    }
+  private reportingSnapshot(): RunReportingSnapshot {
+    return {
+      runId: this.runId,
+      config: this.config,
+      startedAt: this.startedAt,
+      governanceDecisionCount: this.governanceDecisionCount,
+      escalationCount: this.escalationCount,
+      stateHistory: this.stateHistory.getHistory(),
+      stateTimestamps: this.stateTimestamps,
+      workerMetricsByRole: this.accounting.workerMetricsByRole,
+    };
   }
 
   private async saveCheckpoint(): Promise<void> {
-    const state: PersistedState = {
+    const state = buildWorkflowCheckpoint({
       runId: this.runId,
-      schemaVersion: 2,
-      repoRoot: this.config?.repoRoot,
-      currentState: this.checkpointState(),
-      previousState: this.previousState,
-      stateEnteredAt: this.stateEnteredAt,
-      transitionCount: this.transitionCount,
-      stateHistory: [...this.stateHistory.getHistory()],
-      iterationCounts: Object.fromEntries(
-        this.contractRegistry.listContracts().map((c) => {
-          const state = this.contractRegistry.getIterationState(c.id);
-          return [c.id, state.currentIteration];
-        }),
-      ),
-      judgeArbitrationCounts: Object.fromEntries(
-        this.contractRegistry.listContracts().map((c) => {
-          const state = this.contractRegistry.getIterationState(c.id);
-          return [c.id, state.judgeArbitrations];
-        }),
-      ),
-      activeArtifacts: [],
-      lastProducedArtifact: null,
-      lastHumanFeedback: this.lastHumanFeedback ?? undefined,
-      lastReviewContent: this.lastReviewContent ?? undefined,
-      lastTrigger: this.lastTrigger ?? undefined,
-      waitingContext: this.waitingContext ?? undefined,
-      workflowName: this.config?.workflowDefinition.name ?? 'default',
-      workflowVersion: this.config?.workflowDefinition.version ?? '1.0.0',
-      persistedAt: new Date().toISOString(),
-      persistenceVersion: 1,
-      checksum: '',
-      cumulativeInputTokens: this.cumulativeInputTokens,
-      cumulativeOutputTokens: this.cumulativeOutputTokens,
+      config: this.config,
+      progress: {
+        currentState: this.checkpointState(),
+        previousState: this.previousState,
+        stateEnteredAt: this.stateEnteredAt,
+        transitionCount: this.transitionCount,
+        stateHistory: this.stateHistory.getHistory(),
+        lastHumanFeedback: this.lastHumanFeedback,
+        lastReviewContent: this.lastReviewContent,
+        lastTrigger: this.lastTrigger,
+        waitingContext: this.waitingContext,
+        budgetApproved: this.budgetApproved,
+        executionPaused: this.executionPaused,
+        pendingTerminalState: this.pendingTerminalState,
+        terminalRecoveryState: this.terminalRecoveryState,
+        governanceDecisionCount: this.governanceDecisionCount,
+        escalationCount: this.escalationCount,
+        stateTimestamps: this.stateTimestamps,
+        interruptedActionResults: this.interruptedActionResults,
+        entryActionContinuation: this.entryActionContinuation,
+      },
+      accounting: this.accounting,
+      iterationCounts: this.contractCounts('currentIteration'),
+      judgeArbitrationCounts: this.contractCounts('judgeArbitrations'),
       dispatchCounter: this.dispatcher.getDispatchCounter(),
-      firedThresholdIndex: this.firedThresholdIndex,
-      hasReceivedUsage: this.hasReceivedUsage,
-      budgetApproved: this.budgetApproved,
-      executionPaused: this.executionPaused,
-      pendingTerminalState: this.pendingTerminalState ?? undefined,
-      terminalRecoveryState: this.terminalRecoveryState ?? undefined,
-      governanceDecisionCount: this.governanceDecisionCount,
-      escalationCount: this.escalationCount,
-      workerMetricsByRole: Object.fromEntries(
-        Object.entries(this.workerMetricsByRole).map(([k, v]) => [k, { ...v }]),
-      ),
-      stateTimestamps: this.stateTimestamps.map((e) => ({ ...e })),
-      interruptedActionResults: this.interruptedActionResults ?? undefined,
-      entryActionContinuation: this.entryActionContinuation ?? undefined,
-    };
+    });
     this.journalWriter.append({
       timestamp: new Date().toISOString(),
       runId: this.runId,
@@ -2448,119 +2229,7 @@ export class LifecycleController implements WorkflowEngine {
       data: { kind: 'workflow_checkpoint', state: structuredClone(state) },
     });
     await this.statePersistence.save(state);
-    await this.writeInterimManifest();
-  }
-
-  private async writeInterimManifest(): Promise<void> {
-    if (!this.manifestWriter) {
-      return;
-    }
-    try {
-      const { refs, summaries } = await this.collectArtifactInventory();
-      const manifest = this.manifestProducer.produce({
-        runId: this.runId,
-        config: {
-          startedAt: new Date(this.startedAt).toISOString(),
-          completedAt: new Date().toISOString(),
-          governanceDecisions: this.governanceDecisionCount,
-          escalations: this.escalationCount,
-          iterations: [],
-          stateTimestamps: this.stateTimestamps,
-          repoRoot: this.config?.repoRoot,
-        },
-        stateHistory: [...this.stateHistory.getHistory()],
-        artifactInventory: refs,
-        artifactSummaries: summaries,
-        journalPath: this.config?.runDir ? join(this.config.runDir, 'journal.jsonl') : '',
-        workerMetrics: { ...this.workerMetricsByRole },
-        workflowName: this.config?.workflowDefinition.name,
-        workflowVersion: this.config?.workflowDefinition.version,
-      });
-      this.manifestWriter.write(this.runId, {
-        ...manifest,
-        status: 'running',
-        timing: { ...manifest.timing, completedAt: '' },
-      });
-    } catch (err: unknown) {
-      this.logger.debug(
-        `[LifecycleController] Interim manifest write failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
-  }
-
-  private accumulateUsage(actionResults: readonly ActionResult[]): void {
-    for (const result of actionResults) {
-      if (result.workerResults) {
-        for (const wr of result.workerResults) {
-          if (wr.role && wr.model) {
-            this.workerModelByRole[wr.role] = wr.model;
-          }
-          if (!wr.success && wr.error && wr.role) {
-            const role = wr.role;
-            const failures = (this.workerFailuresByRole[role] ??= []);
-            failures.push({ error: wr.error, model: wr.model });
-          }
-        }
-      }
-
-      if (!result.usageSnapshot) {
-        continue;
-      }
-      const snap = result.usageSnapshot;
-      this.cumulativeInputTokens += snap.totalInputTokens;
-      this.cumulativeOutputTokens += snap.totalOutputTokens;
-      this.hasReceivedUsage = true;
-      for (const [role, usage] of Object.entries(snap.byRole)) {
-        const existing = this.workerMetricsByRole[role] as
-          (typeof this.workerMetricsByRole)[string] | undefined;
-        if (existing) {
-          existing.inputTokens += usage.inputTokens;
-          existing.outputTokens += usage.outputTokens;
-          existing.dispatches += 1;
-          existing.durationMs += usage.durationMs;
-        } else {
-          this.workerMetricsByRole[role] = {
-            inputTokens: usage.inputTokens,
-            outputTokens: usage.outputTokens,
-            dispatches: 1,
-            durationMs: usage.durationMs,
-            artifactsProduced: 0,
-          };
-        }
-      }
-    }
-  }
-
-  private checkAlertThresholds(): void {
-    const config = this.config;
-    if (!config?.budgetMaxTokens || !config.budgetAlertThresholds?.length) {
-      return;
-    }
-    const totalTokens = this.cumulativeInputTokens + this.cumulativeOutputTokens;
-    const ratio = totalTokens / config.budgetMaxTokens;
-    const sorted = [...config.budgetAlertThresholds].sort((a, b) => a - b);
-    for (let i = this.firedThresholdIndex + 1; i < sorted.length; i++) {
-      if (ratio >= sorted[i]) {
-        this.firedThresholdIndex = i;
-        const pct = Math.round(sorted[i] * 100);
-        this.logger.warn(
-          `[LifecycleController] Budget alert: ${String(pct)}% threshold reached (${String(totalTokens)}/${String(config.budgetMaxTokens)} tokens used)`,
-        );
-      } else {
-        break;
-      }
-    }
-  }
-
-  private writeReportTo(reportPath: string, manifest: RunManifest): void {
-    try {
-      mkdirSync(dirname(reportPath), { recursive: true });
-      writeFileSync(reportPath, renderReport(manifest), 'utf8');
-    } catch (err: unknown) {
-      this.logger.debug(
-        `[LifecycleController] Report write failed for ${reportPath}: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
+    await this.reporting.writeInterim(() => this.reportingSnapshot());
   }
 
   private async handleDeadSession(
@@ -2635,28 +2304,6 @@ export class LifecycleController implements WorkflowEngine {
     return this.runLoop(this.config, this.config.globalTransitionLimit ?? DEFAULT_TRANSITION_LIMIT);
   }
 
-  private buildEarlyManifest(): RunManifest {
-    return this.manifestProducer.produce({
-      runId: this.runId,
-      config: {
-        startedAt: new Date(this.startedAt).toISOString(),
-        completedAt: new Date().toISOString(),
-        governanceDecisions: this.governanceDecisionCount,
-        escalations: this.escalationCount,
-        iterations: [],
-        stateTimestamps: this.stateTimestamps,
-        repoRoot: this.config?.repoRoot,
-      },
-      stateHistory: [...this.stateHistory.getHistory()],
-      artifactInventory: [],
-      artifactSummaries: [],
-      journalPath: this.config?.runDir ? join(this.config.runDir, 'journal.jsonl') : '',
-      workerMetrics: { ...this.workerMetricsByRole },
-      workflowName: this.config?.workflowDefinition.name,
-      workflowVersion: this.config?.workflowDefinition.version,
-    });
-  }
-
   private publishError(message: string): void {
     this.agentStreamBus?.publish({
       runId: this.runId,
@@ -2715,7 +2362,8 @@ export class LifecycleController implements WorkflowEngine {
     context: Partial<EntryActionContinuation> = {},
   ): Promise<boolean> {
     const limit = this.config?.budgetMaxTokens;
-    const totalTokens = this.cumulativeInputTokens + this.cumulativeOutputTokens;
+    const totalTokens =
+      this.accounting.cumulativeInputTokens + this.accounting.cumulativeOutputTokens;
     if (
       this.aborted ||
       this.executionPaused ||
@@ -2821,17 +2469,14 @@ export class LifecycleController implements WorkflowEngine {
       runId: this.runId,
       finalState: this.currentState,
       artifactInventory: [],
-      manifest: this.buildEarlyManifest(),
+      manifest: this.reporting.buildEarly(this.reportingSnapshot()),
     };
   }
 
   private resetRunState(): void {
+    this.accounting.reset();
     this.previousState = null;
     this.waitingContext = null;
-    this.cumulativeInputTokens = 0;
-    this.cumulativeOutputTokens = 0;
-    this.hasReceivedUsage = false;
-    this.firedThresholdIndex = -1;
     this.lastHumanFeedback = null;
     this.lastReviewContent = null;
     this.lastTrigger = null;
@@ -2844,9 +2489,6 @@ export class LifecycleController implements WorkflowEngine {
     this.entryActionContinuation = null;
     this.pendingTerminalState = null;
     this.terminalRecoveryState = null;
-    this.workerMetricsByRole = {};
-    this.workerFailuresByRole = {};
-    this.workerModelByRole = {};
     this.lastConfidenceScore = null;
     this.guardChecker.setLastConfidenceReport(null);
     this.dispatcher.setDispatchCounter(0);

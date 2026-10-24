@@ -20,12 +20,10 @@ import type { AgentTask } from '@ai-dev-orchestrator/schemas';
 import { AI_CONFIG_DIR_NAME } from '@ai-dev-orchestrator/schemas';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  buildAgentTaskPrompt,
-  CliAgentRunner,
-  extractArtifactJsonFromAgentText,
-  extractUsageFromRawLine,
-} from '../cli-agent-runner';
+import { CliAgentRunner } from '../cli-agent-runner';
+import { extractArtifactJsonFromAgentText } from '../cli-output-reader';
+import { buildAgentTaskPrompt } from '../cli-task-prompt';
+import { extractUsageFromRawLine } from '../cli-token-usage';
 import type { LiveRequestStore } from '../file-backed-live-request-store';
 import type { PermissionApprovalStore } from '../permission-approval-store';
 import { serializeMessage } from '../protocol-serializer';
@@ -1050,6 +1048,8 @@ PY`,
         cliEntryPath: join(tempDir, 'ai', 'index.js'),
       });
       runner.setPermissionPolicyConfig({ defaultAction: 'ask_human' });
+      const approvalStorePath = join(tempDir, 'approvals.json');
+      runner.setApprovalStorePath(approvalStorePath);
 
       const result = await runner.dispatch(task);
       expect(result.status).toBe('success');
@@ -1062,6 +1062,10 @@ PY`,
 
       const hookScript = join(task.runDir, 'codex-permission-hook.sh');
       await expect(readFile(hookScript, 'utf-8')).resolves.toContain('codex-permission-hook');
+      const context = JSON.parse(
+        await readFile(join(task.runDir, 'codex-permission-hook-context.json'), 'utf8'),
+      ) as { approvalStorePath: string };
+      expect(context.approvalStorePath).toBe(approvalStorePath);
     });
 
     it('injects --add-dir for codex so ~/.ai artifact writes are sandbox-allowed', async () => {

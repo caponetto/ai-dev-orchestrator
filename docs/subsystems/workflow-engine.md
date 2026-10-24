@@ -42,6 +42,27 @@ Resume reconciles a valid checkpoint with subsequent durable journal events, inc
 
 Human text responses become feedback for the next worker. States declared with `type: wait` expose their waiting context regardless of their name and require resume rather than retry. Human-driven transitions execute the source state's exit actions; their cursors retain the original response and waiting context across session, budget, and manual pauses. Aborting a paused run executes every declared `ABORTED` entry action and checkpoints terminal cleanup progress. Completing a dynamic task session updates only the matching session, preserving completed peer artifacts. Review and judge artifacts marked as having failed validation cannot approve a transition, including artifacts produced after session reattachment.
 
+## Execution module boundaries
+
+`LifecycleController` owns the active execution, run lock, transition state and durable action
+cursors. Collaborators receive explicit snapshots or narrow capabilities; none receives the
+controller instance.
+
+| Module                        | Responsibility and boundary                                                                                         |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `execution-accounting.ts`     | Owns token totals, worker metrics/failures/models and fired budget alerts; restores copied persisted values         |
+| `workflow-checkpoint.ts`      | Constructs the existing checkpoint schema from an execution snapshot; performs no I/O                               |
+| `run-reporting.ts`            | Builds/writes manifests and reports; reads current reporting values after asynchronous inventory collection         |
+| `session-continuation.ts`     | Attaches/responds/awaits with cancellation checks, stores completion output and merges the matching parallel result |
+| `terminal-action-executor.ts` | Executes remaining terminal actions and checkpoints each completed cursor before observing pauses/stops             |
+
+The controller still orders journal checkpoint append → state save → interim manifest. It alone
+applies session results to transitions and continuation cursors, accounts for new work and routes
+terminal failures. The terminal executor receives separate persist, dispatch, usage, pause and
+stop capabilities so moving the loop does not give another component ownership of workflow state.
+Reporting retains best-effort interim/report writes and propagates required final-manifest writer
+failures. Public engine methods, persisted field names and recovery semantics are unchanged.
+
 ## Workflow Sources
 
 The repository currently ships built-in workflows from `packages/config-templates/src/static/workflows/`.

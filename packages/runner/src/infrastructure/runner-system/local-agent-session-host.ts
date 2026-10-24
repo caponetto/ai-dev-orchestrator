@@ -18,7 +18,7 @@ import type {
   AgentResult as AgentResultSchema,
 } from '@ai-dev-orchestrator/schemas';
 
-import { extractUsageFromRawLine } from './cli-agent-runner';
+import { extractUsageFromRawLine } from './cli-token-usage';
 import type { StdioProtocolTransport } from './stdio-protocol-transport';
 
 interface LocalSessionResult {

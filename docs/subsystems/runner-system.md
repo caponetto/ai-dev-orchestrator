@@ -51,6 +51,29 @@ Live requests are stored under `.ai/runs/<run-id>/live-requests/` and responses 
 
 Permission heuristics check actual operation types before display labels. Every pipeline segment must qualify as read-only; redirects, substitutions and compound safe-command extensions require the applicable policy/approval. Cached file approvals use path boundaries, and cached shell approvals cannot expand into another command through shell operators. Explicit deny rules retain precedence over grants. These heuristics complement the agent sandbox; they are not a general shell parser.
 
+## CLI execution module boundaries
+
+`CliAgentRunner` remains the public dispatch/session facade and configuration entry point.
+Its implementation delegates to focused modules under `runner-system/`:
+
+| Module                                       | Responsibility and ownership                                          |
+| -------------------------------------------- | --------------------------------------------------------------------- |
+| `cli-task-prompt.ts`, `cli-invocation.ts`    | Pure prompt/argument construction and stdin setup                     |
+| `cli-token-usage.ts`, `cli-output-reader.ts` | Vendor usage parsing, output retries and fallback precedence          |
+| `cli-human-request-handler.ts`               | Permission/clarification routing and policy/store configuration       |
+| `cli-session-execution.ts`                   | Supervised session negotiation, registration and dispatch fallback    |
+| `cli-process-registry.ts`                    | The single active-process set and cancellation generation             |
+| `cli-process-execution.ts`                   | One dispatch attempt's protocol/legacy execution and completion state |
+| `cli-legacy-execution.ts`                    | Legacy stream draining, token accumulation and early failure handling |
+| `cli-protocol-events.ts`                     | Stateless progress/log/artifact event mapping                         |
+| `cli-runner-config.ts`                       | Immutable configuration types and shared timeout defaults             |
+
+Cancellation generations are shared by session creation and transient dispatch retries. The
+per-attempt executor retains listener registration before negotiation, final-vs-delta token
+precedence, close-after-stdout handling and single completion. The session host imports usage
+parsing directly from its canonical module. Internal helpers are not added to the package API,
+and implementation files do not end with compatibility re-exports.
+
 ## Key Implementation Files
 
 See `packages/runner/src/infrastructure/runner-system/` for the full set. Core files include:
@@ -58,7 +81,7 @@ See `packages/runner/src/infrastructure/runner-system/` for the full set. Core f
 - `default-runner-system.ts` — orchestrates dispatch, streaming, and result handling
 - `agent-task-assembler.ts` — builds agent tasks from workflow state and role contracts
 - `runner-context-assembler.ts` — assembles runtime context for dispatch
-- `cli-agent-runner.ts` — CLI-backed runner adapter
+- `cli-agent-runner.ts` — CLI dispatch/session facade
 - `codex-permission-hook.ts` — Codex PermissionRequest hook bridge to dashboard live requests
 - `http-agent-runner.ts` — HTTP-backed runner adapter
 - `parallel-manager.ts` — parallel worker dispatch coordination
