@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.9](https://github.com/caponetto/ai-dev-orchestrator/compare/config-templates-v0.1.8...config-templates-v0.1.9) (2026-10-24)
+
+
+### Features
+
+* add release smoke test workflow and enhance PR review feedback handling ([#80](https://github.com/caponetto/ai-dev-orchestrator/issues/80)) ([475c03f](https://github.com/caponetto/ai-dev-orchestrator/commit/475c03f326da1b538a4bff08995273b4928e4aca))
+
 ## [0.1.8](https://github.com/caponetto/ai-dev-orchestrator/compare/config-templates-v0.1.7...config-templates-v0.1.8) (2026-10-24)
 
 
