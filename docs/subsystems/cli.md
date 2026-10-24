@@ -103,6 +103,26 @@ and `already_responded` means the same decision was already recorded. A conflict
 An untargeted permit with no pending request reports `no_pending_requests`. These acknowledgements
 do not establish that the agent consumed the response. Blank explicit permission IDs are invalid.
 
+During interactive `ai run`, live permission and clarification prompts share one terminal reader.
+Requests are offered in pending-list order, one at a time, and polling does not overlap slow reads.
+Permission answers accept `y`/`yes`, `n`/`no` (case-insensitive), and Enter retains the displayed
+`[Y/n]` default grant. Other input does not submit a decision. Clarification answers must contain
+non-whitespace text; their original text is preserved.
+
+The prompt waits for response storage before reporting `stored` or `already recorded`. Writes
+require the selected cataloged request. Failures are reported locally and requests still pending
+are reoffered on the next poll. Dashboard answers, expiry and cancellation remove stale questions
+at the next successful poll; strict storage validation handles races between polls. A conflicting
+decision cannot replace the first stored response. Storage acknowledgement does not confirm agent
+consumption or tool execution.
+
+EOF closes interactive prompting without submitting a default response; the operator can inspect
+pending requests and use `ai permit` or `ai answer --message-id`. Workflow shutdown closes the
+reader and ignores late input/polls. A write already started may still commit after shutdown;
+its result is handled without restarting prompts or printing a late success. Shutdown does not
+wait indefinitely for storage. Real terminal regression tests use the system `script` utility on
+macOS/Linux; deterministic prompt lifecycle tests also run without a terminal.
+
 ## Source of Truth
 
 Prefer:

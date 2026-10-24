@@ -1,6 +1,5 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createInterface, type Interface as ReadlineInterface } from 'node:readline';
 
 import { safeJsonParse } from '@ai-dev-orchestrator/artifacts';
 import type { LiveRequest, LiveRequestStore } from '@ai-dev-orchestrator/runner';
@@ -23,6 +22,8 @@ import { workflowResultFields } from '../output/workflow-result';
 import { resolveProjectWorkflow } from '../project-config';
 import { handleWaitingForHuman } from '../waiting-for-human';
 import { getArtifactsDir, getConfigSnapshotPath } from '../workspace-paths';
+
+import { startLiveRequestPrompter } from './live-request-prompter';
 
 /** Options for the `ai run` command. */
 export interface RunOptions {
@@ -155,7 +156,7 @@ export async function runCommand(
   });
 
   const livePoller = process.stdin.isTTY
-    ? startLiveRequestPoller(ctx.runId, ctx.liveRequestStore, formatter)
+    ? startLiveRequestPrompter(ctx.runId, ctx.liveRequestStore, formatter)
     : startNonTtyLiveRequestPoller(ctx.runId, ctx.liveRequestStore, formatter);
 
   const onUncaughtException = (err: Error): void => {
@@ -267,155 +268,6 @@ export async function runCommand(
 }
 
 const LIVE_POLL_MS = 1000;
-
-function startLiveRequestPoller(
-  runId: string,
-  store: LiveRequestStore,
-  formatter: OutputFormatter,
-): { stop: () => void } {
-  const seenIds = new Set<string>();
-  let stopped = false;
-  const activePrompts = new Set<ReadlineInterface>();
-  const isStopped = (): boolean => stopped;
-
-  const timer = setInterval(() => {
-    void (async () => {
-      if (stopped) {
-        return;
-      }
-      let pending: readonly LiveRequest[];
-      try {
-        pending = await store.listPendingRequests(runId);
-      } catch {
-        return;
-      }
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- async race: stop() may fire during await
-      if (stopped) {
-        return;
-      }
-
-      for (const req of pending) {
-        if (isStopped()) {
-          break;
-        }
-        if (seenIds.has(req.messageId)) {
-          continue;
-        }
-        seenIds.add(req.messageId);
-
-        formatter.clearSpinner();
-        const payload = req.payload;
-
-        if (req.kind === 'permission') {
-          const action = typeof payload['action'] === 'string' ? payload['action'] : 'unknown';
-          const resource = typeof payload['resource'] === 'string' ? payload['resource'] : '';
-          const risk = typeof payload['riskLevel'] === 'string' ? payload['riskLevel'] : 'unknown';
-          const detail = typeof payload['detail'] === 'string' ? payload['detail'] : '';
-          promptPermission({
-            runId,
-            messageId: req.messageId,
-            action,
-            resource,
-            risk,
-            detail,
-            store,
-            formatter,
-            activePrompts,
-            isStopped,
-          });
-        } else {
-          const question = typeof payload['question'] === 'string' ? payload['question'] : '';
-          promptClarification(
-            runId,
-            req.messageId,
-            question,
-            store,
-            formatter,
-            activePrompts,
-            isStopped,
-          );
-        }
-      }
-    })();
-  }, LIVE_POLL_MS);
-
-  return {
-    stop: () => {
-      stopped = true;
-      clearInterval(timer);
-      for (const rl of activePrompts) {
-        rl.close();
-      }
-      activePrompts.clear();
-    },
-  };
-}
-
-interface PromptPermissionOpts {
-  runId: string;
-  messageId: string;
-  action: string;
-  resource: string;
-  risk: string;
-  detail: string;
-  store: LiveRequestStore;
-  formatter: OutputFormatter;
-  activePrompts: Set<ReadlineInterface>;
-  isStopped: () => boolean;
-}
-
-function promptPermission(opts: PromptPermissionOpts): void {
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  opts.activePrompts.add(rl);
-  if (opts.detail) {
-    opts.formatter.info(`  Detail: ${opts.detail}`);
-  }
-  rl.question(`? ${opts.action} ${opts.resource} (${opts.risk} risk). Allow? [Y/n] `, (answer) => {
-    rl.close();
-    opts.activePrompts.delete(rl);
-    if (opts.isStopped()) {
-      return;
-    }
-    const granted = answer.trim().toLowerCase() !== 'n';
-    void opts.store.writeResponse({
-      runId: opts.runId,
-      messageId: opts.messageId,
-      payload: { granted },
-      respondedAt: new Date().toISOString(),
-    });
-    opts.formatter.info(granted ? 'Approved.' : 'Denied.');
-    opts.formatter.startSpinner('Running workflow…');
-  });
-}
-
-function promptClarification(
-  runId: string,
-  messageId: string,
-  question: string,
-  store: LiveRequestStore,
-  formatter: OutputFormatter,
-  activePrompts: Set<ReadlineInterface>,
-  isStopped: () => boolean,
-): void {
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  activePrompts.add(rl);
-  formatter.info(`? ${question}`);
-  rl.question('  Answer: ', (answer) => {
-    rl.close();
-    activePrompts.delete(rl);
-    if (isStopped()) {
-      return;
-    }
-    void store.writeResponse({
-      runId,
-      messageId,
-      payload: { answer },
-      respondedAt: new Date().toISOString(),
-    });
-    formatter.info('Answer submitted.');
-    formatter.startSpinner('Running workflow…');
-  });
-}
 
 function startNonTtyLiveRequestPoller(
   runId: string,
