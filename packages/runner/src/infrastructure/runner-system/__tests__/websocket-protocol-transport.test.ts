@@ -1,6 +1,6 @@
 import type { ProtocolMessage } from '@ai-dev-orchestrator/agent-protocol';
 import { createProtocolMessage } from '@ai-dev-orchestrator/agent-protocol';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import { serializeMessage } from '../protocol-serializer';
 import { WebSocketProtocolTransport, WS_READY_STATE } from '../websocket-protocol-transport';
@@ -370,6 +370,25 @@ describe('WebSocketProtocolTransport', () => {
   });
 
   describe('WebSocket close event', () => {
+    it('notifies all observers once on remote close and ignores deliberate closure', () => {
+      const error = vi.fn<(error: unknown) => void>();
+      transport.onError(() => {
+        throw new Error('observer failed');
+      });
+      transport.onError(error);
+      ws.simulateClose();
+      ws.simulateClose();
+      expect(error).toHaveBeenCalledOnce();
+      expect(error.mock.calls[0][0]).toMatchObject({ message: 'Remote WebSocket closed' });
+    });
+
+    it('does not report a locally closed socket as remote failure', () => {
+      const error = vi.fn<(error: unknown) => void>();
+      transport.onError(error);
+      transport.close();
+      ws.simulateClose();
+      expect(error).not.toHaveBeenCalled();
+    });
     it('marks transport as closed on remote close', () => {
       ws.simulateClose();
       const msg = createProtocolMessage('done', { summary: 'Done' });

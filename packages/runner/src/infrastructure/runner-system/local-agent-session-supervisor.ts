@@ -157,7 +157,8 @@ export class LocalAgentSessionSupervisor implements AgentSessionSupervisor {
     if (host) {
       return Promise.resolve(this.buildSnapshot(host));
     }
-    return Promise.resolve(this.registry.get(sessionId));
+    const snapshot = this.registry.get(sessionId);
+    return Promise.resolve(snapshot?.ref.transport === 'stdio' ? snapshot : null);
   }
 
   getState(sessionId: string): AgentSessionState | null {
@@ -166,7 +167,7 @@ export class LocalAgentSessionSupervisor implements AgentSessionSupervisor {
       return host.state;
     }
     const snap = this.registry.get(sessionId);
-    return snap?.state ?? null;
+    return snap?.ref.transport === 'stdio' ? snap.state : null;
   }
 
   listByRun(runId: string): Promise<readonly AgentSessionSnapshot[]> {
@@ -174,7 +175,9 @@ export class LocalAgentSessionSupervisor implements AgentSessionSupervisor {
     const result = new Map<string, AgentSessionSnapshot>();
 
     for (const snap of fromRegistry) {
-      result.set(snap.ref.sessionId, snap);
+      if (snap.ref.transport === 'stdio') {
+        result.set(snap.ref.sessionId, snap);
+      }
     }
 
     for (const host of this.hosts.values()) {

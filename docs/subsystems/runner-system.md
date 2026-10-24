@@ -132,6 +132,38 @@ that write completes can still require recovery from the remote agent. Snapshot 
 not a power-loss/fsync guarantee, and no receiver acknowledgement or exactly-once remote delivery
 contract is introduced.
 
+## Remote reconnect ownership and leases
+
+Concurrent attach/reconnect calls share one transport attempt per host, including while its snapshot
+is being saved. Restored hosts are published before transport creation so cancellation can find them.
+Abort, pause, finalization and host replacement invalidate outstanding attempts. They release waiting
+callers immediately; a late transport is closed and a late failure cannot revive the old host.
+Finalization remains fenced after a failed save and can be retried. A failed initial session save
+closes its socket/deadline and retains a failed host for explicit persistence retry, preserving any
+abort or replacement that happened during the write. Factory/write failures close
+uncommitted transports and allow a later reconnect attempt without losing pending request identity.
+A restored session retains its original creation time and reports `awaiting_human` when requests remain.
+
+Local and remote delegates share a registry but expose only snapshots for their own transport type.
+Composite advancement and finalization therefore select the session's owning delegate. Normal remote
+WebSocket close is observed as disconnection, clears the current transport, and records reconnecting
+state. The next explicit attach/reconnect can create a replacement; deliberate local close does not
+report an extra connection failure.
+
+Lease deadlines work independently of the optional heartbeat interval and are checked at reconnect
+entry, after transport creation, after snapshot persistence and before sending human answers. Expiry
+at the deadline (or an invalid expiry string) fails closed, clears pending requests, closes the socket,
+and settles observers. The owned deadline keeps Node alive until termination/finalization; distant
+leases are scheduled in bounded timer intervals. Completion receipts already observed remain terminal
+and recoverable after lease expiry. Timers require a responsive Node event loop.
+
+Expiry/disconnection callbacks observe background snapshot-write rejections. Failure observations
+through `waitForAdvance` retry persistence, so a storage failure does not require reviving the session.
+As with completion, the in-memory state remains available for an explicit retry if saving fails.
+Factory cancellation is local: the current port cannot interrupt a factory that never returns.
+Fencing disposes its late result and does not prove that remote work stopped. Exclusive run ownership
+is still required across processes; this adds no remote fencing token or exactly-once delivery contract.
+
 ## CLI execution module boundaries
 
 `CliAgentRunner` remains the public dispatch/session facade and configuration entry point.

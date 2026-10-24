@@ -141,7 +141,20 @@ export class WebSocketProtocolTransport {
     });
 
     this.ws.addEventListener('close', () => {
+      if (this.closed) {
+        return;
+      }
       this.closed = true;
+      const handlers = [...this.errorHandlers];
+      this.messageHandlers.length = 0;
+      this.errorHandlers.length = 0;
+      for (const handler of handlers) {
+        try {
+          handler(new Error('Remote WebSocket closed'));
+        } catch {
+          // One observer must not prevent the others from seeing connection loss.
+        }
+      }
     });
 
     this.ws.addEventListener('error', (ev: unknown) => {
