@@ -63,11 +63,41 @@ export class FileBackedLiveRequestStore implements LiveRequestStore {
     const dir = this.requestsDir(request.runId);
     await mkdir(dir, { recursive: true });
     const filePath = join(dir, `${request.messageId}.json`);
-    await writeFile(filePath, JSON.stringify(request, null, 2));
+    const temporary = `${filePath}.${randomUUID()}.tmp`;
+    try {
+      await writeFile(temporary, JSON.stringify(request, null, 2), { flag: 'wx', flush: true });
+      try {
+        await link(temporary, filePath);
+      } catch (error: unknown) {
+        if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) {
+          throw error;
+        }
+        const previous = safeJsonParse(await readFile(filePath, 'utf8'), liveRequestSchema);
+        if (
+          !previous.success ||
+          previous.data.runId !== request.runId ||
+          previous.data.messageId !== request.messageId ||
+          previous.data.kind !== request.kind ||
+          !isDeepStrictEqual(previous.data.payload, request.payload)
+        ) {
+          throw new Error(`Request ${request.messageId} already identifies a different request`);
+        }
+      }
+    } finally {
+      await unlink(temporary).catch(() => undefined);
+    }
   }
 
   async writeResponse(response: LiveResponse): Promise<void> {
     this.validateIdentifier(response.messageId);
+    const previous = await this.readResponse(response.runId, response.messageId);
+    if (previous) {
+      if (!isDeepStrictEqual(previous.payload, response.payload)) {
+        throw new Error(`Request ${response.messageId} already has a response`);
+      }
+      return;
+    }
+    await this.validateResponseRequest(response);
     const dir = this.responsesDir(response.runId);
     await mkdir(dir, { recursive: true });
     const filePath = join(dir, `${response.messageId}.json`);
@@ -207,6 +237,45 @@ export class FileBackedLiveRequestStore implements LiveRequestStore {
         : null;
     } catch {
       return null;
+    }
+  }
+
+  private async validateResponseRequest(response: LiveResponse): Promise<void> {
+    let content: string;
+    try {
+      content = await readFile(
+        join(this.requestsDir(response.runId), `${response.messageId}.json`),
+        'utf8',
+      );
+    } catch (error: unknown) {
+      // A streamed request can be answered before its catalog entry is published.
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+        return;
+      }
+      throw error;
+    }
+    const parsed = safeJsonParse(content, liveRequestSchema);
+    if (
+      !parsed.success ||
+      parsed.data.runId !== response.runId ||
+      parsed.data.messageId !== response.messageId
+    ) {
+      throw new Error('Live response request identity is invalid');
+    }
+    if (response.payload['timedOut'] === true || response.payload['aborted'] === true) {
+      return;
+    }
+    if (parsed.data.expiresAt && Date.parse(parsed.data.expiresAt) <= Date.now()) {
+      throw new Error(`Request ${response.messageId} has expired`);
+    }
+    const valid =
+      parsed.data.kind === 'permission'
+        ? typeof response.payload['granted'] === 'boolean' &&
+          response.payload['answer'] === undefined
+        : typeof response.payload['answer'] === 'string' &&
+          response.payload['granted'] === undefined;
+    if (!valid) {
+      throw new Error(`Request ${response.messageId} response kind does not match`);
     }
   }
 

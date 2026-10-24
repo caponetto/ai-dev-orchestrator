@@ -29,6 +29,35 @@ const permission = (): PermissionRequestMessage =>
   });
 
 describe('CLI human request handling', () => {
+  it.each(['permission', 'clarification'] as const)(
+    'still fails closed when persisting a %s timeout races with another response',
+    async (kind) => {
+      const handler = new CliHumanRequestHandler();
+      const transport = { send: vi.fn(), writeRaw: vi.fn() };
+      handler.setLiveRequestStore({
+        writeRequest: vi.fn(),
+        awaitResponse: vi.fn().mockResolvedValue(null),
+        writeResponse: vi.fn().mockRejectedValue(new Error('already has a response')),
+        listPendingRequests: vi.fn(),
+        cleanupResolved: vi.fn(),
+      });
+      const request =
+        kind === 'permission'
+          ? permission()
+          : createProtocolMessage('clarification_request', { question: 'Which branch?' });
+      const operation =
+        request.type === 'permission_request'
+          ? handler.handlePermissionRequest(request, task, transport)
+          : handler.handleClarificationRequest(request, task, transport);
+      await expect(operation).rejects.toThrow('already has a response');
+      expect(transport.send.mock.calls[0]?.[0] as unknown).toMatchObject(
+        kind === 'permission'
+          ? { type: 'permission_response', replyTo: request.messageId, payload: { granted: false } }
+          : { type: 'abort' },
+      );
+    },
+  );
+
   it('delivers an approved answer even if recording the reusable approval fails', async () => {
     const handler = new CliHumanRequestHandler();
     const request = permission();

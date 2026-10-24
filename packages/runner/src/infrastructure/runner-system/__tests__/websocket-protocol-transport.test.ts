@@ -71,7 +71,7 @@ describe('WebSocketProtocolTransport', () => {
   describe('send', () => {
     it('sends serialized protocol message', () => {
       const msg = createProtocolMessage('done', { summary: 'All done' });
-      transport.send(msg);
+      expect(transport.send(msg)).toBe(true);
       expect(ws.sentMessages).toHaveLength(1);
       expect(ws.sentMessages[0]).toContain('"type":"done"');
     });
@@ -79,7 +79,7 @@ describe('WebSocketProtocolTransport', () => {
     it('does not send after close', () => {
       transport.close();
       const msg = createProtocolMessage('done', { summary: 'Done' });
-      transport.send(msg);
+      expect(transport.send(msg)).toBe(false);
       expect(ws.sentMessages).toHaveLength(0);
     });
 
@@ -96,7 +96,7 @@ describe('WebSocketProtocolTransport', () => {
       const connectingTransport = new WebSocketProtocolTransport(connectingWs);
 
       const msg = createProtocolMessage('done', { summary: 'Done' });
-      connectingTransport.send(msg);
+      expect(connectingTransport.send(msg)).toBe(false);
       expect(closedWs.sentMessages).toHaveLength(0);
     });
 
@@ -110,7 +110,9 @@ describe('WebSocketProtocolTransport', () => {
 
       // Should not throw
       expect(() => {
-        throwingTransport.send(createProtocolMessage('done', { summary: 'ok' }));
+        expect(throwingTransport.send(createProtocolMessage('done', { summary: 'ok' }))).toBe(
+          false,
+        );
       }).not.toThrow();
     });
   });

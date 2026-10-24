@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import type { ProtocolMessage } from '@ai-dev-orchestrator/agent-protocol';
 import { createProtocolMessage } from '@ai-dev-orchestrator/agent-protocol';
 import type { AgentSessionRef, RemoteReconnectMeta } from '@ai-dev-orchestrator/schemas';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AgentSessionRegistry } from '../agent-session-registry';
 import { DefaultAgentSessionStore } from '../default-agent-session-store';
@@ -78,6 +78,243 @@ describe('RemoteAgentSessionSupervisor', () => {
     const transport = new WebSocketProtocolTransport(ws);
     return { ws, transport };
   }
+
+  it.each(['done', 'error'] as const)(
+    'does not deliver responses or reopen a session after %s',
+    async (terminal) => {
+      const { ws, transport } = makeTransport();
+      await supervisor.createSession(REF, undefined, RECONNECT_META, transport);
+      const request = createProtocolMessage('permission_request', {
+        action: 'write',
+        resource: '/file',
+        riskLevel: 'high',
+      });
+      sendWsMessage(ws, request);
+      sendWsMessage(
+        ws,
+        terminal === 'done'
+          ? createProtocolMessage('done', { summary: 'done' })
+          : createProtocolMessage('error', {
+              code: 'failed',
+              message: 'failed',
+              recoverable: false,
+            }),
+      );
+      const state = supervisor.getState(REF.sessionId);
+      const sent = ws.sentMessages.length;
+      expect(
+        await supervisor.sendHumanResponse(REF.sessionId, request.messageId, { granted: true }),
+      ).toBe(false);
+      expect(ws.sentMessages).toHaveLength(sent);
+      sendWsMessage(ws, createProtocolMessage('clarification_request', { question: 'late?' }));
+      expect(supervisor.getState(REF.sessionId)).toBe(state);
+    },
+  );
+
+  it('retains the pending request when the WebSocket cannot send and permits a later retry', async () => {
+    const { ws, transport } = makeTransport();
+    await supervisor.createSession(REF, undefined, RECONNECT_META, transport);
+    const request = createProtocolMessage('permission_request', {
+      action: 'write',
+      resource: '/file',
+      riskLevel: 'high',
+    });
+    sendWsMessage(ws, request);
+    const send = ws.send.bind(ws);
+    ws.send = () => {
+      throw new Error('socket unavailable');
+    };
+    expect(
+      await supervisor.sendHumanResponse(REF.sessionId, request.messageId, { granted: true }),
+    ).toBe(false);
+    expect((await supervisor.getSnapshot(REF.sessionId))?.pendingRequests[0].requestId).toBe(
+      request.messageId,
+    );
+    ws.send = send;
+    expect(
+      await supervisor.sendHumanResponse(REF.sessionId, request.messageId, { granted: true }),
+    ).toBe(true);
+    expect(ws.sentMessages).toHaveLength(1);
+  });
+
+  it('expires pending permissions with the remote lease and refuses late answers', async () => {
+    vi.useFakeTimers();
+    try {
+      const { ws, transport } = makeTransport();
+      await supervisor.createSession(
+        REF,
+        undefined,
+        { ...RECONNECT_META, leaseExpiresAt: '2020-01-01T00:00:00Z', heartbeatIntervalMs: 10 },
+        transport,
+      );
+      const request = createProtocolMessage('permission_request', {
+        action: 'write',
+        resource: '/file',
+        riskLevel: 'high',
+      });
+      sendWsMessage(ws, request);
+      await supervisor.waitForAdvance(REF.sessionId);
+      await vi.advanceTimersByTimeAsync(10);
+      expect((await supervisor.getSnapshot(REF.sessionId))?.pendingRequests).toEqual([]);
+      expect(
+        await supervisor.sendHumanResponse(REF.sessionId, request.messageId, { granted: true }),
+      ).toBe(false);
+      expect(await supervisor.waitForAdvance(REF.sessionId)).toMatchObject({ kind: 'failed' });
+      await supervisor.finalize(REF.sessionId);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('persists an immediately pending request before returning it to the workflow', async () => {
+    const { ws, transport } = makeTransport();
+    await supervisor.createSession(REF, undefined, RECONNECT_META, transport);
+    const request = createProtocolMessage('permission_request', {
+      action: 'write',
+      resource: '/file',
+      riskLevel: 'high',
+    });
+    sendWsMessage(ws, request);
+    await supervisor.waitForAdvance(REF.sessionId);
+    expect(
+      (await store.loadSnapshot(REF.sessionId, REF.runId))?.pendingRequests[0]?.requestId,
+    ).toBe(request.messageId);
+  });
+
+  it('retains request identity across restart after send succeeds but snapshot persistence fails', async () => {
+    const { ws, transport } = makeTransport();
+    await supervisor.createSession(REF, undefined, RECONNECT_META, transport);
+    const request = createProtocolMessage('permission_request', {
+      action: 'write',
+      resource: '/file',
+      riskLevel: 'high',
+    });
+    sendWsMessage(ws, request);
+    await supervisor.waitForAdvance(REF.sessionId);
+    const save = vi
+      .spyOn(store, 'saveSnapshot')
+      .mockRejectedValueOnce(new Error('snapshot unavailable after send'));
+    await expect(
+      supervisor.sendHumanResponse(REF.sessionId, request.messageId, { granted: true }),
+    ).rejects.toThrow('snapshot unavailable');
+    expect(ws.sentMessages).toHaveLength(1);
+    expect(
+      await supervisor.sendHumanResponse(REF.sessionId, request.messageId, { granted: true }),
+    ).toBe(false);
+    save.mockRestore();
+    const restartedRegistry = new AgentSessionRegistry(new DefaultAgentSessionStore(dir));
+    await restartedRegistry.rebuild();
+    const restarted = new RemoteAgentSessionSupervisor(restartedRegistry);
+    const reconnected = makeTransport();
+    restarted.setTransportFactory(() => Promise.resolve(reconnected.transport));
+    const attached = await restarted.attach(REF.sessionId);
+    expect(attached?.pendingRequests[0].requestId).toBe(request.messageId);
+    expect(
+      await restarted.sendHumanResponse(REF.sessionId, 'different-request', { granted: true }),
+    ).toBe(false);
+    expect(reconnected.ws.sentMessages).toHaveLength(0);
+    await restarted.finalize(REF.sessionId);
+  });
+
+  it('does not reconnect a persisted terminal session or deliver answers after abort', async () => {
+    const { ws, transport } = makeTransport();
+    await supervisor.createSession(REF, undefined, RECONNECT_META, transport);
+    const request = createProtocolMessage('permission_request', {
+      action: 'write',
+      resource: '/file',
+      riskLevel: 'high',
+    });
+    sendWsMessage(ws, request);
+    await supervisor.abort(REF.sessionId, 'stop');
+    expect(
+      await supervisor.sendHumanResponse(REF.sessionId, request.messageId, { granted: true }),
+    ).toBe(false);
+    supervisor.setTransportFactory(() => Promise.resolve(makeTransport().transport));
+    expect(await supervisor.reconnect(REF.sessionId)).toBeNull();
+    await supervisor.finalize(REF.sessionId);
+    const restoredRegistry = new AgentSessionRegistry(new DefaultAgentSessionStore(dir));
+    await restoredRegistry.rebuild();
+    const restarted = new RemoteAgentSessionSupervisor(restoredRegistry);
+    const factory = vi.fn(() => Promise.resolve(makeTransport().transport));
+    restarted.setTransportFactory(factory);
+    expect(await restarted.attach(REF.sessionId)).toBeNull();
+    expect(factory).not.toHaveBeenCalled();
+  });
+
+  it('ignores messages from a replaced transport', async () => {
+    const first = makeTransport();
+    await supervisor.createSession(REF, undefined, RECONNECT_META, first.transport);
+    // A transport error severs ownership; reconnect installs another transport for this host.
+    first.ws.emit('error', new Error('connection lost'));
+    const next = makeTransport();
+    supervisor.setTransportFactory(() => Promise.resolve(next.transport));
+    await supervisor.reconnect(REF.sessionId);
+    sendWsMessage(
+      first.ws,
+      createProtocolMessage('permission_request', {
+        action: 'write',
+        resource: '/stale',
+        riskLevel: 'high',
+      }),
+    );
+    expect((await supervisor.getSnapshot(REF.sessionId))?.pendingRequests).toEqual([]);
+    const current = createProtocolMessage('permission_request', {
+      action: 'read',
+      resource: '/current',
+      riskLevel: 'low',
+    });
+    sendWsMessage(next.ws, current);
+    expect(
+      (await supervisor.getSnapshot(REF.sessionId))?.pendingRequests.map(
+        (request) => request.requestId,
+      ),
+    ).toEqual([current.messageId]);
+    first.ws.emit('error', new Error('late error on replaced transport'));
+    expect(supervisor.getState(REF.sessionId)).toBe('awaiting_human');
+    expect(
+      await supervisor.sendHumanResponse(REF.sessionId, current.messageId, { granted: true }),
+    ).toBe(true);
+    await supervisor.finalize(REF.sessionId);
+  });
+
+  it.each(['permission', 'clarification'] as const)(
+    'isolates parallel %s requests and rejects wrong-kind and duplicate responses',
+    async (kind) => {
+      const first = makeTransport();
+      const second = makeTransport();
+      const otherRef = { ...REF, sessionId: 'rsess-2', runId: 'run-2' };
+      await supervisor.createSession(REF, undefined, RECONNECT_META, first.transport);
+      await supervisor.createSession(otherRef, undefined, RECONNECT_META, second.transport);
+      const request =
+        kind === 'permission'
+          ? createProtocolMessage('permission_request', {
+              action: 'write',
+              resource: '/file',
+              riskLevel: 'high',
+            })
+          : createProtocolMessage('clarification_request', { question: 'Which branch?' });
+      sendWsMessage(first.ws, request);
+      sendWsMessage(second.ws, request);
+      expect(
+        await supervisor.sendHumanResponse(
+          REF.sessionId,
+          request.messageId,
+          kind === 'permission' ? { answer: 'main' } : { granted: true },
+        ),
+      ).toBe(false);
+      const answer = kind === 'permission' ? { granted: true } : { answer: 'main' };
+      expect(
+        await Promise.all([
+          supervisor.sendHumanResponse(REF.sessionId, request.messageId, answer),
+          supervisor.sendHumanResponse(REF.sessionId, request.messageId, answer),
+        ]),
+      ).toEqual([true, false]);
+      expect(second.ws.sentMessages).toHaveLength(0);
+      expect((await supervisor.getSnapshot(otherRef.sessionId))?.pendingRequests[0].requestId).toBe(
+        request.messageId,
+      );
+    },
+  );
 
   it('creates a session with reconnect metadata', async () => {
     const { transport } = makeTransport();

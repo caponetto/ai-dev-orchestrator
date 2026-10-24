@@ -116,9 +116,17 @@ export class LocalAgentSessionHost {
     if (!pending) {
       return false;
     }
+    if (
+      pending.kind === 'permission'
+        ? typeof payload['granted'] !== 'boolean' || payload['answer'] !== undefined
+        : typeof payload['answer'] !== 'string' || payload['granted'] !== undefined
+    ) {
+      return false;
+    }
 
+    let sent: boolean;
     if (pending.kind === 'permission') {
-      this._transport.send(
+      sent = this._transport.send(
         createProtocolMessage(
           'permission_response',
           { granted: payload['granted'] === true, reason: payload['reason'] as string | undefined },
@@ -126,13 +134,17 @@ export class LocalAgentSessionHost {
         ),
       );
     } else {
-      this._transport.send(
+      sent = this._transport.send(
         createProtocolMessage(
           'clarification_response',
           { answer: (payload['answer'] as string | undefined) ?? '' },
           requestId,
         ),
       );
+    }
+
+    if (!sent) {
+      return false;
     }
 
     this._pendingRequests.delete(requestId);
@@ -182,12 +194,14 @@ export class LocalAgentSessionHost {
   setTimeout(timeoutMs: number): void {
     this._overallTimer = setTimeout(() => {
       if (this._state !== 'completed' && this._state !== 'failed' && this._state !== 'aborted') {
+        this._state = 'failed';
+        const error = `Session timed out after ${String(timeoutMs)}ms`;
         this.finishResult({
           status: 'timeout',
-          error: `Session timed out after ${String(timeoutMs)}ms`,
+          error,
           durationMs: Date.now() - this._startTime,
         });
-        this._state = 'failed';
+        this.resolveAdvance({ kind: 'failed', error });
         try {
           this._process.kill('SIGTERM');
         } catch {
@@ -203,6 +217,9 @@ export class LocalAgentSessionHost {
 
   private setupMessageHandling(): void {
     this._transport.onMessage((_msg: ProtocolMessage) => {
+      if (this._state === 'completed' || this._state === 'failed' || this._state === 'aborted') {
+        return;
+      }
       const message = _msg as AgentToOrchestratorMessage;
       this._lastProtocolTimestamp = message.timestamp;
 
@@ -419,6 +436,7 @@ export class LocalAgentSessionHost {
   }
 
   private finishResult(result: LocalSessionResult): void {
+    this._pendingRequests.clear();
     if (this._resultResolve) {
       const tokenUsage = result.tokenUsage ?? this.getTokenUsage();
       this._resultResolve(tokenUsage ? { ...result, tokenUsage } : result);

@@ -61,6 +61,7 @@ import {
   resumeLiveSession,
   createSessionCompletion,
   completeSessionAction,
+  refreshSessionRequest,
 } from './session-continuation';
 import { StateHistory } from './state-history';
 import { executeTerminalActions } from './terminal-action-executor';
@@ -372,6 +373,12 @@ export class LifecycleController implements WorkflowEngine {
     if (!this.config) {
       throw new Error('No active run to resume');
     }
+    if (
+      (input.sessionId !== undefined && input.sessionId !== this.waitingContext?.liveSessionId) ||
+      (input.requestId !== undefined && input.requestId !== this.waitingContext?.pendingRequestId)
+    ) {
+      throw new Error('Human response identity no longer matches the current wait');
+    }
     const pendingHumanTransition = this.entryActionContinuation;
     const originalWait = pendingHumanTransition?.resumeWaitingContext;
     const isOriginalGate =
@@ -439,12 +446,22 @@ export class LifecycleController implements WorkflowEngine {
 
       const sessionId = savedWaitingContext.liveSessionId;
       const isAborted = () => this.aborted;
+      const expectedRef = [
+        ...(this.entryActionContinuation?.completedResults ?? []),
+        ...(this.entryActionContinuation?.completedExitResults ?? []),
+      ]
+        .flatMap((result) => [
+          result.sessionRef,
+          ...(result.workerResults?.map((worker) => worker.sessionRef) ?? []),
+        ])
+        .find((ref) => ref?.sessionId === sessionId);
       const session = await resumeLiveSession(savedWaitingContext, input, sessionId, {
         supervisor: this.sessionSupervisor,
         journalWriter: this.journalWriter,
         runId: this.runId,
         getStateId: () => this.currentState,
         isAborted,
+        expectedRef,
       });
       // Abort may run during the promise handoff after the helper's final I/O check.
       if (session.kind === 'interrupted' || this.aborted) {
@@ -560,31 +577,62 @@ export class LifecycleController implements WorkflowEngine {
 
       if (advance.kind === 'awaiting_human') {
         const originatingState = savedWaitingContext.requestingState;
-        if (this.currentState !== 'WAITING_FOR_HUMAN') {
-          this.recordStateExit();
-          this.previousState = this.currentState;
-          this.currentState = 'WAITING_FOR_HUMAN';
-          this.stateEnteredAt = new Date().toISOString();
-          this.transitionCount += 1;
-          this.stateHistory.record(this.currentState);
-        }
-
-        this.waitingContext = {
-          reason: 'live_session_awaiting_human',
-          requiredInput: advance.pendingRequest.kind === 'clarification' ? 'text' : 'approval',
-          requestingState: originatingState,
-          autoResumeSafe: false,
-          presentedArtifacts: [],
-          waitingSince: new Date().toISOString(),
-          liveSessionId: sessionId,
-          pendingRequestId: advance.pendingRequest.requestId,
-          liveRequestType: advance.pendingRequest.kind,
-          sessionTransport: savedWaitingContext.sessionTransport,
+        const continuation = this.entryActionContinuation ?? {
+          stateId: originatingState,
+          completedResults: [
+            {
+              action: { type: 'dispatch_worker' as const, params: { role: handle.ref.role } },
+              success: true,
+              sessionOutcome: 'awaiting_human' as const,
+              sessionRef: handle.ref,
+              pendingRequest: advance.pendingRequest,
+            },
+          ],
+          nextActionIndex:
+            (this.config.workflowDefinition.states[originatingState].entryActions?.findIndex(
+              (action) =>
+                action.type === 'dispatch_worker' && action.params.role === handle.ref.role,
+            ) ?? -1) + 1,
         };
+        this.entryActionContinuation = {
+          ...continuation,
+          completedResults: continuation.completedResults.map((result) =>
+            refreshSessionRequest(result, sessionId, advance.pendingRequest),
+          ),
+          completedExitResults: continuation.completedExitResults?.map((result) =>
+            refreshSessionRequest(result, sessionId, advance.pendingRequest),
+          ),
+        };
+        if (!this.executionPaused) {
+          if (this.currentState !== 'WAITING_FOR_HUMAN') {
+            this.recordStateExit();
+            this.previousState = this.currentState;
+            this.currentState = 'WAITING_FOR_HUMAN';
+            this.stateEnteredAt = new Date().toISOString();
+            this.transitionCount += 1;
+            this.stateHistory.record(this.currentState);
+          }
+
+          this.waitingContext = {
+            reason: 'live_session_awaiting_human',
+            requiredInput: advance.pendingRequest.kind === 'clarification' ? 'text' : 'approval',
+            requestingState: originatingState,
+            autoResumeSafe: false,
+            presentedArtifacts: [],
+            waitingSince: new Date().toISOString(),
+            liveSessionId: sessionId,
+            pendingRequestId: advance.pendingRequest.requestId,
+            liveRequestType: advance.pendingRequest.kind,
+            sessionTransport: savedWaitingContext.sessionTransport,
+          };
+        }
 
         await this.saveCheckpoint();
         this.releaseLockIfHeld();
 
+        if (session.requestChanged) {
+          throw new Error('Human request changed; review the current request before responding');
+        }
         return {
           runId: this.runId,
           finalState: this.currentState,

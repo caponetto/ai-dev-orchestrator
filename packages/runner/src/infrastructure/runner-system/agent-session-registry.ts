@@ -9,6 +9,7 @@ export class AgentSessionRegistry {
   private readonly bySessionId = new Map<string, AgentSessionSnapshot>();
   private readonly byRunId = new Map<string, Set<string>>();
   private readonly store: AgentSessionStore;
+  private readonly writes = new Map<string, Promise<void>>();
 
   constructor(store: AgentSessionStore) {
     this.store = store;
@@ -26,8 +27,22 @@ export class AgentSessionRegistry {
 
   /** Register or update a session in both the store and the index. */
   async register(snapshot: AgentSessionSnapshot): Promise<void> {
-    await this.store.saveSnapshot(snapshot);
-    this.index(snapshot);
+    const id = snapshot.ref.sessionId;
+    const previous = this.writes.get(id) ?? Promise.resolve();
+    const write = previous
+      .catch(() => undefined)
+      .then(async () => {
+        await this.store.saveSnapshot(snapshot);
+        this.index(snapshot);
+      });
+    this.writes.set(id, write);
+    try {
+      await write;
+    } finally {
+      if (this.writes.get(id) === write) {
+        this.writes.delete(id);
+      }
+    }
   }
 
   /** Get a session snapshot by sessionId. */

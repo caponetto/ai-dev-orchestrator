@@ -51,6 +51,36 @@ Live requests are stored under `.ai/runs/<run-id>/live-requests/` and responses 
 
 Permission heuristics check actual operation types before display labels. Every pipeline segment must qualify as read-only; redirects, substitutions and compound safe-command extensions require the applicable policy/approval. Cached file approvals use path boundaries, and cached shell approvals cannot expand into another command through shell operators. Explicit deny rules retain precedence over grants. These heuristics complement the agent sandbox; they are not a general shell parser.
 
+## Human request identity and delivery
+
+Local and remote sessions consume a response only for a matching pending request and payload
+kind. Duplicate consumed responses return false. Terminal sessions clear pending requests and
+ignore later protocol requests; a local timeout also settles any pending advancement waiter.
+Remote sessions ignore callbacks from replaced transports and cannot reconnect terminal hosts
+or terminal persisted snapshots.
+
+Protocol transport `send` returns whether the message was accepted locally for writing. Closed
+transports and synchronous write failures return false; stdio backpressure still counts as a
+queued write. Session hosts retain pending requests after failed writes so the same request can
+be retried. This result is not an acknowledgement that the agent received or applied the answer.
+
+Session snapshots commit in order per session, including after an older write fails; other
+sessions can persist independently. Remote `waitForAdvance` persists an already-pending request
+before returning it to the workflow.
+
+File-backed request IDs identify one run, kind and payload. Identical request replay preserves
+the original creation/expiry times; reuse for a different operation fails. Responses retain the
+first published decision, allow identical retries, and reject conflicting, expired or wrong-kind
+answers for published requests. Terminal timeout records remain writable after expiry. A failure
+to persist a timeout record cannot suppress the agent's default denial or clarification abort.
+
+Transport send and snapshot persistence are separate effects. If sending succeeds but persisting
+the consumed request fails, the live host rejects a duplicate, but restart can recover the older
+pending request. The protocol has no durable receiver acknowledgement/deduplication contract, so
+that boundary is ambiguous and does not guarantee exactly-once delivery. Reconcile the agent's
+state before retrying an ambiguous response. Local stdio sessions cannot reattach across process
+restart; remote recovery retains the original run/session/request identity.
+
 ## CLI execution module boundaries
 
 `CliAgentRunner` remains the public dispatch/session facade and configuration entry point.

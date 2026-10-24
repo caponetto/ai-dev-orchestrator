@@ -38,6 +38,32 @@ describe('FileBackedLiveRequestStore', () => {
   });
 
   describe('writeRequest', () => {
+    it('allows identical request replay without extending expiry but rejects reuse for another operation', async () => {
+      const original = makeRequest({ expiresAt: '2090-01-01T00:05:00Z' });
+      await store.writeRequest(original);
+      await store.writeResponse(makeResponse());
+      await store.writeRequest({
+        ...original,
+        createdAt: '2026-01-01T01:00:00Z',
+        expiresAt: '2099-01-01T00:00:00Z',
+      });
+      expect(
+        JSON.parse(
+          await readFile(join(baseDir, 'run-1/live-requests/msg-1.json'), 'utf8'),
+        ) as unknown,
+      ).toEqual(original);
+      await expect(
+        store.writeRequest(
+          makeRequest({ payload: { action: 'file_write', resource: '/different' } }),
+        ),
+      ).rejects.toThrow('different request');
+      await expect(
+        store.writeRequest(
+          makeRequest({ kind: 'clarification', payload: { question: 'different?' } }),
+        ),
+      ).rejects.toThrow('different request');
+    });
+
     it('rejects run identifiers that traverse into another run namespace', async () => {
       await expect(store.writeRequest(makeRequest({ runId: 'run-1/../run-2' }))).rejects.toThrow(
         'identifier',
@@ -67,6 +93,30 @@ describe('FileBackedLiveRequestStore', () => {
   });
 
   describe('writeResponse', () => {
+    it('rejects an expired grant while allowing a terminal timeout and identical retries', async () => {
+      await store.writeRequest(makeRequest({ expiresAt: '2020-01-01T00:00:00Z' }));
+      await expect(store.writeResponse(makeResponse())).rejects.toThrow('expired');
+      const timeout = makeResponse({ payload: { timedOut: true, granted: false } });
+      await store.writeResponse(timeout);
+      await store.writeResponse(timeout);
+      expect((await store.awaitResponse('run-1', 'msg-1', 1))?.payload).toEqual(timeout.payload);
+    });
+
+    it.each(['permission', 'clarification'] as const)(
+      'does not consume a %s request with the wrong response kind',
+      async (kind) => {
+        await store.writeRequest(makeRequest({ kind }));
+        await expect(
+          store.writeResponse(
+            makeResponse({
+              payload: kind === 'permission' ? { answer: 'main' } : { granted: true },
+            }),
+          ),
+        ).rejects.toThrow('response kind');
+        expect(await store.listPendingRequests('run-1')).toHaveLength(1);
+      },
+    );
+
     it('rejects message identifiers that escape the response directory', async () => {
       await expect(store.writeResponse(makeResponse({ messageId: '../state' }))).rejects.toThrow(
         'identifier',

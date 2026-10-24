@@ -48,6 +48,27 @@ completed cursor and usage before resume. If cancellation arrives during output 
 storage, completed session usage is still journaled/checkpointed, while cancelled work cursors
 cannot replace abort cleanup. A late pause cannot overwrite an aborted run.
 
+A new permission or clarification arriving during manual pause also preserves the manual gate.
+The controller refreshes the matching entry/exit action and nested worker request IDs, preserving
+other workers and their completed output. Unpausing exposes that newest request for a separate
+decision rather than granting it or resending the previous answer. Checkpoint and journal restore
+retain the updated cursor, including for legacy single-worker cursors reconstructed on advance.
+
+Before responding, reattached sessions must match the run, session and persisted worker identity
+(state and role). Legacy waits without a worker reference use their requesting state. Refused
+delivery is an error and does not advance the workflow. A reattached session already running
+without pending requests, or already terminal, is observed without replaying the saved approval.
+If the agent's pending request has changed since the checkpoint, the controller persists the
+current request and reports the mismatch without sending the old answer; a separate response is
+required after reviewing the refreshed request.
+The human-input journal event records received intent; it is not a transport delivery receipt.
+
+Human input supports optional `sessionId` and `requestId` targets. The controller checks those
+targets against its current wait before changing state or attaching a session. CLI `permit` and
+session `answer` retain the IDs selected before rebuilding the run, so a composition reload
+cannot redirect that answer to a newer request. Existing unbound inputs remain compatible and
+mean approval of the current gate; they do not provide stale-client request targeting.
+
 Recovery avoids repeating work whose completion cursor is durably recorded. External effects and
 their journal records are not a transaction: a process crash after an effect completes but before
 its completion record is appended can cause that effect to run again. Actions with external

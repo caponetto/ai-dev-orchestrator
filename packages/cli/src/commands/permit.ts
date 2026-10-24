@@ -90,7 +90,11 @@ export async function permitCommand(
 
     let result: RunResult;
     try {
-      result = await ctx.engine.resume(input);
+      result = await ctx.engine.resume({
+        ...input,
+        sessionId: state.waitingContext.liveSessionId,
+        requestId: sessionRequestId,
+      });
     } catch (error: unknown) {
       formatter.error(toCLIError(error));
       return ExitCode.RUN_FAILED;

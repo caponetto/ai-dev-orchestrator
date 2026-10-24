@@ -293,6 +293,21 @@ describe('engineStateSchema', () => {
 });
 
 describe('humanInputSchema', () => {
+  it('preserves optional session/request identity while accepting legacy unbound inputs', () => {
+    const targeted = {
+      type: 'approval',
+      content: 'yes',
+      sessionId: 'session',
+      requestId: 'request',
+    };
+    expect(humanInputSchema.parse(targeted)).toEqual(targeted);
+    expect(humanInputSchema.parse({ type: 'approval', content: 'yes' })).toEqual({
+      type: 'approval',
+      content: 'yes',
+    });
+    expect(humanInputSchema.safeParse({ ...targeted, requestId: '' }).success).toBe(false);
+    expect(humanInputSchema.safeParse({ ...targeted, sessionId: 1 }).success).toBe(false);
+  });
   it('validates text input', () => {
     const data = { type: 'text', content: 'Focus on performance' };
     expect(humanInputSchema.safeParse(data).success).toBe(true);

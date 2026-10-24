@@ -157,6 +157,208 @@ function manualPause() {
 }
 
 describe('session output interruption boundaries', () => {
+  it.each(['requestId', 'sessionId'] as const)(
+    'rejects a targeted response whose %s became stale during composition reload',
+    async (field) => {
+      const f = sessionFixture();
+      const controller = new LifecycleController(f);
+      await controller.start(f.c);
+      await expect(
+        controller.resume({ type: 'approval', content: 'old consent', [field]: 'outdated' }),
+      ).rejects.toThrow('identity');
+      expect(f.sessionSupervisor.attach).not.toHaveBeenCalled();
+      expect(f.sessionSupervisor.sendHumanResponse).not.toHaveBeenCalled();
+      expect(controller.getState().currentState).toBe('WAITING_FOR_HUMAN');
+    },
+  );
+
+  it('refreshes a stale checkpoint request without applying its answer to the new request', async () => {
+    const f = sessionFixture();
+    const controller = new LifecycleController(f);
+    await controller.start(f.c);
+    const pendingRequest = {
+      requestId: 'changed-request',
+      kind: 'permission' as const,
+      createdAt: '',
+      payload: { action: 'write', resource: '/new' },
+    };
+    assert(f.pending.sessionRef);
+    vi.mocked(f.sessionSupervisor).attach.mockResolvedValue({
+      ref: f.pending.sessionRef,
+      state: 'awaiting_human',
+      pendingRequests: [pendingRequest],
+    });
+    vi.mocked(f.sessionSupervisor).sendHumanResponse.mockImplementation((_sessionId, requestId) =>
+      Promise.resolve(requestId === pendingRequest.requestId),
+    );
+    await expect(
+      controller.resume({ type: 'approval', content: 'answer for old request' }),
+    ).rejects.toThrow('request changed');
+    expect(f.sessionSupervisor.sendHumanResponse).not.toHaveBeenCalled();
+    expect(f.statePersistence.load(createRunId(f.c.runId))?.waitingContext?.pendingRequestId).toBe(
+      'changed-request',
+    );
+    expect(
+      (await controller.resume({ type: 'approval', content: 'approve new request' })).finalState,
+    ).toBe('DONE');
+    expect(
+      vi.mocked(f.sessionSupervisor).sendHumanResponse.mock.calls.map(([, requestId]) => requestId),
+    ).toEqual(['changed-request']);
+  });
+
+  it('restores a legacy live wait that still names its worker state before another request', async () => {
+    const f = sessionFixture();
+    await new LifecycleController(f).start(f.c);
+    const saved = f.statePersistence.load(createRunId(f.c.runId));
+    assert(saved);
+    saved.currentState = 'WORK';
+    const controller = new LifecycleController(f);
+    controller.restore(f.c, saved);
+    vi.mocked(f.sessionSupervisor).waitForAdvance.mockResolvedValueOnce({
+      kind: 'awaiting_human',
+      pendingRequest: {
+        requestId: 'next',
+        kind: 'permission',
+        createdAt: '',
+        payload: { action: 'write', resource: '/next' },
+      },
+    });
+    expect((await controller.resume({ type: 'approval', content: 'first' })).finalState).toBe(
+      'WAITING_FOR_HUMAN',
+    );
+    expect(f.statePersistence.load(createRunId(f.c.runId))?.waitingContext?.pendingRequestId).toBe(
+      'next',
+    );
+    expect(f.runner.dispatch).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['entry', 'live', 'permission'],
+    ['entry', 'checkpoint', 'clarification'],
+    ['exit', 'journal', 'permission'],
+    ['parallel', 'checkpoint', 'permission'],
+    ['entry', 'legacy', 'permission'],
+  ] as const)(
+    'retains a new %s request through manual pause and %s recovery (%s)',
+    async (phase, recovery, kind) => {
+      const f = sessionFixture();
+      const actions = f.c.workflowDefinition.states['WORK'].entryActions;
+      if (phase === 'exit') {
+        f.c.workflowDefinition.states['WORK'].entryActions = [];
+        f.c.workflowDefinition.states['WORK'].exitActions = actions;
+      }
+      if (phase === 'parallel') {
+        const peer = await f.artifactStore.store({
+          type: 'static_review',
+          name: 'peer',
+          content: '{}',
+          producedBy: 'static_reviewer',
+        });
+        vi.mocked(f.runner).dispatchParallel.mockResolvedValue([
+          f.pending,
+          {
+            ...f.pending,
+            role: 'static_reviewer',
+            outputArtifacts: [peer],
+            sessionOutcome: 'completed',
+            sessionRef: undefined,
+            pendingRequest: undefined,
+          },
+        ]);
+        f.c.workflowDefinition.states['WORK'].entryActions = [
+          { type: 'dispatch_parallel_workers', params: { roles: ['planner', 'static_reviewer'] } },
+          { type: 'store_artifact', params: { type: 'plan', name: 'after', content: '{}' } },
+        ];
+      }
+      let controller = new LifecycleController(f);
+      await controller.start(f.c);
+      if (recovery === 'legacy') {
+        const legacy = f.statePersistence.load(createRunId(f.c.runId));
+        assert(legacy);
+        delete legacy.entryActionContinuation;
+        controller = new LifecycleController(f);
+        controller.restore(f.c, legacy);
+      }
+      const entered = deferred<undefined>();
+      const advance = deferred<SessionAdvanceResult>();
+      vi.mocked(f.sessionSupervisor).waitForAdvance.mockImplementationOnce(() => {
+        entered.resolve(undefined);
+        return advance.promise;
+      });
+      const resuming = controller.resume({ type: 'approval', content: 'first approval' });
+      await entered.promise;
+      await controller.pause(manualPause());
+      const pendingRequest =
+        kind === 'permission'
+          ? {
+              requestId: 'next-request',
+              kind,
+              createdAt: '',
+              payload: { action: 'write', resource: '/next' },
+            }
+          : {
+              requestId: 'next-request',
+              kind,
+              createdAt: '',
+              payload: { question: 'Which branch?' },
+            };
+      advance.resolve({ kind: 'awaiting_human', pendingRequest });
+      expect((await resuming).finalState).toBe('WAITING_FOR_HUMAN');
+      expect(controller.getState().waitingContext?.reason).toBe('manual');
+      let saved = f.statePersistence.load(createRunId(f.c.runId));
+      assert(saved);
+      const cursor = saved.entryActionContinuation;
+      const pending =
+        phase === 'exit' ? cursor?.completedExitResults?.[0] : cursor?.completedResults[0];
+      expect(pending?.pendingRequest?.requestId).toBe('next-request');
+      if (phase === 'parallel') {
+        expect(pending?.workerResults?.[0].pendingRequest?.requestId).toBe('next-request');
+        expect(pending?.workerResults?.[1].artifactRef?.type).toBe('static_review');
+      }
+      if (recovery !== 'live') {
+        if (recovery === 'journal') {
+          const events = vi
+            .mocked(f.journalWriter)
+            .append.mock.calls.map(([event], i) => ({ ...event, sequence: i + 1 }));
+          saved = new DefaultStatePersistence(
+            '/private/tmp/human-request-replay-unused',
+          ).reconstructFromJournal(createRunId(f.c.runId), events);
+          assert(saved);
+        }
+        controller = new LifecycleController(f);
+        controller.restore(f.c, saved);
+      }
+      expect(
+        (await controller.resume({ type: 'approval', content: 'unpause only' })).finalState,
+      ).toBe('WAITING_FOR_HUMAN');
+      expect(f.sessionSupervisor.sendHumanResponse).toHaveBeenCalledTimes(1);
+      expect(
+        f.statePersistence.load(createRunId(f.c.runId))?.waitingContext?.pendingRequestId,
+      ).toBe('next-request');
+      expect(
+        (
+          await controller.resume({
+            type: kind === 'permission' ? 'approval' : 'text',
+            content: 'main',
+          })
+        ).finalState,
+      ).toBe('DONE');
+      expect(
+        vi.mocked(f.sessionSupervisor).sendHumanResponse.mock.calls.map(([, id]) => id),
+      ).toEqual(['permission', 'next-request']);
+      expect(f.statePersistence.load(createRunId(f.c.runId))).toMatchObject({
+        cumulativeInputTokens: 30,
+        cumulativeOutputTokens: 20,
+      });
+      expect(
+        phase === 'parallel' ? f.runner.dispatchParallel : f.runner.dispatch,
+      ).toHaveBeenCalledTimes(1);
+      expect(
+        vi.mocked(f.artifactStore).store.mock.calls.filter(([request]) => request.name === 'after'),
+      ).toHaveLength(1);
+    },
+  );
+
   it('preserves a manual pause requested while awaiting session advancement', async () => {
     const f = sessionFixture();
     const controller = new LifecycleController(f);

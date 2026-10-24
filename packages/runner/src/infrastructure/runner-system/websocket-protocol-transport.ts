@@ -39,15 +39,18 @@ export class WebSocketProtocolTransport {
     this.setupListeners();
   }
 
-  send(message: ProtocolMessage): void {
+  send(message: ProtocolMessage): boolean {
     if (this.closed || this.ws.readyState !== WS_READY_STATE.OPEN) {
-      return;
+      return false;
     }
     this.outboundIds.add(message.messageId);
     try {
       this.ws.send(serializeMessage(message));
+      return true;
     } catch {
       // WebSocket may be closing
+      this.outboundIds.delete(message.messageId);
+      return false;
     }
   }
 

@@ -205,17 +205,19 @@ function makeSupervisor(overrides?: Partial<AgentSessionSupervisor>): AgentSessi
       state: 'running',
       pendingRequests: [],
     }),
-    attach: vi.fn().mockResolvedValue({
-      ref: {
-        sessionId: 'sess-1',
-        runId: 'run-001',
-        stateId: 'IMPL',
-        role: 'implementer',
-        transport: 'stdio',
-      },
-      state: 'awaiting_human',
-      pendingRequests: [],
-    }),
+    attach: vi.fn().mockImplementation((sessionId: string) =>
+      Promise.resolve({
+        ref: {
+          sessionId,
+          runId: 'run-001',
+          stateId: 'IMPL',
+          role: 'implementer',
+          transport: 'stdio',
+        },
+        state: 'awaiting_human',
+        pendingRequests: [],
+      }),
+    ),
     sendHumanResponse: vi.fn().mockResolvedValue(true),
     waitForAdvance: vi.fn().mockResolvedValue({
       kind: 'completed',

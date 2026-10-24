@@ -34,16 +34,19 @@ export class StdioProtocolTransport {
     this.setupStderrReader();
   }
 
-  send(message: ProtocolMessage): void {
-    if (this.closed) {
-      return;
+  send(message: ProtocolMessage): boolean {
+    if (this.closed || this.streams.stdin.destroyed || this.streams.stdin.writableEnded) {
+      return false;
     }
     this.outboundIds.add(message.messageId);
     const line = serializeMessage(message) + '\n';
     try {
       this.streams.stdin.write(line);
+      return true;
     } catch {
       // stdin may be closed if subprocess exited
+      this.outboundIds.delete(message.messageId);
+      return false;
     }
   }
 

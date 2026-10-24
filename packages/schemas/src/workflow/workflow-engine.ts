@@ -373,6 +373,8 @@ export const humanInputSchema = z.object({
   type: z.enum(['text', 'approval', 'rejection']),
   content: z.string(),
   artifactRef: artifactRefSchema.optional(),
+  sessionId: z.string().min(1).optional(),
+  requestId: z.string().min(1).optional(),
 });
 export type HumanInput = z.infer<typeof humanInputSchema>;
 

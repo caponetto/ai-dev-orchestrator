@@ -543,7 +543,12 @@ describe('answerCommand session path', () => {
 
     expect(code).toBe(ExitCode.SUCCESS);
     expect(mockResumeOrchestrator).toHaveBeenCalled();
-    expect(mockResume).toHaveBeenCalledWith({ type: 'text', content: 'Use Redis' });
+    expect(mockResume).toHaveBeenCalledWith({
+      type: 'text',
+      content: 'Use Redis',
+      sessionId: 'session-abc',
+      requestId: 'req-123',
+    });
   });
 
   it('returns GENERAL_ERROR when messageId does not match session pending request', async () => {

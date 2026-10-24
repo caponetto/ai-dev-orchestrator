@@ -12,6 +12,7 @@ import {
   completeSessionAction,
   createSessionCompletion,
   resumeLiveSession,
+  refreshSessionRequest,
 } from '../session-continuation';
 
 const handle: AgentSessionHandle = {
@@ -23,6 +24,12 @@ const handle: AgentSessionHandle = {
       kind: 'permission',
       createdAt: '2026-10-23T00:00:00Z',
       payload: { action: 'file_write', resource: '/repo/file' },
+    },
+    {
+      requestId: 'request',
+      kind: 'permission',
+      createdAt: '2026-10-23T00:00:00Z',
+      payload: { action: 'file_write', resource: '/repo/saved' },
     },
   ],
 };
@@ -63,6 +70,81 @@ function fixture() {
 }
 
 describe('session continuation', () => {
+  it.each(['runId', 'sessionId', 'stateId', 'role'] as const)(
+    'rejects an attachment with the wrong %s before delivering a response',
+    async (field) => {
+      const f = fixture();
+      f.attach.mockResolvedValueOnce({ ...handle, ref: { ...handle.ref, [field]: 'unrelated' } });
+      await expect(
+        resumeLiveSession(waiting, { type: 'approval', content: 'yes' }, 'session', {
+          ...f.context,
+          expectedRef: handle.ref,
+        }),
+      ).rejects.toThrow('identity');
+      expect(f.sendHumanResponse).not.toHaveBeenCalled();
+      expect(f.append).not.toHaveBeenCalled();
+    },
+  );
+
+  it('refreshes a nested session request without replacing a different top-level or peer request', () => {
+    const next = { ...handle.pendingRequests[0], requestId: 'next' };
+    const other = { ...handle.ref, sessionId: 'other' };
+    const result: ActionResult = {
+      action: { type: 'dispatch_parallel_workers', params: { roles: ['planner'] } },
+      success: true,
+      sessionRef: other,
+      pendingRequest: handle.pendingRequests[0],
+      workerResults: [
+        {
+          role: 'planner',
+          success: true,
+          sessionRef: handle.ref,
+          pendingRequest: handle.pendingRequests[0],
+        },
+        {
+          role: 'planner',
+          success: true,
+          sessionRef: other,
+          pendingRequest: handle.pendingRequests[0],
+        },
+      ],
+    };
+    const updated = refreshSessionRequest(result, 'session', next);
+    expect(updated.pendingRequest).toBe(result.pendingRequest);
+    expect(updated.workerResults?.[0].pendingRequest).toEqual(next);
+    expect(updated.workerResults?.[1]).toBe(result.workerResults?.[1]);
+    expect(result.workerResults?.[0].pendingRequest?.requestId).toBe('fallback');
+  });
+
+  it('reports refused delivery without advancing or redirecting the answer', async () => {
+    const f = fixture();
+    f.sendHumanResponse.mockResolvedValue(false);
+    await expect(
+      resumeLiveSession(waiting, { type: 'approval', content: 'yes' }, 'session', f.context),
+    ).rejects.toThrow('not delivered');
+    expect(f.sendHumanResponse).toHaveBeenCalledExactlyOnceWith('session', 'request', {
+      granted: true,
+      reason: 'yes',
+    });
+    expect(f.waitForAdvance).not.toHaveBeenCalled();
+  });
+
+  it.each(['running', 'completed', 'failed', 'aborted'] as const)(
+    'does not replay an approval when the attached session is already %s without pending requests',
+    async (state) => {
+      const f = fixture();
+      f.attach.mockResolvedValueOnce({ ...handle, state, pendingRequests: [] });
+      await resumeLiveSession(
+        waiting,
+        { type: 'approval', content: 'old answer' },
+        'session',
+        f.context,
+      );
+      expect(f.sendHumanResponse).not.toHaveBeenCalled();
+      expect(f.waitForAdvance).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it.each([
     ['approval', { granted: true, reason: 'response' }],
     ['rejection', { granted: false, reason: 'response' }],

@@ -2,7 +2,7 @@ import { PassThrough } from 'node:stream';
 
 import type { ProtocolMessage } from '@ai-dev-orchestrator/agent-protocol';
 import { createProtocolMessage, resetMessageCounter } from '@ai-dev-orchestrator/agent-protocol';
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 
 import { serializeMessage } from '../protocol-serializer';
 import { StdioProtocolTransport } from '../stdio-protocol-transport';
@@ -48,6 +48,21 @@ describe('StdioProtocolTransport', () => {
   });
 
   describe('send', () => {
+    it('reports ended stdin and synchronous write errors as failed delivery', () => {
+      const write = vi.spyOn(streams.toAgent, 'write').mockImplementationOnce(() => {
+        throw new Error('closed stdin');
+      });
+      expect(transport.send(createProtocolMessage('abort', { reason: 'test' }))).toBe(false);
+      write.mockRestore();
+      streams.toAgent.end();
+      expect(transport.send(createProtocolMessage('abort', { reason: 'test' }))).toBe(false);
+    });
+
+    it('treats writable backpressure as queued delivery', () => {
+      const write = vi.spyOn(streams.toAgent, 'write').mockReturnValueOnce(false);
+      expect(transport.send(createProtocolMessage('abort', { reason: 'test' }))).toBe(true);
+      write.mockRestore();
+    });
     it('writes JSON lines to stdin', async () => {
       const collected: string[] = [];
       streams.toAgent.on('data', (chunk: Buffer) => {

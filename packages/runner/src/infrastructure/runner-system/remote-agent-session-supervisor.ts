@@ -127,9 +127,12 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
 
   async reconnect(sessionId: string): Promise<AgentSessionHandle | null> {
     const host = this.hosts.get(sessionId);
+    if (host && isTerminal(host.state)) {
+      return null;
+    }
     if (!host) {
       const snap = this.registry.get(sessionId);
-      if (!snap || snap.reconnect?.type !== 'remote') {
+      if (!snap || snap.reconnect?.type !== 'remote' || isTerminal(snap.state)) {
         return null;
       }
 
@@ -193,7 +196,7 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
     response: SessionResponsePayload,
   ): Promise<boolean> {
     const host = this.hosts.get(sessionId);
-    if (!host?.transport) {
+    if (!host?.transport || isTerminal(host.state)) {
       return false;
     }
 
@@ -201,9 +204,17 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
     if (!pending) {
       return false;
     }
+    if (
+      pending.kind === 'permission'
+        ? typeof response.granted !== 'boolean' || response.answer !== undefined
+        : typeof response.answer !== 'string' || response.granted !== undefined
+    ) {
+      return false;
+    }
 
+    let sent: boolean;
     if (pending.kind === 'permission') {
-      host.transport.send(
+      sent = host.transport.send(
         createProtocolMessage(
           'permission_response',
           { granted: response.granted === true, reason: response.reason },
@@ -211,13 +222,17 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
         ),
       );
     } else {
-      host.transport.send(
+      sent = host.transport.send(
         createProtocolMessage(
           'clarification_response',
           { answer: response.answer ?? '' },
           requestId,
         ),
       );
+    }
+
+    if (!sent) {
+      return false;
     }
 
     host.pendingRequests.delete(requestId);
@@ -249,6 +264,7 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
       return false;
     }
     host.state = 'aborted';
+    host.pendingRequests.clear();
     this.stopHeartbeat(host);
     if (host.transport) {
       host.transport.send(createProtocolMessage('abort', { reason }));
@@ -333,6 +349,7 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
 
     if (host.state === 'awaiting_human' && host.pendingRequests.size > 0) {
       const first = [...host.pendingRequests.values()][0];
+      await this.persistSnapshot(host);
       return { kind: 'awaiting_human', pendingRequest: first };
     }
 
@@ -389,6 +406,9 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
 
   private wireTransport(host: RemoteSessionHost, transport: WebSocketProtocolTransport): void {
     transport.onMessage((_msg: ProtocolMessage) => {
+      if (isTerminal(host.state) || host.transport !== transport) {
+        return;
+      }
       const message = _msg as AgentToOrchestratorMessage;
       host.lastProtocolTimestamp = message.timestamp;
 
@@ -436,6 +456,7 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
           break;
         case 'done': {
           host.state = 'completed';
+          host.pendingRequests.clear();
           this.stopHeartbeat(host);
           const doneArtifact =
             host.finalArtifact ?? JSON.stringify({ summary: message.payload.summary });
@@ -455,6 +476,7 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
         }
         case 'error': {
           host.state = 'failed';
+          host.pendingRequests.clear();
           this.stopHeartbeat(host);
           const errMsg = `Agent error [${message.payload.code}]: ${message.payload.message}`;
           host.resultResolve?.({
@@ -476,7 +498,7 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
     });
 
     transport.onError(() => {
-      if (!isTerminal(host.state)) {
+      if (host.transport === transport && !isTerminal(host.state)) {
         host.state = 'reconnecting';
         host.transport = null;
       }
@@ -557,6 +579,7 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
       }
       if (this.isLeaseExpired(host.ref.sessionId)) {
         host.state = 'failed';
+        host.pendingRequests.clear();
         this.stopHeartbeat(host);
         const leaseErr = 'Remote session lease expired';
         host.resultResolve?.({

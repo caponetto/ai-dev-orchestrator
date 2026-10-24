@@ -123,7 +123,12 @@ export async function answerCommand(
 
     let result: RunResult;
     try {
-      result = await ctx.engine.resume({ type: 'text', content: answerContent });
+      result = await ctx.engine.resume({
+        type: 'text',
+        content: answerContent,
+        sessionId: state.waitingContext.liveSessionId,
+        requestId: sessionRequestId,
+      });
     } catch (error: unknown) {
       formatter.error(toCLIError(error));
       return ExitCode.RUN_FAILED;

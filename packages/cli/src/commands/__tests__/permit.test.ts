@@ -342,6 +342,32 @@ describe('permitCommand', () => {
     );
   }
 
+  it('keeps the selected request identity when composition reloads newer session state', async () => {
+    const runId = 'run-reloaded-session';
+    mkdirSync(getRunDir(runId), { recursive: true });
+    mockSessionState({ liveSessionId: 'selected-session', pendingRequestId: 'selected-request' });
+    const resume = vi.fn().mockResolvedValue({ finalState: 'DONE' });
+    (resumeOrchestrator as Mock).mockImplementation(() => {
+      mockSessionState({
+        liveSessionId: 'replacement-session',
+        pendingRequestId: 'replacement-request',
+      });
+      return Promise.resolve({ warnings: [], engine: { resume } });
+    });
+    expect(
+      await permitCommand(
+        { runId, deny: false, messageId: 'selected-request', json: false, verbose: false },
+        new OutputFormatter({ noColor: true }),
+      ),
+    ).toBe(ExitCode.SUCCESS);
+    expect(resume).toHaveBeenCalledExactlyOnceWith({
+      type: 'approval',
+      content: 'Approved',
+      sessionId: 'selected-session',
+      requestId: 'selected-request',
+    });
+  });
+
   it('returns GENERAL_ERROR when messageId does not match session pending request', async () => {
     const runId = 'run-test-session-mismatch';
     mkdirSync(getRunDir(runId), { recursive: true });

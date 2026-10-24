@@ -8,10 +8,12 @@ import type {
   Action,
   ActionResult,
   AgentSessionHandle,
+  AgentSessionRef,
   ArtifactType,
   HumanInput,
   PersistedWaitingContext,
   RunId,
+  SessionPendingRequest,
 } from '@ai-dev-orchestrator/schemas';
 import { getErrorMessage } from '@ai-dev-orchestrator/utils';
 
@@ -22,6 +24,7 @@ type SessionContinuationResult =
       readonly kind: 'advanced';
       readonly handle: AgentSessionHandle;
       readonly advance: SessionAdvanceResult;
+      readonly requestChanged?: true;
     };
 
 interface SessionContinuationContext {
@@ -33,6 +36,7 @@ interface SessionContinuationContext {
   readonly runId: RunId;
   readonly getStateId: () => string;
   readonly isAborted: () => boolean;
+  readonly expectedRef?: AgentSessionRef;
 }
 
 /** Perform session I/O with cancellation checks; the caller owns all workflow mutations. */
@@ -73,6 +77,32 @@ export async function resumeLiveSession(
     return { kind: 'unreachable' };
   }
 
+  if (
+    handle.ref.runId !== runId ||
+    handle.ref.sessionId !== sessionId ||
+    handle.ref.stateId !== (context.expectedRef?.stateId ?? savedWaitingContext.requestingState) ||
+    (context.expectedRef !== undefined && handle.ref.role !== context.expectedRef.role)
+  ) {
+    throw new Error('Attached session identity does not match the waiting workflow');
+  }
+
+  const terminated =
+    handle.state === 'completed' || handle.state === 'failed' || handle.state === 'aborted';
+  const recordedRequest = savedWaitingContext.pendingRequestId;
+  if (
+    !terminated &&
+    recordedRequest &&
+    handle.pendingRequests.length > 0 &&
+    !handle.pendingRequests.some((request) => request.requestId === recordedRequest)
+  ) {
+    return {
+      kind: 'advanced',
+      handle,
+      requestChanged: true,
+      advance: { kind: 'awaiting_human', pendingRequest: handle.pendingRequests[0] },
+    };
+  }
+
   journalWriter.append({
     timestamp: new Date().toISOString(),
     runId: runId,
@@ -94,8 +124,15 @@ export async function resumeLiveSession(
         : { answer: input.content };
 
   const requestId = savedWaitingContext.pendingRequestId ?? handle.pendingRequests[0]?.requestId;
-  if (requestId) {
-    await supervisor.sendHumanResponse(sessionId, requestId, responsePayload);
+  if (
+    requestId &&
+    !terminated &&
+    (handle.state === 'awaiting_human' || handle.pendingRequests.length > 0)
+  ) {
+    const delivered = await supervisor.sendHumanResponse(sessionId, requestId, responsePayload);
+    if (!delivered) {
+      throw new Error(`Human response for request '${requestId}' was not delivered`);
+    }
   }
 
   if (isAborted()) {
@@ -189,4 +226,23 @@ export async function completeSessionAction(
     sessionRef: pending?.sessionRef,
     pendingRequest: pending?.pendingRequest,
   });
+}
+
+/** Refresh only the session that advanced, preserving other workers and completed output. */
+export function refreshSessionRequest(
+  result: ActionResult,
+  sessionId: string,
+  pendingRequest: SessionPendingRequest,
+): ActionResult {
+  return {
+    ...result,
+    ...(result.sessionRef?.sessionId === sessionId ? { pendingRequest } : {}),
+    ...(result.workerResults
+      ? {
+          workerResults: result.workerResults.map((worker) =>
+            worker.sessionRef?.sessionId === sessionId ? { ...worker, pendingRequest } : worker,
+          ),
+        }
+      : {}),
+  };
 }

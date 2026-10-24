@@ -208,25 +208,28 @@ export class CliHumanRequestHandler {
             .catch(() => {});
         }
       } else {
-        await this.liveRequestStore.writeResponse({
-          runId: task.runId,
-          messageId: message.messageId,
-          respondedAt: new Date().toISOString(),
-          payload: { timedOut: true, granted: false },
-        });
-        this.sendToAgent(
-          createProtocolMessage(
-            'permission_response',
-            {
-              granted: false,
-              reason: 'Live request timed out — denied by default',
-              externalRequestId: payload.externalRequestId,
-              toolInput: payload.toolInput,
-            },
-            message.messageId,
-          ),
-          transport,
-        );
+        try {
+          await this.liveRequestStore.writeResponse({
+            runId: task.runId,
+            messageId: message.messageId,
+            respondedAt: new Date().toISOString(),
+            payload: { timedOut: true, granted: false },
+          });
+        } finally {
+          this.sendToAgent(
+            createProtocolMessage(
+              'permission_response',
+              {
+                granted: false,
+                reason: 'Live request timed out — denied by default',
+                externalRequestId: payload.externalRequestId,
+                toolInput: payload.toolInput,
+              },
+              message.messageId,
+            ),
+            transport,
+          );
+        }
       }
       return;
     }
@@ -294,16 +297,19 @@ export class CliHumanRequestHandler {
         );
       } else {
         // v1: timeout → abort (do NOT transition to WAITING_FOR_HUMAN)
-        await this.liveRequestStore.writeResponse({
-          runId: task.runId,
-          messageId: message.messageId,
-          respondedAt: new Date().toISOString(),
-          payload: { timedOut: true, aborted: true },
-        });
-        this.sendToAgent(
-          createProtocolMessage('abort', { reason: 'Clarification request timed out' }),
-          transport,
-        );
+        try {
+          await this.liveRequestStore.writeResponse({
+            runId: task.runId,
+            messageId: message.messageId,
+            respondedAt: new Date().toISOString(),
+            payload: { timedOut: true, aborted: true },
+          });
+        } finally {
+          this.sendToAgent(
+            createProtocolMessage('abort', { reason: 'Clarification request timed out' }),
+            transport,
+          );
+        }
       }
       return;
     }
