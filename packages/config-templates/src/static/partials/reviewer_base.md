@@ -30,6 +30,10 @@ If neither source is sufficient and you are reviewing a pull request, fall back 
 
 {{>diff_retrieval_strategy}}
 
+### Existing PR Feedback
+
+For pull request reviews, read the PR comments and review discussions included in the canonical specification before finalizing findings. Do not report an issue that those comments already flag when it is the same underlying issue in the current code; matching is based on the issue, not wording, severity, or reviewer perspective. Report it only if the current diff introduces a distinct occurrence or regresses a fix. Do not treat questions or general design discussion as flagged findings.
+
 **Token budget:** Limit file reads to files directly referenced in the diff or specification. Do not explore the broader repository structure, read unrelated tests, or scan for conventions unless a specific finding requires verification. A focused review of the changed files is more valuable than a broad survey.
 
 {{#if humanFeedback}}

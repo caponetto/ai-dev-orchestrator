@@ -11,6 +11,7 @@ import {
 } from '../../schemas/static-schemas';
 import { generateConfigYaml } from '../config-generator';
 import { generateGovernanceYaml } from '../governance-generator';
+import { generatePartialFile } from '../partials-generator';
 import { generateRolesYaml } from '../roles-generator';
 import { ALL_ROLE_IDS, generateTemplateFile } from '../templates-generator';
 import { generateWorkflowYaml, getBuiltInWorkflowByName } from '../workflow-generator';
@@ -303,6 +304,20 @@ describe('templates-generator', () => {
       const content = generateTemplateFile(roleId);
       expect(content).toContain(`role: ${roleId}`);
     }
+  });
+
+  it('checks PR feedback to avoid repeating findings already flagged', () => {
+    const reviewerBase = generatePartialFile('reviewer_base');
+    expect(reviewerBase).toContain('### Existing PR Feedback');
+    expect(reviewerBase).toContain('Do not report an issue that those comments already flag');
+    expect(reviewerBase).toContain('a distinct occurrence or regresses a fix');
+
+    const contextAnalyst = generateTemplateFile('context_analyst');
+    expect(contextAnalyst).toContain('resolved/unresolved status');
+
+    const synthesizer = generateTemplateFile('report_synthesizer');
+    expect(synthesizer).toContain('Deduplicate against prior PR feedback and across reviewers');
+    expect(synthesizer).toContain('same underlying issue already flagged there');
   });
 
   it('adds bounded execution contracts to the highest-impact prompt targets', () => {
