@@ -3,6 +3,7 @@ name: Release
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -11,6 +12,7 @@ permissions:
 
 jobs:
   release-please:
+    if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
     steps:
       - uses: googleapis/release-please-action@v5
@@ -34,4 +36,20 @@ jobs:
 
       - name: Publish packages to npm
         if: ${{ steps.release.outputs.releases_created == 'true' }}
+        run: pnpm -r publish --access public --no-git-checks
+
+  publish-manual:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Build production
+        run: pnpm build:prod
+
+      - name: Publish unpublished package versions to npm
         run: pnpm -r publish --access public --no-git-checks
