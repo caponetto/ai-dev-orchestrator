@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.1.11](https://github.com/caponetto/ai-dev-orchestrator/compare/cli-v0.1.10...cli-v0.1.11) (2026-10-24)
+
+
+### Bug Fixes
+
+* harden workflow orchestration, recovery, and live controls ([#77](https://github.com/caponetto/ai-dev-orchestrator/issues/77)) ([6eaabc3](https://github.com/caponetto/ai-dev-orchestrator/commit/6eaabc3d1bfa5b5e164093d6c9d48fa5723d61c2))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @ai-dev-orchestrator/agent-adapters bumped to 0.1.6
+    * @ai-dev-orchestrator/artifacts bumped to 0.1.2
+    * @ai-dev-orchestrator/config-templates bumped to 0.1.8
+    * @ai-dev-orchestrator/core bumped to 0.1.2
+    * @ai-dev-orchestrator/dashboard-server bumped to 0.1.4
+    * @ai-dev-orchestrator/dependency-graph bumped to 0.1.2
+    * @ai-dev-orchestrator/execution-analytics bumped to 0.1.3
+    * @ai-dev-orchestrator/governance bumped to 0.1.2
+    * @ai-dev-orchestrator/journal bumped to 0.1.2
+    * @ai-dev-orchestrator/policy-engine bumped to 0.1.2
+    * @ai-dev-orchestrator/ports bumped to 0.1.2
+    * @ai-dev-orchestrator/project-context bumped to 0.1.2
+    * @ai-dev-orchestrator/prompt-engine bumped to 0.1.2
+    * @ai-dev-orchestrator/recovery bumped to 0.1.2
+    * @ai-dev-orchestrator/role-system bumped to 0.1.2
+    * @ai-dev-orchestrator/run-manifest bumped to 0.1.2
+    * @ai-dev-orchestrator/runner bumped to 0.1.6
+    * @ai-dev-orchestrator/schemas bumped to 0.1.4
+    * @ai-dev-orchestrator/utils bumped to 0.1.2
+    * @ai-dev-orchestrator/workflow bumped to 0.1.5
+
 ## [0.1.10](https://github.com/caponetto/ai-dev-orchestrator/compare/cli-v0.1.9...cli-v0.1.10) (2026-10-17)
 
 

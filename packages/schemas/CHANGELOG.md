@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/caponetto/ai-dev-orchestrator/compare/schemas-v0.1.3...schemas-v0.1.4) (2026-10-24)
+
+
+### Bug Fixes
+
+* harden workflow orchestration, recovery, and live controls ([#77](https://github.com/caponetto/ai-dev-orchestrator/issues/77)) ([6eaabc3](https://github.com/caponetto/ai-dev-orchestrator/commit/6eaabc3d1bfa5b5e164093d6c9d48fa5723d61c2))
+
 ## [0.1.3](https://github.com/caponetto/ai-dev-orchestrator/compare/schemas-v0.1.2...schemas-v0.1.3) (2026-09-26)
 
 
