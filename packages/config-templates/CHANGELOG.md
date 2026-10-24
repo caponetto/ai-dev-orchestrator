@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.8](https://github.com/caponetto/ai-dev-orchestrator/compare/config-templates-v0.1.7...config-templates-v0.1.8) (2026-10-24)
+
+
+### Bug Fixes
+
+* harden workflow orchestration, recovery, and live controls ([#77](https://github.com/caponetto/ai-dev-orchestrator/issues/77)) ([6eaabc3](https://github.com/caponetto/ai-dev-orchestrator/commit/6eaabc3d1bfa5b5e164093d6c9d48fa5723d61c2))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @ai-dev-orchestrator/schemas bumped to 0.1.4
+    * @ai-dev-orchestrator/utils bumped to 0.1.2
+    * @ai-dev-orchestrator/workflow bumped to 0.1.5
+
 ## [0.1.7](https://github.com/caponetto/ai-dev-orchestrator/compare/config-templates-v0.1.6...config-templates-v0.1.7) (2026-10-17)
 
 

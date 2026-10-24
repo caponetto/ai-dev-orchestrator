@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.2](https://github.com/caponetto/ai-dev-orchestrator/compare/project-context-v0.1.1...project-context-v0.1.2) (2026-10-24)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @ai-dev-orchestrator/ports bumped to 0.1.2
+    * @ai-dev-orchestrator/schemas bumped to 0.1.4
+
 ## [0.1.1](https://github.com/caponetto/ai-dev-orchestrator/compare/project-context-v0.1.0...project-context-v0.1.1) (2026-09-05)
 
 

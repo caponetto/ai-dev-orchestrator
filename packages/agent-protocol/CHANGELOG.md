@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.2](https://github.com/caponetto/ai-dev-orchestrator/compare/agent-protocol-v0.1.1...agent-protocol-v0.1.2) (2026-10-24)
+
+
+### Bug Fixes
+
+* harden workflow orchestration, recovery, and live controls ([#77](https://github.com/caponetto/ai-dev-orchestrator/issues/77)) ([6eaabc3](https://github.com/caponetto/ai-dev-orchestrator/commit/6eaabc3d1bfa5b5e164093d6c9d48fa5723d61c2))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @ai-dev-orchestrator/schemas bumped to 0.1.4
+
 ## [0.1.1](https://github.com/caponetto/ai-dev-orchestrator/compare/agent-protocol-v0.1.0...agent-protocol-v0.1.1) (2026-09-05)
 
 
