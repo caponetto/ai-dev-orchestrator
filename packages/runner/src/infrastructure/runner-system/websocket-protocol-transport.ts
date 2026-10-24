@@ -33,21 +33,25 @@ export class WebSocketProtocolTransport {
   private readonly errorHandlers: ((error: unknown) => void)[] = [];
   private readonly outboundIds = new Set<string>();
   private closed = false;
+  private readonly negotiations = new Set<() => void>();
 
   constructor(ws: WebSocketLike) {
     this.ws = ws;
     this.setupListeners();
   }
 
-  send(message: ProtocolMessage): void {
+  send(message: ProtocolMessage): boolean {
     if (this.closed || this.ws.readyState !== WS_READY_STATE.OPEN) {
-      return;
+      return false;
     }
     this.outboundIds.add(message.messageId);
     try {
       this.ws.send(serializeMessage(message));
+      return true;
     } catch {
       // WebSocket may be closing
+      this.outboundIds.delete(message.messageId);
+      return false;
     }
   }
 
@@ -64,43 +68,53 @@ export class WebSocketProtocolTransport {
     permissionHints?: readonly string[],
     timeoutMs: number = DEFAULT_HANDSHAKE_TIMEOUT_MS,
   ): Promise<string[] | null> {
+    if (this.closed) {
+      return null;
+    }
     return new Promise<string[] | null>((resolve) => {
       let settled = false;
-      const timer = setTimeout(() => {
-        if (!settled) {
-          settled = true;
-          resolve(null);
-        }
-      }, timeoutMs);
-
-      const handshakeHandler = (message: ProtocolMessage) => {
+      const finish = (capabilities: string[] | null) => {
         if (settled) {
           return;
         }
-        if (message.type === 'handshake') {
-          settled = true;
-          clearTimeout(timer);
-
-          const capabilities = (message.payload as HandshakePayload).capabilities;
-          const ackPayload: HandshakeAckPayload = {
-            sessionId,
-            ...(permissionHints
-              ? { permissionHints: permissionHints as readonly PermissionAction[] }
-              : {}),
-          };
-          this.send(createProtocolMessage('handshake_ack', ackPayload, message.messageId));
-
-          const idx = this.messageHandlers.indexOf(handshakeHandler);
-          if (idx >= 0) {
-            this.messageHandlers.splice(idx, 1);
-          }
-
-          resolve([...capabilities]);
+        settled = true;
+        clearTimeout(timer);
+        this.negotiations.delete(cancel);
+        const idx = this.messageHandlers.indexOf(handshakeHandler);
+        if (idx >= 0) {
+          this.messageHandlers.splice(idx, 1);
         }
+        resolve(capabilities);
       };
-
+      const cancel = () => {
+        finish(null);
+      };
+      const timer = setTimeout(cancel, timeoutMs);
+      const handshakeHandler = (message: ProtocolMessage) => {
+        if (settled || message.type !== 'handshake') {
+          return;
+        }
+        const capabilities = (message.payload as HandshakePayload).capabilities;
+        const ackPayload: HandshakeAckPayload = {
+          sessionId,
+          ...(permissionHints
+            ? { permissionHints: permissionHints as readonly PermissionAction[] }
+            : {}),
+        };
+        const sent = this.send(
+          createProtocolMessage('handshake_ack', ackPayload, message.messageId),
+        );
+        finish(sent ? [...capabilities] : null);
+      };
+      this.negotiations.add(cancel);
       this.messageHandlers.push(handshakeHandler);
     });
+  }
+
+  private cancelNegotiations(): void {
+    for (const cancel of this.negotiations) {
+      cancel();
+    }
   }
 
   close(): void {
@@ -108,6 +122,7 @@ export class WebSocketProtocolTransport {
       return;
     }
     this.closed = true;
+    this.cancelNegotiations();
     this.messageHandlers.length = 0;
     this.errorHandlers.length = 0;
     try {
@@ -126,7 +141,7 @@ export class WebSocketProtocolTransport {
       const result = deserializeMessage(line, this.outboundIds);
       if (result.status === 'ok') {
         const msg = result.message;
-        for (const handler of this.messageHandlers) {
+        for (const handler of [...this.messageHandlers]) {
           try {
             handler(msg);
           } catch {
@@ -138,11 +153,26 @@ export class WebSocketProtocolTransport {
     });
 
     this.ws.addEventListener('close', () => {
+      if (this.closed) {
+        return;
+      }
       this.closed = true;
+      this.cancelNegotiations();
+      const handlers = [...this.errorHandlers];
+      this.messageHandlers.length = 0;
+      this.errorHandlers.length = 0;
+      for (const handler of handlers) {
+        try {
+          handler(new Error('Remote WebSocket closed'));
+        } catch {
+          // One observer must not prevent the others from seeing connection loss.
+        }
+      }
     });
 
     this.ws.addEventListener('error', (ev: unknown) => {
-      for (const handler of this.errorHandlers) {
+      this.cancelNegotiations();
+      for (const handler of [...this.errorHandlers]) {
         try {
           handler(ev);
         } catch {

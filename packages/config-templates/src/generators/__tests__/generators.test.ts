@@ -76,6 +76,10 @@ describe('pr-review workflow structure', () => {
     expect(workflow).toBeDefined();
   });
 
+  it('sets a seven-million-token budget per run', () => {
+    expect(workflow.budget?.maxTokensPerRun).toBe(7_000_000);
+  });
+
   it('has name and version', () => {
     expect(workflow.name).toBe('pr-review');
     expect(workflow.version).toBe('1.0.0');

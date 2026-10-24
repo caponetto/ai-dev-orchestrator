@@ -527,6 +527,148 @@ describe('RunDetailPage', () => {
     expect(screen.getByRole('tab', { name: /Artifacts/i })).toBeTruthy();
   });
 
+  it.each(['state_changed', 'run_started', 'run_completed', 'run_aborted'] as const)(
+    'refreshes a terminal view from %s even when a newer health event arrives',
+    async (type) => {
+      let current: RunStateView = { ...runState, status: 'failed', currentState: 'FAILED' };
+      server.use(
+        http.get('/api/runs/:runId/state', () => HttpResponse.json(current)),
+        http.get('/api/runs/:runId/workflow', () => HttpResponse.json(workflow)),
+      );
+      const { rerender } = renderPage();
+      await screen.findByText('FAILED');
+      current = { ...runState, status: 'completed', currentState: 'DONE' };
+      mockUseEventStream.mockReturnValue({
+        status: 'connected',
+        clearEvents: vi.fn(),
+        events: [
+          {
+            type: 'health_changed',
+            timestamp: '2026-01-01T10:00:07Z',
+            runId: runState.runId,
+            data: {},
+          },
+          { type, timestamp: '2026-01-01T10:00:06Z', runId: runState.runId, data: {} },
+        ],
+      });
+      rerender(
+        <MemoryRouter initialEntries={['/runs/run-live-123']}>
+          <Routes>
+            <Route path="/runs/:runId" element={<RunDetailPage />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+      expect(await screen.findByText('COMPLETED')).toBeInTheDocument();
+    },
+  );
+
+  it('does not cancel a pending state refresh when unrelated events or duplicate history arrive', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let hold = false;
+    let entered!: () => void;
+    const requested = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    server.use(
+      http.get('/api/runs/:runId/state', async () => {
+        if (!hold) {
+          return HttpResponse.json({ ...runState, status: 'failed', currentState: 'FAILED' });
+        }
+        entered();
+        await gate;
+        return HttpResponse.json({ ...runState, status: 'completed', currentState: 'DONE' });
+      }),
+      http.get('/api/runs/:runId/workflow', () => HttpResponse.json(workflow)),
+    );
+    const { rerender } = renderPage();
+    await screen.findByText('FAILED');
+    hold = true;
+    const relevant: DashboardEvent = {
+      type: 'state_changed',
+      timestamp: '2026-01-01T10:00:06Z',
+      runId: runState.runId,
+      data: {},
+    };
+    const update = (events: DashboardEvent[]) => {
+      mockUseEventStream.mockReturnValue({ status: 'connected', clearEvents: vi.fn(), events });
+      rerender(
+        <MemoryRouter initialEntries={['/runs/run-live-123']}>
+          <Routes>
+            <Route path="/runs/:runId" element={<RunDetailPage />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+    };
+    update([relevant]);
+    await requested;
+    update([
+      {
+        type: 'health_changed',
+        timestamp: '2026-01-01T10:00:09Z',
+        runId: runState.runId,
+        data: {},
+      },
+      { type: 'state_changed', timestamp: '2026-01-01T10:00:08Z', runId: 'other-run', data: {} },
+      { ...relevant },
+    ]);
+    release();
+    expect(await screen.findByText('COMPLETED')).toBeInTheDocument();
+  });
+
+  it('retains displayed data when event refresh fails and recovers on a later event', async () => {
+    let fail = false;
+    let finished = false;
+    const failedRequests = new Set<string>();
+    const reply = (endpoint: string, data: Parameters<typeof HttpResponse.json>[0]) => {
+      if (fail) {
+        failedRequests.add(endpoint);
+        return new HttpResponse(null, { status: 500 });
+      }
+      return HttpResponse.json(data);
+    };
+    server.use(
+      http.get('/api/runs/:runId/state', () =>
+        reply('state', {
+          ...runState,
+          status: finished ? 'completed' : 'failed',
+          currentState: finished ? 'DONE' : 'FAILED',
+        }),
+      ),
+      http.get('/api/runs/:runId/workflow', () => reply('workflow', workflow)),
+      http.get('/api/runs/:runId/artifacts', () => reply('artifacts', artifacts)),
+      http.get('/api/runs/:runId/usage', () => reply('usage', usage)),
+    );
+    const { rerender } = renderPage();
+    await screen.findByText('FAILED');
+    const update = (timestamp: string) => {
+      mockUseEventStream.mockReturnValue({
+        status: 'connected',
+        clearEvents: vi.fn(),
+        events: [{ type: 'run_completed', runId: runState.runId, timestamp, data: {} }],
+      });
+      rerender(
+        <MemoryRouter initialEntries={['/runs/run-live-123']}>
+          <Routes>
+            <Route path="/runs/:runId" element={<RunDetailPage />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+    };
+    fail = true;
+    update('2026-01-01T10:00:06Z');
+    await waitFor(() => {
+      expect(failedRequests.size).toBe(4);
+    });
+    expect(screen.getByText('FAILED')).toBeInTheDocument();
+    fail = false;
+    finished = true;
+    update('2026-01-01T10:00:07Z');
+    expect(await screen.findByText('COMPLETED')).toBeInTheDocument();
+  });
+
   it('triggers refreshRunData when a state_changed live event arrives', async () => {
     stateRequests = 0;
     workflowRequests = 0;

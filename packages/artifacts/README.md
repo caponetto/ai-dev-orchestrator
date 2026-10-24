@@ -51,3 +51,9 @@ src/
 **Infrastructure -- Agreement Artifacts**:
 
 - `DefaultAgreementGate`, `AgreementGenerator`, `DefaultAgreementValidator`
+
+## Write and recovery boundaries
+
+Stores sharing a resolved artifacts directory serialize version allocation, content, metadata and inventory writes within one process. Failed queued writes do not block later writes. Cross-process mutation requires the orchestrator run lock. Version discovery matches the complete artifact name/version suffix, so names with shared prefixes remain independent.
+
+Inventory reads refresh from disk. Malformed/schema-invalid inventories and inconsistent reference fields raise `InventoryCorruptionError`; they are never silently replaced with an empty index. After stopping writers and inspecting content/metadata, explicitly call `InventoryManager.rebuild()` to rebuild the index from valid metadata. Content, metadata and inventory are separate durable writes, so a crash can leave orphan files or an index missing a committed pair. Inspect/repair orphan pairs with recovery's `ArtifactConsistencyChecker`, then rebuild the inventory; this is an explicit maintenance API, not automatic CLI recovery. Preserve a copy before destructive repair.

@@ -5,6 +5,7 @@ import type { RunResult } from '@ai-dev-orchestrator/schemas';
 import { resumeOrchestrator } from '../composition-root';
 import { ExitCode, toCLIError } from '../output/exit-codes';
 import type { OutputFormatter } from '../output/formatter';
+import { workflowResultFields } from '../output/workflow-result';
 import { handleWaitingForHuman } from '../waiting-for-human';
 import { getRunDir } from '../workspace-paths';
 
@@ -18,9 +19,8 @@ export interface RetryOptions {
 /**
  * Retry a terminal (aborted/failed) run from the state that caused the failure.
  *
- * Expects the checkpoint to have been rewritten by the caller (e.g. the dashboard
- * action handler) so that `currentState` already points to the non-terminal state
- * where the failure occurred.
+ * The engine selects and checkpoints the source state under the run lock. Pending
+ * terminal cleanup retains its cursor instead of repeating completed work.
  */
 export async function retryCommand(
   repoRoot: string,
@@ -49,101 +49,109 @@ export async function retryCommand(
     return ExitCode.CONFIGURATION_ERROR;
   }
 
-  for (const w of ctx.warnings) {
-    formatter.warn(w);
-  }
-
-  const state = ctx.engine.getState();
-  formatter.info(`Retrying from state: ${state.currentState}`);
-
-  const onUncaughtException = (err: Error): void => {
-    ctx.journalWriter.append({
-      timestamp: new Date().toISOString(),
-      runId,
-      sequence: 0,
-      type: 'error',
-      data: {
-        kind: 'error',
-        errorCode: 'uncaught_exception',
-        message: err.message,
-        recoverable: false,
-      },
-    });
-    process.exitCode = ExitCode.RUN_FAILED;
-  };
-
-  const onUnhandledRejection = (reason: unknown): void => {
-    const message = reason instanceof Error ? reason.message : String(reason);
-    ctx.journalWriter.append({
-      timestamp: new Date().toISOString(),
-      runId,
-      sequence: 0,
-      type: 'error',
-      data: {
-        kind: 'error',
-        errorCode: 'unhandled_rejection',
-        message,
-        recoverable: false,
-      },
-    });
-    process.exitCode = ExitCode.RUN_FAILED;
-  };
-
-  process.on('uncaughtException', onUncaughtException);
-  process.on('unhandledRejection', onUnhandledRejection);
-
-  formatter.startSpinner('Retrying workflow…');
-
-  let result: RunResult;
   try {
-    result = await ctx.engine.retry();
-
-    if (result.finalState === 'WAITING_FOR_HUMAN') {
-      handleWaitingForHuman(result, ctx.engine, runId, formatter);
-      return ExitCode.SUCCESS;
+    for (const w of ctx.warnings) {
+      formatter.warn(w);
     }
-  } catch (error: unknown) {
-    formatter.error(toCLIError(error));
-    return ExitCode.RUN_FAILED;
-  } finally {
-    process.removeListener('uncaughtException', onUncaughtException);
-    process.removeListener('unhandledRejection', onUnhandledRejection);
-  }
 
-  formatter.clearSpinner();
+    const state = ctx.engine.getState();
+    formatter.info(`Retrying from state: ${state.currentState}`);
 
-  if (result.finalState === 'DONE') {
-    formatter.success('Workflow retried and completed successfully.');
+    const onUncaughtException = (err: Error): void => {
+      ctx.journalWriter.append({
+        timestamp: new Date().toISOString(),
+        runId,
+        sequence: 0,
+        type: 'error',
+        data: {
+          kind: 'error',
+          errorCode: 'uncaught_exception',
+          message: err.message,
+          recoverable: false,
+        },
+      });
+      process.exitCode = ExitCode.RUN_FAILED;
+    };
+
+    const onUnhandledRejection = (reason: unknown): void => {
+      const message = reason instanceof Error ? reason.message : String(reason);
+      ctx.journalWriter.append({
+        timestamp: new Date().toISOString(),
+        runId,
+        sequence: 0,
+        type: 'error',
+        data: {
+          kind: 'error',
+          errorCode: 'unhandled_rejection',
+          message,
+          recoverable: false,
+        },
+      });
+      process.exitCode = ExitCode.RUN_FAILED;
+    };
+
+    process.on('uncaughtException', onUncaughtException);
+    process.on('unhandledRejection', onUnhandledRejection);
+
+    formatter.startSpinner('Retrying workflow…');
+
+    let result: RunResult;
+    try {
+      result = await ctx.engine.retry();
+
+      if (options.json) {
+        process.stdout.write(JSON.stringify(workflowResultFields(result)) + '\n');
+      }
+
+      if (result.finalState === 'WAITING_FOR_HUMAN') {
+        handleWaitingForHuman(result, ctx.engine, runId, formatter);
+        return workflowResultFields(result).exitCode;
+      }
+    } catch (error: unknown) {
+      formatter.error(toCLIError(error));
+      return ExitCode.RUN_FAILED;
+    } finally {
+      process.removeListener('uncaughtException', onUncaughtException);
+      process.removeListener('unhandledRejection', onUnhandledRejection);
+    }
+
+    formatter.clearSpinner();
+
+    if (result.finalState === 'DONE') {
+      formatter.success('Workflow retried and completed successfully.');
+      formatter.summary({
+        'Run ID': result.runId,
+        'Final State': result.finalState,
+        Artifacts: result.artifactInventory.length,
+      });
+      return workflowResultFields(result).exitCode;
+    }
+
+    if (result.finalState === 'FAILED') {
+      formatter.error({
+        code: ExitCode.RUN_FAILED,
+        message: 'Workflow failed during retry.',
+        remediation: 'Check the journal for details.',
+      });
+      return workflowResultFields(result).exitCode;
+    }
+
+    if (result.finalState === 'ABORTED') {
+      formatter.error({
+        code: ExitCode.RUN_ABORTED,
+        message: 'Workflow was aborted during retry.',
+        remediation: 'Check the journal for details.',
+      });
+      return workflowResultFields(result).exitCode;
+    }
+
     formatter.summary({
       'Run ID': result.runId,
       'Final State': result.finalState,
       Artifacts: result.artifactInventory.length,
     });
-    return ExitCode.SUCCESS;
+    return workflowResultFields(result).exitCode;
+  } finally {
+    ctx.shutdownCoordinator?.uninstall();
   }
-
-  if (result.finalState === 'FAILED') {
-    formatter.error({
-      code: ExitCode.RUN_FAILED,
-      message: 'Workflow failed during retry.',
-      remediation: 'Check the journal for details.',
-    });
-    return ExitCode.RUN_FAILED;
-  }
-
-  if (result.finalState === 'ABORTED') {
-    formatter.error({
-      code: ExitCode.RUN_ABORTED,
-      message: 'Workflow was aborted during retry.',
-      remediation: 'Check the journal for details.',
-    });
-    return ExitCode.RUN_ABORTED;
-  }
-
-  formatter.summary({
-    'Run ID': result.runId,
-    'Final State': result.finalState,
-    Artifacts: result.artifactInventory.length,
-  });
-  return ExitCode.SUCCESS;
 }

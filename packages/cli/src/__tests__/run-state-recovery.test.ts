@@ -1,6 +1,11 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { hostname } from 'node:os';
 
+import { rebuildStateFromEvents } from '@ai-dev-orchestrator/core';
+import { createRunId } from '@ai-dev-orchestrator/ports';
+import type { StatePersistence } from '@ai-dev-orchestrator/ports';
+import type { JournalEvent, PersistedState } from '@ai-dev-orchestrator/schemas';
+import { persistedStateSchema } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -24,7 +29,8 @@ vi.mock('../workspace-paths', () => ({
 const mockLoad = vi.fn();
 const mockReconstruct = vi.fn();
 
-vi.mock('@ai-dev-orchestrator/core', () => ({
+vi.mock('@ai-dev-orchestrator/core', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   DefaultStatePersistence: vi.fn().mockImplementation(function (this: Record<string, unknown>) {
     this.load = mockLoad;
     this.reconstructFromJournal = mockReconstruct;
@@ -37,7 +43,137 @@ vi.mock('@ai-dev-orchestrator/workflow', () => ({
   }),
 }));
 
-import { recoverRunState, readLockMetadata, terminateRunFromLock } from '../run-state-recovery';
+import {
+  loadLatestRunState,
+  recoverRunState,
+  readLockMetadata,
+  terminateRunFromLock,
+} from '../run-state-recovery';
+
+describe('loadLatestRunState', () => {
+  function state(overrides: Partial<PersistedState> = {}): PersistedState {
+    return {
+      runId: createRunId('run-1'),
+      schemaVersion: 2,
+      currentState: 'WORK',
+      previousState: null,
+      stateEnteredAt: '2026-01-01T00:00:00.000Z',
+      transitionCount: 1,
+      stateHistory: ['WORK'],
+      iterationCounts: {},
+      activeArtifacts: [],
+      lastProducedArtifact: null,
+      workflowName: 'test',
+      workflowVersion: '1',
+      persistedAt: '2026-01-01T00:00:00.000Z',
+      persistenceVersion: 1,
+      checksum: '',
+      ...overrides,
+    };
+  }
+  function event(snapshot: PersistedState, sequence: number): JournalEvent {
+    return {
+      runId: snapshot.runId,
+      timestamp: snapshot.persistedAt,
+      sequence,
+      type: 'workflow_checkpoint',
+      data: { kind: 'workflow_checkpoint', state: snapshot },
+    };
+  }
+  function persistence(checkpoint: PersistedState | null) {
+    return {
+      load: vi.fn().mockReturnValue(checkpoint),
+      reconstructFromJournal:
+        vi.fn<StatePersistence['reconstructFromJournal']>(rebuildStateFromEvents),
+    };
+  }
+
+  it('prefers a completed cleanup cursor in the journal even within the same millisecond', () => {
+    const checkpoint = state({
+      pendingTerminalState: 'DONE',
+      entryActionContinuation: { stateId: 'DONE', completedResults: [], nextActionIndex: 0 },
+    });
+    const newer = state({
+      ...checkpoint,
+      entryActionContinuation: {
+        stateId: 'DONE',
+        completedResults: [{ action: { type: 'notify_human', params: {} }, success: true }],
+        nextActionIndex: 1,
+      },
+    });
+    const result = loadLatestRunState(persistence(checkpoint), checkpoint.runId, [
+      event(persistedStateSchema.parse(checkpoint), 1),
+      event(persistedStateSchema.parse(newer), 2),
+    ]);
+    expect(result.source).toBe('journal');
+    expect(result.state?.entryActionContinuation?.nextActionIndex).toBe(1);
+  });
+
+  it('replays completed workers after the last checkpoint without losing earlier snapshot fields', () => {
+    const checkpoint = state({ repoRoot: '/cloned', cumulativeInputTokens: 20 });
+    const completion: JournalEvent = {
+      runId: checkpoint.runId,
+      sequence: 2,
+      timestamp: checkpoint.persistedAt,
+      type: 'worker_completed',
+      data: {
+        kind: 'worker',
+        workerId: 'worker',
+        role: 'planner',
+        stateId: 'WORK',
+        status: 'success',
+        inputTokens: 10,
+      },
+    };
+    const result = loadLatestRunState(persistence(checkpoint), checkpoint.runId, [
+      completion,
+      event(checkpoint, 1),
+    ]);
+    expect(result.state).toMatchObject({ repoRoot: '/cloned', cumulativeInputTokens: 30 });
+  });
+
+  it('preserves a checkpoint rewritten for retry after the latest journal snapshot', () => {
+    const old = state({ currentState: 'ABORTED' });
+    const checkpoint = state({ persistedAt: '2026-01-01T00:00:01.000Z' });
+    expect(loadLatestRunState(persistence(checkpoint), checkpoint.runId, [event(old, 1)])).toEqual({
+      state: checkpoint,
+      source: 'checkpoint',
+    });
+  });
+
+  it('uses a newer journal snapshot when the checkpoint has no matching journal event', () => {
+    const checkpoint = state();
+    const newer = state({ currentState: 'DONE', persistedAt: '2026-01-01T00:00:01.000Z' });
+    expect(
+      loadLatestRunState(persistence(checkpoint), checkpoint.runId, [event(newer, 2)]).state
+        ?.currentState,
+    ).toBe('DONE');
+  });
+
+  it('uses an identical final checkpoint without replay and ignores other runs', () => {
+    const checkpoint = state();
+    const store = persistence(checkpoint);
+    expect(
+      loadLatestRunState(store, checkpoint.runId, [
+        event(checkpoint, 1),
+        event(state({ runId: createRunId('other') }), 2),
+      ]).source,
+    ).toBe('checkpoint');
+    expect(vi.mocked(store).reconstructFromJournal).not.toHaveBeenCalled();
+  });
+
+  it('retains the checkpoint if reconstruction is unavailable', () => {
+    const checkpoint = state();
+    const store = persistence(checkpoint);
+    vi.mocked(store).reconstructFromJournal.mockReturnValue(null);
+    expect(
+      loadLatestRunState(store, checkpoint.runId, [
+        event(checkpoint, 1),
+        event(state({ currentState: 'DONE' }), 2),
+      ]).state,
+    ).toBe(checkpoint);
+  });
+});
 
 describe('recoverRunState', () => {
   beforeEach(() => {

@@ -1,27 +1,8 @@
 import type { IterationContractRegistry } from '@ai-dev-orchestrator/ports';
 import type { IterationContract, IterationState } from '@ai-dev-orchestrator/schemas';
+import { ITERATION_STATE_MAPPING } from '@ai-dev-orchestrator/schemas';
 
 import { BUILT_IN_CONTRACTS } from './built-in-contracts';
-
-const STATE_TO_CONTRACT: Readonly<Record<string, string>> = {
-  PLAN_REVIEW: 'plan_review_loop',
-  CODE_REVIEW: 'implementation_review_loop',
-  REVIEW_SYNTHESIS: 'implementation_review_loop',
-  IMPLEMENTATION: 'implementation_review_loop',
-  TEST_AUTHORING: 'implementation_review_loop',
-  JUDGE_REVIEW: 'implementation_review_loop',
-  REFINEMENT: 'clarification_loop',
-  WAITING_FOR_HUMAN: 'clarification_loop',
-  ACCEPTANCE_VALIDATION: 'acceptance_validation_loop',
-};
-
-const ROUND_ENTRY_STATES: ReadonlySet<string> = new Set([
-  'PLAN_REVIEW',
-  'CODE_REVIEW',
-  'REFINEMENT',
-  'ACCEPTANCE_VALIDATION',
-]);
-const JUDGE_ENTRY_STATES: ReadonlySet<string> = new Set(['JUDGE_REVIEW']);
 
 /** Default registry of iteration contracts with built-in contracts pre-loaded. */
 export class DefaultIterationContractRegistry implements IterationContractRegistry {
@@ -51,7 +32,7 @@ export class DefaultIterationContractRegistry implements IterationContractRegist
 
   /** @inheritdoc */
   getContractForState(stateId: string): IterationContract | null {
-    const contractId = STATE_TO_CONTRACT[stateId];
+    const contractId = ITERATION_STATE_MAPPING[stateId]?.contractId;
     if (!contractId) {
       return null;
     }
@@ -65,13 +46,13 @@ export class DefaultIterationContractRegistry implements IterationContractRegist
       return;
     }
 
-    if (JUDGE_ENTRY_STATES.has(stateId)) {
+    if (ITERATION_STATE_MAPPING[stateId]?.counter === 'judge') {
       const current = this.judgeArbitrationCounts.get(contract.id) ?? 0;
       this.judgeArbitrationCounts.set(contract.id, current + 1);
       return;
     }
 
-    if (!ROUND_ENTRY_STATES.has(stateId)) {
+    if (ITERATION_STATE_MAPPING[stateId]?.counter !== 'iteration') {
       return;
     }
     const current = this.iterationCounts.get(contract.id) ?? 0;

@@ -2,6 +2,7 @@ import type { ArtifactStore, IterationContractRegistry } from '@ai-dev-orchestra
 import type {
   ActionResult,
   Artifact,
+  ArtifactRef,
   IterationContract,
   IterationState,
 } from '@ai-dev-orchestrator/schemas';
@@ -12,15 +13,91 @@ import { ReviewResultInterpreter } from '../review-result-interpreter';
 function makeArtifactStore(overrides: Partial<ArtifactStore> = {}): ArtifactStore {
   return {
     store: vi.fn(),
-    get: vi.fn(),
+    get: vi.fn((ref: ArtifactRef) => overrides.getLatest?.(ref.type, ref.name)),
     getLatest: vi.fn().mockResolvedValue(null),
     list: vi.fn().mockResolvedValue([]),
     history: vi.fn().mockResolvedValue([]),
-    verify: vi.fn(),
+    verify: vi.fn().mockResolvedValue({ valid: true }),
     inventory: vi.fn(),
     ...overrides,
   };
 }
+
+describe('sequential review failures', () => {
+  it('rejects approval when the produced artifact checksum no longer matches', async () => {
+    const store = makeArtifactStore({
+      getLatest: vi.fn().mockResolvedValue(approvedArtifact('plan_review')),
+      verify: vi.fn().mockResolvedValue({ valid: false }),
+    });
+    const interpreter = new ReviewResultInterpreter(store, makeContractRegistry());
+    expect(
+      await interpreter.interpret(
+        [successResult('plan_review', 'plan_review-1')],
+        'REVIEW',
+        'review',
+      ),
+    ).toBe('review_rejected');
+  });
+  it('evaluates the produced version rather than a newer approval with the same name', async () => {
+    const rejected = rejectedArtifact('plan_review');
+    const newer = { ...approvedArtifact('plan_review'), version: 2 };
+    const store = makeArtifactStore({
+      get: vi.fn().mockResolvedValue(rejected),
+      getLatest: vi.fn().mockResolvedValue(newer),
+    });
+    const interpreter = new ReviewResultInterpreter(store, makeContractRegistry());
+    expect(
+      await interpreter.interpret(
+        [successResult('plan_review', rejected.name)],
+        'REVIEW',
+        'review',
+      ),
+    ).toBe('review_rejected');
+  });
+  it.each([
+    ['review', 'plan_review', 'review_rejected'],
+    ['judge', 'judge_decision', 'judge_rejected'],
+  ] as const)(
+    'rejects %s approval from an artifact marked invalid by storage',
+    async (stateType, artifactType, expected) => {
+      const artifact = { ...approvedArtifact(artifactType), metadata: { validationFailed: true } };
+      const store = makeArtifactStore({ getLatest: vi.fn().mockResolvedValue(artifact) });
+      const interpreter = new ReviewResultInterpreter(store, makeContractRegistry());
+      expect(
+        await interpreter.interpret(
+          [
+            {
+              action: { type: 'dispatch_worker', params: { role: 'plan_reviewer' } },
+              success: true,
+              artifactRef: artifact.ref,
+            },
+          ],
+          'REVIEW',
+          stateType,
+        ),
+      ).toBe(expected);
+    },
+  );
+
+  it('does not let a successful journal action mask a failed reviewer', async () => {
+    const interpreter = new ReviewResultInterpreter(makeArtifactStore(), makeContractRegistry());
+    expect(
+      await interpreter.interpret(
+        [
+          { action: { type: 'record_journal', params: { event: 'run_started' } }, success: true },
+          {
+            action: { type: 'dispatch_worker', params: { role: 'plan_reviewer' } },
+            success: false,
+            error: 'offline',
+            errorType: 'agent_error',
+          },
+        ],
+        'PLAN_REVIEW',
+        'review',
+      ),
+    ).toBe('failure');
+  });
+});
 
 function makeContract(overrides: Partial<IterationContract> = {}): IterationContract {
   return {

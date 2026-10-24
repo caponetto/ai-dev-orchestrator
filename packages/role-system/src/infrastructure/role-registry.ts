@@ -69,8 +69,8 @@ export class DefaultRoleRegistry implements RoleRegistry, OwnershipRegistry {
     return this.modelAssigner.getRecommendedModel(roleId, calibrationData);
   }
 
-  getNextTier(roleId: RoleId): ModelAssignment | null {
-    return this.modelAssigner.getNextTier(roleId);
+  getNextTier(roleId: RoleId, currentModel?: string): ModelAssignment | null {
+    return this.modelAssigner.getNextTier(roleId, currentModel);
   }
 
   validate(): RoleValidationResult {

@@ -1,5 +1,7 @@
+/* eslint-disable @typescript-eslint/unbound-method -- Assertions inspect mocked transport methods without invoking them. */
 import { EventEmitter } from 'node:events';
 
+import { createProtocolMessage } from '@ai-dev-orchestrator/agent-protocol';
 import type { AgentSessionRef } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
@@ -63,7 +65,7 @@ function makeTransport(): StdioProtocolTransport & {
     ) {
       this._stderrHandler = cb;
     }),
-    send: vi.fn(),
+    send: vi.fn().mockReturnValue(true),
     close: vi.fn(),
   } as unknown as ReturnType<typeof makeTransport>;
 }
@@ -135,6 +137,109 @@ describe('LocalAgentSessionHost', () => {
   });
 
   describe('sendHumanResponse', () => {
+    it('keeps a pending request when transport delivery fails so the same request can be retried', () => {
+      const request = createProtocolMessage('permission_request', {
+        action: 'write',
+        resource: '/file',
+        riskLevel: 'high',
+      });
+      transport._messageHandler?.(request);
+      vi.mocked(transport.send).mockReturnValueOnce(false);
+      expect(host.sendHumanResponse(request.messageId, { granted: true })).toBe(false);
+      expect(host.pendingRequests[0]?.requestId).toBe(request.messageId);
+    });
+    it.each(['done', 'error', 'abort', 'timeout'] as const)(
+      'rejects late responses and requests after %s',
+      async (terminal) => {
+        vi.useFakeTimers();
+        try {
+          const request = createProtocolMessage('permission_request', {
+            action: 'write',
+            resource: '/file',
+            riskLevel: 'high',
+          });
+          transport._messageHandler?.(request);
+          if (terminal === 'done') {
+            transport._messageHandler?.(createProtocolMessage('done', { summary: 'done' }));
+          }
+          if (terminal === 'error') {
+            transport._messageHandler?.(
+              createProtocolMessage('error', {
+                code: 'failed',
+                message: 'failed',
+                recoverable: false,
+              }),
+            );
+          }
+          if (terminal === 'abort') {
+            host.abort('stop');
+          }
+          if (terminal === 'timeout') {
+            host.setTimeout(10);
+            await vi.advanceTimersByTimeAsync(10);
+          }
+          const state = host.state;
+          vi.mocked(transport.send).mockClear();
+          expect(host.sendHumanResponse(request.messageId, { granted: true })).toBe(false);
+          expect(transport.send).not.toHaveBeenCalled();
+          transport._messageHandler?.(
+            createProtocolMessage('permission_request', {
+              action: 'write',
+              resource: '/late',
+              riskLevel: 'high',
+            }),
+          );
+          expect(host.state).toBe(state);
+        } finally {
+          vi.useRealTimers();
+        }
+      },
+    );
+
+    it.each(['permission', 'clarification'] as const)(
+      'rejects a response of the wrong kind for %s and consumes the correct answer only once',
+      (kind) => {
+        const request =
+          kind === 'permission'
+            ? createProtocolMessage('permission_request', {
+                action: 'write',
+                resource: '/file',
+                riskLevel: 'high',
+              })
+            : createProtocolMessage('clarification_request', { question: 'Which branch?' });
+        transport._messageHandler?.(request);
+        expect(
+          host.sendHumanResponse(
+            request.messageId,
+            kind === 'permission' ? { answer: 'main' } : { granted: true },
+          ),
+        ).toBe(false);
+        expect(transport.send).not.toHaveBeenCalled();
+        const answer = kind === 'permission' ? { granted: true } : { answer: 'main' };
+        expect(host.sendHumanResponse(request.messageId, answer)).toBe(true);
+        expect(host.sendHumanResponse(request.messageId, answer)).toBe(false);
+        expect(transport.send).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it('settles a pending advance when the local session times out', async () => {
+      vi.useFakeTimers();
+      try {
+        let advanced: unknown;
+        void host.waitForAdvance().then((result) => {
+          advanced = result;
+        });
+        host.setTimeout(10);
+        await vi.advanceTimersByTimeAsync(10);
+        expect(advanced).toMatchObject({
+          kind: 'failed',
+          error: expect.stringContaining('timed out') as unknown,
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('returns false when no pending request matches', () => {
       expect(host.sendHumanResponse('nonexistent', {})).toBe(false);
     });
@@ -148,14 +253,12 @@ describe('LocalAgentSessionHost', () => {
 
     it('sends abort message via transport', () => {
       host.abort('reason');
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(transport.send).toHaveBeenCalled();
     });
 
     it('is idempotent for terminal states', () => {
       host.abort('first');
       host.abort('second');
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(transport.send).toHaveBeenCalledTimes(1);
     });
 
@@ -166,6 +269,22 @@ describe('LocalAgentSessionHost', () => {
   });
 
   describe('done message handling', () => {
+    it('retains final token usage supplied by protocol completion', async () => {
+      transport._messageHandler?.(
+        createProtocolMessage('done', {
+          summary: 'done',
+          tokenUsage: { inputTokens: 30, outputTokens: 20 },
+        }),
+      );
+      expect(await host.resultPromise).toMatchObject({
+        status: 'success',
+        tokenUsage: { inputTokens: 30, outputTokens: 20 },
+      });
+      expect(await host.waitForAdvance()).toMatchObject({
+        kind: 'completed',
+        tokenUsage: { inputTokens: 30, outputTokens: 20 },
+      });
+    });
     it('transitions to completed on done message', () => {
       transport._messageHandler?.({
         type: 'done',

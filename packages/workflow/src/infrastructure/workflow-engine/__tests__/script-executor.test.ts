@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/unbound-method -- Assertions inspect mocked stream port methods. */
 import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -67,6 +68,88 @@ describe('ScriptExecutor', () => {
     }
     return path;
   }
+
+  it('cancels preparation before spawn and permits a later execution', async () => {
+    await writeScript('generation.ts', 'process.stdout.write("launched")');
+    const pending = executor.execute({ script: 'generation.ts' }, context());
+    await executor.cancelAll();
+    expect(await pending).toMatchObject({
+      success: false,
+      error: 'Script cancelled before launch',
+    });
+    expect(await executor.execute({ script: 'generation.ts' }, context())).toMatchObject({
+      success: true,
+      scriptResult: { stdout: 'launched' },
+    });
+  });
+
+  it('cancels synchronously from a start notification before spawn', async () => {
+    await writeScript('generation.ts', 'process.stdout.write("must not launch")');
+    vi.mocked(streamBus.publish).mockImplementationOnce(() => {
+      void executor.cancelAll();
+    });
+    expect(await executor.execute({ script: 'generation.ts' }, context())).toMatchObject({
+      success: false,
+      scriptResult: { stdout: '', exitCode: 143 },
+    });
+  });
+
+  it('treats a cancelled script that traps TERM and exits zero as failure', async () => {
+    await writeScript(
+      'trap.ts',
+      `process.on('SIGTERM', () => process.exit(0));
+      process.stdout.write('ready'); setInterval(() => {}, 1000);`,
+    );
+    const pending = executor.execute({ script: 'trap.ts' }, context());
+    await vi.waitFor(() => {
+      expect(
+        vi.mocked(streamBus.publish).mock.calls.some(([event]) => event.content === 'ready'),
+      ).toBe(true);
+    });
+    await Promise.all([executor.cancelAll(), executor.cancelAll()]);
+    expect(await pending).toMatchObject({
+      success: false,
+      error: 'Script cancelled',
+      scriptResult: { exitCode: 143 },
+    });
+  });
+
+  it('does not accept success handed off after cancellation', async () => {
+    await writeScript('handoff.ts', '');
+    const spawn = vi.spyOn(
+      executor as unknown as {
+        spawn: () => Promise<{
+          exitCode: number;
+          stdout: string;
+          stderr: string;
+          durationMs: number;
+        }>;
+      },
+      'spawn',
+    );
+    spawn.mockImplementation(async () => {
+      await executor.cancelAll();
+      return { exitCode: 0, stdout: '', stderr: '', durationMs: 0 };
+    });
+    expect(await executor.execute({ script: 'handoff.ts' }, context())).toMatchObject({
+      success: false,
+      error: 'Script cancelled',
+      scriptResult: { exitCode: 143 },
+    });
+  });
+
+  it('settles and records native spawn errors after cleanup', async () => {
+    await writeScript('missing-interpreter', '#!/no-such-orchestrator-test-interpreter\n');
+    const result = await executor.execute({ script: 'missing-interpreter' }, context());
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('ENOENT');
+    expect(
+      vi
+        .mocked(journalWriter.append)
+        .mock.calls.filter(([event]) => event.type === 'script_completed'),
+    ).toHaveLength(1);
+    await executor.cancelAll();
+  });
 
   it('returns failure when script file does not exist', async () => {
     const result = await executor.execute({ script: 'nonexistent-script' }, context());
@@ -145,6 +228,20 @@ describe('ScriptExecutor', () => {
     expect(result.scriptResult?.stderr).toContain('Script timed out');
     expect(result.scriptResult?.durationMs).toBeLessThan(10000);
   }, 15000);
+
+  it.each([0, 42])(
+    'fails timed-out scripts even when their SIGTERM handler exits %i',
+    async (exitCode) => {
+      await writeScript(
+        'handles-term.ts',
+        `process.on('SIGTERM', () => process.exit(${String(exitCode)}));\nsetInterval(() => {}, 1000);\n`,
+      );
+      const result = await executor.execute({ script: 'handles-term.ts', timeout: 500 }, context());
+      expect(result.success).toBe(false);
+      expect(result.scriptResult?.exitCode).toBe(exitCode === 0 ? 143 : exitCode);
+      expect(result.scriptResult?.durationMs).toBeGreaterThanOrEqual(490);
+    },
+  );
 
   it('records journal events for start and complete', async () => {
     await writeScript('journal-test', '#!/bin/bash\necho ok');

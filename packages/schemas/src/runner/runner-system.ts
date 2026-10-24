@@ -108,6 +108,12 @@ export const reconnectMetaSchema = z.discriminatedUnion('type', [
 ]);
 export type ReconnectMeta = z.infer<typeof reconnectMetaSchema>;
 
+export const agentTokenUsageSchema = z.object({
+  inputTokens: z.number(),
+  outputTokens: z.number(),
+});
+export type AgentTokenUsage = z.infer<typeof agentTokenUsageSchema>;
+
 export const agentSessionSnapshotSchema = z.object({
   ref: agentSessionRefSchema,
   state: agentSessionStateSchema,
@@ -119,6 +125,13 @@ export const agentSessionSnapshotSchema = z.object({
   expiresAt: z.string().optional(),
   workerId: z.string().optional(),
   error: z.string().optional(),
+  completion: z
+    .object({
+      artifactContent: z.string(),
+      durationMs: z.number().nonnegative(),
+      tokenUsage: agentTokenUsageSchema.optional(),
+    })
+    .optional(),
 });
 export type AgentSessionSnapshot = z.infer<typeof agentSessionSnapshotSchema>;
 
@@ -306,12 +319,6 @@ export const agentTaskSchema = z.object({
   iterationCount: z.number().optional(),
 });
 export type AgentTask = z.infer<typeof agentTaskSchema>;
-
-export const agentTokenUsageSchema = z.object({
-  inputTokens: z.number(),
-  outputTokens: z.number(),
-});
-export type AgentTokenUsage = z.infer<typeof agentTokenUsageSchema>;
 
 export const agentResultSchema = z.object({
   taskId: z.string(),

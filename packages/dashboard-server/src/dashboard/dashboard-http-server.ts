@@ -102,6 +102,53 @@ export class DashboardHttpServer {
     this.bridgeAgentStreamEvents();
   }
 
+  private async submitLiveResponse(
+    store: LiveRequestStore,
+    runId: string,
+    messageId: string,
+    payload: Record<string, unknown>,
+    event: DashboardEvent,
+  ): Promise<{ status: 200 | 400 | 404 | 409 | 410 | 500; body: Record<string, unknown> }> {
+    try {
+      const result = await store.writeResponse(
+        { runId, messageId, payload, respondedAt: new Date().toISOString() },
+        { requireRequest: true },
+      );
+      const outcome = typeof result === 'string' ? result : 'response_written';
+      if (outcome === 'response_written') {
+        try {
+          this.eventStream.publish({ ...event, data: { ...event.data, outcome } });
+        } catch {
+          // Notifications cannot undo a committed response or make an identical retry new work.
+        }
+      }
+      return { status: 200, body: { ok: true, outcome } };
+    } catch (error: unknown) {
+      const statuses: Readonly<Record<string, 400 | 404 | 409 | 410>> = {
+        LIVE_REQUEST_INVALID: 400,
+        LIVE_RESPONSE_KIND_MISMATCH: 400,
+        LIVE_REQUEST_NOT_FOUND: 404,
+        LIVE_RESPONSE_CONFLICT: 409,
+        LIVE_REQUEST_CONFLICT: 409,
+        LIVE_REQUEST_EXPIRED: 410,
+        LIVE_REQUEST_RETIRED: 410,
+      };
+      const status =
+        error instanceof Error &&
+        'code' in error &&
+        typeof error.code === 'string' &&
+        Object.hasOwn(statuses, error.code)
+          ? statuses[error.code]
+          : undefined;
+      return {
+        status: status ?? 500,
+        body: {
+          error: status && error instanceof Error ? error.message : 'Unable to store live response',
+        },
+      };
+    }
+  }
+
   async start(): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       const listener = getRequestListener(this.app.fetch);
@@ -515,23 +562,28 @@ export class DashboardHttpServer {
       }
       const runId = c.req.param('runId');
       const messageId = c.req.param('messageId');
-      const body: { granted?: boolean } = await c.req.json();
-      if (typeof body.granted !== 'boolean') {
+      const body = await c.req.json<unknown>().catch(() => null);
+      if (
+        !body ||
+        typeof body !== 'object' ||
+        !('granted' in body) ||
+        typeof body.granted !== 'boolean'
+      ) {
         return c.json({ error: 'Body must include "granted" (boolean)' }, 400);
       }
-      await this.liveRequestStore.writeResponse({
+      const result = await this.submitLiveResponse(
+        this.liveRequestStore,
         runId,
         messageId,
-        payload: { granted: body.granted },
-        respondedAt: new Date().toISOString(),
-      });
-      this.eventStream.publish({
-        type: 'permission_resolved',
-        timestamp: new Date().toISOString(),
-        runId,
-        data: { messageId, granted: body.granted },
-      });
-      return c.json({ ok: true });
+        { granted: body.granted },
+        {
+          type: 'permission_resolved',
+          timestamp: new Date().toISOString(),
+          runId,
+          data: { messageId, granted: body.granted },
+        },
+      );
+      return c.json(result.body, result.status);
     });
 
     this.app.post('/api/runs/:runId/clarifications/:messageId', async (c) => {
@@ -540,23 +592,29 @@ export class DashboardHttpServer {
       }
       const runId = c.req.param('runId');
       const messageId = c.req.param('messageId');
-      const body: { answer?: string } = await c.req.json();
-      if (typeof body.answer !== 'string' || body.answer.length === 0) {
+      const body = await c.req.json<unknown>().catch(() => null);
+      if (
+        !body ||
+        typeof body !== 'object' ||
+        !('answer' in body) ||
+        typeof body.answer !== 'string' ||
+        !body.answer.trim()
+      ) {
         return c.json({ error: 'Body must include "answer" (non-empty string)' }, 400);
       }
-      await this.liveRequestStore.writeResponse({
+      const result = await this.submitLiveResponse(
+        this.liveRequestStore,
         runId,
         messageId,
-        payload: { answer: body.answer },
-        respondedAt: new Date().toISOString(),
-      });
-      this.eventStream.publish({
-        type: 'clarification_resolved',
-        timestamp: new Date().toISOString(),
-        runId,
-        data: { messageId, answer: body.answer },
-      });
-      return c.json({ ok: true });
+        { answer: body.answer },
+        {
+          type: 'clarification_resolved',
+          timestamp: new Date().toISOString(),
+          runId,
+          data: { messageId, answer: body.answer },
+        },
+      );
+      return c.json(result.body, result.status);
     });
 
     this.app.post('/api/runs/:runId/approve', async (c) => {

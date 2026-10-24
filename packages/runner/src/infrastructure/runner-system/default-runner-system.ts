@@ -63,6 +63,7 @@ export class DefaultRunnerSystem implements RunnerSystem {
   private readonly metricsRecorder: MetricsRecorder;
   private readonly parallelManager: ParallelManager;
   private readonly activeWorkers = new Map<string, WorkerStatus>();
+  private parallelCancellation = new AbortController();
   private readonly abortControllers = new Map<string, AbortController>();
   private readonly promptEngine: PromptEngine;
   private readonly journalWriter: JournalWriter | undefined;
@@ -128,6 +129,7 @@ export class DefaultRunnerSystem implements RunnerSystem {
 
     try {
       const context = await this.contextAssembler.assemble(request);
+      controller.signal.throwIfAborted();
 
       const sessionKey = `${request.runId}:${request.stateId}:${request.role}`;
       const optimizedArtifacts = this.applyArtifactDiffs(sessionKey, context.inputArtifacts);
@@ -139,6 +141,7 @@ export class DefaultRunnerSystem implements RunnerSystem {
         request,
         optimizedContext,
         onStreamEvent,
+        controller.signal,
       );
     } catch (error: unknown) {
       this.updateWorkerState(workerId, 'failed');
@@ -176,6 +179,7 @@ export class DefaultRunnerSystem implements RunnerSystem {
       readonly constraints: WorkerConstraints;
     },
     onStreamEvent?: StreamEventCallback,
+    signal?: AbortSignal,
   ): Promise<DispatchResult> {
     const runnerKey = context.role.runner;
     if (!runnerKey) {
@@ -285,6 +289,7 @@ export class DefaultRunnerSystem implements RunnerSystem {
 
     try {
       let agentResult: AgentResult;
+      signal?.throwIfAborted();
       if (isSessionCapable(runner)) {
         const dispatchResult = await runner.dispatchWithSession(agentTask, onStreamEvent);
         if (dispatchResult.kind === 'session') {
@@ -344,7 +349,11 @@ export class DefaultRunnerSystem implements RunnerSystem {
     requests: readonly DispatchRequest[],
     createStreamCallback?: (request: DispatchRequest) => StreamEventCallback | undefined,
   ): Promise<readonly DispatchResult[]> {
-    return this.parallelManager.dispatchAll(requests, createStreamCallback);
+    return this.parallelManager.dispatchAll(
+      requests,
+      createStreamCallback,
+      this.parallelCancellation.signal,
+    );
   }
 
   /** @inheritdoc */
@@ -373,12 +382,18 @@ export class DefaultRunnerSystem implements RunnerSystem {
 
   /** @inheritdoc */
   async cancelAllWorkers(): Promise<void> {
+    this.parallelCancellation.abort();
+    this.parallelCancellation = new AbortController();
     const workerIds = [...this.activeWorkers.keys()];
-    await Promise.all(workerIds.map((id) => this.cancelWorker(id)));
+    await Promise.allSettled(workerIds.map((id) => this.cancelWorker(id)));
 
     for (const runner of this.runnerRegistry.values()) {
       if (hasKillAll(runner)) {
-        runner.killAll();
+        try {
+          runner.killAll();
+        } catch {
+          /* Signal the remaining runners even if one backend fails. */
+        }
       }
     }
   }
@@ -424,45 +439,44 @@ export class DefaultRunnerSystem implements RunnerSystem {
           pendingRequest: advance.pendingRequest,
         };
       }
-      if (advance.kind === 'completed') {
-        const sessionArtifacts: ArtifactRef[] = [];
-        if (advance.artifactContent) {
-          const ref = await this.artifactStore.store({
-            type: context.constraints.requiredOutputType,
-            name: `${context.role.id}-output`,
-            content: advance.artifactContent,
-            producedBy: context.role.id,
-          });
-          sessionArtifacts.push(ref);
-        }
-        emitOutputArtifacts(sessionArtifacts);
-        const tu = advance.tokenUsage;
-        const sessionMetrics = tu
-          ? this.metricsRecorder.buildMetrics(
-              startedAt,
-              tu.inputTokens,
-              tu.outputTokens,
-              0,
-              'agent',
-            )
-          : initialMetrics;
-        return {
+      if (advance.kind === 'failed') {
+        throw new Error(advance.error);
+      }
+      const sessionArtifacts: ArtifactRef[] = [];
+      if (advance.artifactContent) {
+        const ref = await this.artifactStore.store({
+          type: context.constraints.requiredOutputType,
+          name: `${context.role.id}-output`,
+          content: advance.artifactContent,
+          producedBy: context.role.id,
+        });
+        sessionArtifacts.push(ref);
+      }
+      emitOutputArtifacts(sessionArtifacts);
+      const tu = advance.tokenUsage;
+      const sessionMetrics = tu
+        ? this.metricsRecorder.buildMetrics(startedAt, tu.inputTokens, tu.outputTokens, 0, 'agent')
+        : initialMetrics;
+      this.recordJournal(
+        {
+          runId: request.runId,
+          stateId: request.stateId,
           workerId,
           role: request.role,
-          status: 'success',
-          outputArtifacts: sessionArtifacts,
-          metrics: sessionMetrics,
-          sessionOutcome: 'completed',
-          sessionRef: handle.ref,
-        };
-      }
+          model: sessionMetrics.modelUsed,
+          inputArtifacts: request.inputArtifacts,
+        },
+        sessionArtifacts,
+        'success',
+        sessionMetrics,
+      );
       return {
         workerId,
         role: request.role,
         status: 'success',
-        outputArtifacts: [],
-        metrics: initialMetrics,
-        sessionOutcome: 'session_active',
+        outputArtifacts: sessionArtifacts,
+        metrics: sessionMetrics,
+        sessionOutcome: 'completed',
         sessionRef: handle.ref,
       };
     }

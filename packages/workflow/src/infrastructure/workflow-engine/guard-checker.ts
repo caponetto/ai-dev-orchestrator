@@ -196,7 +196,7 @@ export class GuardChecker {
     const contractId = guard.params.contract;
     const contract = this.contractRegistry.getContract(contractId);
     if (!contract) {
-      return { guard, passed: true, detail: `No contract "${contractId}" found, allowing` };
+      return { guard, passed: false, detail: `No contract "${contractId}" found` };
     }
     const iterState = this.contractRegistry.getIterationState(contract.id);
     const belowLimit = iterState.currentIteration < contract.maxIterations;

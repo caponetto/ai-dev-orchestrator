@@ -4,7 +4,7 @@ Shared low-level utilities for error handling, YAML parsing, content hashing, fo
 
 ## Architecture Layer
 
-**Foundation** -- pure utility functions with no domain knowledge, used across all layers.
+**Foundation** -- shared utilities with no domain knowledge, used across all layers.
 
 ## Workspace Dependencies
 
@@ -27,3 +27,9 @@ src/
 - `isObject`, `requireString`, `requireNumber`, `requireObject`, `requireStringArray` -- runtime type guards
 - `raceWithTimeout`, `sleep` -- async timing helpers
 - `FRONTMATTER_REGEX` -- frontmatter detection pattern
+
+`OwnedProcess` is implemented and exported directly through
+`@ai-dev-orchestrator/utils/owned-process`. Callers must explicitly opt into POSIX group ownership
+only for a child they spawned detached. It provides idempotent TERM/KILL cleanup, a native-close
+completion promise, deadline/timer cleanup and a shared parent-exit signal backstop. It never
+infers group ownership or scans unrelated processes. This subpath adds no barrel re-export.

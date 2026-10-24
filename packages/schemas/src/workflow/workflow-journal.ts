@@ -2,10 +2,15 @@ import { z } from 'zod/v4';
 
 import { artifactRefSchema } from '../artifacts/artifact-system';
 import { escalationReasonSchema, governanceOutcomeSchema } from '../governance/governance';
+import {
+  entryActionContinuationSchema,
+  persistedStateSchema,
+} from '../persistence/state-persistence';
 
 import { transitionTriggerSchema } from './workflow-engine';
 
 export const JOURNAL_EVENT_TYPES = [
+  'workflow_checkpoint',
   'run_started',
   'run_completed',
   'run_failed',
@@ -50,6 +55,7 @@ export const stateTransitionDataSchema = z.object({
   kind: z.literal('state_transition'),
   from: z.string(),
   to: z.string(),
+  transitionCount: z.number().int().nonnegative().optional(),
   trigger: transitionTriggerSchema,
   durationMs: z.number(),
   guardsEvaluated: z.number(),
@@ -57,6 +63,11 @@ export const stateTransitionDataSchema = z.object({
   governanceRequired: z.boolean(),
   governanceOutcome: governanceOutcomeSchema.optional(),
   contractId: z.string().optional(),
+  iterationCounts: z.record(z.string(), z.number()).optional(),
+  judgeArbitrationCounts: z.record(z.string(), z.number()).optional(),
+  terminalActionsPending: z.boolean().optional(),
+  pendingTerminalState: z.string().optional(),
+  terminalRecoveryState: z.string().optional(),
 });
 export type StateTransitionData = z.infer<typeof stateTransitionDataSchema>;
 
@@ -72,6 +83,8 @@ export const workerEventDataSchema = z.object({
   error: z.string().optional(),
   retryCount: z.number().optional(),
   outputArtifacts: z.array(artifactRefSchema).readonly().optional(),
+  /** Session completion and its action cursor are replayed as one event. */
+  entryActionContinuation: entryActionContinuationSchema.optional(),
 });
 export type WorkerEventData = z.infer<typeof workerEventDataSchema>;
 
@@ -157,7 +170,14 @@ export const scriptEventDataSchema = z.object({
 });
 export type ScriptEventData = z.infer<typeof scriptEventDataSchema>;
 
+export const workflowCheckpointDataSchema = z.object({
+  kind: z.literal('workflow_checkpoint'),
+  state: persistedStateSchema,
+});
+export type WorkflowCheckpointData = z.infer<typeof workflowCheckpointDataSchema>;
+
 export const journalEventDataSchema = z.discriminatedUnion('kind', [
+  workflowCheckpointDataSchema,
   runLifecycleDataSchema,
   stateTransitionDataSchema,
   workerEventDataSchema,
@@ -174,6 +194,7 @@ export type JournalEventData = z.infer<typeof journalEventDataSchema>;
 
 /** Mapped type -- cannot be expressed as Zod schema. */
 export interface JournalEventMap {
+  workflow_checkpoint: WorkflowCheckpointData;
   run_started: RunLifecycleData;
   run_completed: RunLifecycleData;
   run_failed: RunLifecycleData;

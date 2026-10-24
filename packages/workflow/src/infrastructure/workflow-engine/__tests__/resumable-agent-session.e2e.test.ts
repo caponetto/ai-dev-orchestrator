@@ -8,6 +8,7 @@ import type {
   RunnerSystem,
   StatePersistence,
 } from '@ai-dev-orchestrator/ports';
+import { DefaultRoleRegistry } from '@ai-dev-orchestrator/role-system';
 import { AgentSessionReaper, DefaultAgentSessionStore } from '@ai-dev-orchestrator/runner';
 import type {
   AgentSessionSnapshot,
@@ -17,6 +18,7 @@ import type {
   WorkflowDefinition,
   WorkflowRunConfig,
 } from '@ai-dev-orchestrator/schemas';
+import { TEST_ROLES } from '@ai-dev-orchestrator/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 
 import { LifecycleController } from '../lifecycle-controller';
@@ -203,17 +205,19 @@ function makeSupervisor(overrides?: Partial<AgentSessionSupervisor>): AgentSessi
       state: 'running',
       pendingRequests: [],
     }),
-    attach: vi.fn().mockResolvedValue({
-      ref: {
-        sessionId: 'sess-1',
-        runId: 'run-001',
-        stateId: 'IMPL',
-        role: 'implementer',
-        transport: 'stdio',
-      },
-      state: 'awaiting_human',
-      pendingRequests: [],
-    }),
+    attach: vi.fn().mockImplementation((sessionId: string) =>
+      Promise.resolve({
+        ref: {
+          sessionId,
+          runId: 'run-001',
+          stateId: 'IMPL',
+          role: 'implementer',
+          transport: 'stdio',
+        },
+        state: 'awaiting_human',
+        pendingRequests: [],
+      }),
+    ),
     sendHumanResponse: vi.fn().mockResolvedValue(true),
     waitForAdvance: vi.fn().mockResolvedValue({
       kind: 'completed',
@@ -318,6 +322,7 @@ describe('Resumable agent session e2e', () => {
       const runner = makeRunner([sessionPermissionDispatch(), successDispatch()]);
       const persistence = makePersistence();
       const controller = new LifecycleController({
+        roleRegistry: new DefaultRoleRegistry(TEST_ROLES, { assignments: {} }),
         runner,
         artifactStore: makeStore(),
         governanceEngine: makeGovernance(),
@@ -343,6 +348,7 @@ describe('Resumable agent session e2e', () => {
     it('clarification request: pause -> answer -> resume -> complete', async () => {
       const runner = makeRunner([sessionClarificationDispatch(), successDispatch()]);
       const controller = new LifecycleController({
+        roleRegistry: new DefaultRoleRegistry(TEST_ROLES, { assignments: {} }),
         runner,
         artifactStore: makeStore(),
         governanceEngine: makeGovernance(),
@@ -368,6 +374,7 @@ describe('Resumable agent session e2e', () => {
       const supervisor = makeSupervisor();
 
       const controller1 = new LifecycleController({
+        roleRegistry: new DefaultRoleRegistry(TEST_ROLES, { assignments: {} }),
         runner,
         artifactStore: makeStore(),
         governanceEngine: makeGovernance(),
@@ -393,6 +400,7 @@ describe('Resumable agent session e2e', () => {
       });
 
       const controller2 = new LifecycleController({
+        roleRegistry: new DefaultRoleRegistry(TEST_ROLES, { assignments: {} }),
         runner: makeRunner([successDispatch()]),
         artifactStore: makeStore(),
         governanceEngine: makeGovernance(),
@@ -443,6 +451,7 @@ describe('Resumable agent session e2e', () => {
       const supervisor = makeSupervisor();
 
       const controller1 = new LifecycleController({
+        roleRegistry: new DefaultRoleRegistry(TEST_ROLES, { assignments: {} }),
         runner,
         artifactStore: makeStore(),
         governanceEngine: makeGovernance(),
@@ -461,6 +470,7 @@ describe('Resumable agent session e2e', () => {
       expect(checkpoint.waitingContext?.liveSessionId).toBe('rsess-1');
 
       const controller2 = new LifecycleController({
+        roleRegistry: new DefaultRoleRegistry(TEST_ROLES, { assignments: {} }),
         runner: makeRunner([successDispatch()]),
         artifactStore: makeStore(),
         governanceEngine: makeGovernance(),
@@ -482,6 +492,7 @@ describe('Resumable agent session e2e', () => {
       const supervisor = makeSupervisor();
 
       const controller1 = new LifecycleController({
+        roleRegistry: new DefaultRoleRegistry(TEST_ROLES, { assignments: {} }),
         runner,
         artifactStore: makeStore(),
         governanceEngine: makeGovernance(),
@@ -500,6 +511,7 @@ describe('Resumable agent session e2e', () => {
       });
 
       const controller2 = new LifecycleController({
+        roleRegistry: new DefaultRoleRegistry(TEST_ROLES, { assignments: {} }),
         runner: makeRunner([successDispatch()]),
         artifactStore: makeStore(),
         governanceEngine: makeGovernance(),
@@ -596,6 +608,7 @@ describe('Resumable agent session e2e', () => {
     it('legacy non-protocol agent completes without session involvement', async () => {
       const runner = makeRunner([legacyDispatch()]);
       const controller = new LifecycleController({
+        roleRegistry: new DefaultRoleRegistry(TEST_ROLES, { assignments: {} }),
         runner,
         artifactStore: makeStore(),
         governanceEngine: makeGovernance(),
@@ -613,6 +626,7 @@ describe('Resumable agent session e2e', () => {
       const runner = makeRunner([sessionPermissionDispatch(), successDispatch()]);
       const persistence = makePersistence();
       const controller = new LifecycleController({
+        roleRegistry: new DefaultRoleRegistry(TEST_ROLES, { assignments: {} }),
         runner,
         artifactStore: makeStore(),
         governanceEngine: makeGovernance(),

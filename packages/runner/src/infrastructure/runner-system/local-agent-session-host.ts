@@ -17,8 +17,9 @@ import type {
   SessionPendingRequest,
   AgentResult as AgentResultSchema,
 } from '@ai-dev-orchestrator/schemas';
+import type { OwnedProcess } from '@ai-dev-orchestrator/utils/owned-process';
 
-import { extractUsageFromRawLine } from './cli-agent-runner';
+import { extractUsageFromRawLine } from './cli-token-usage';
 import type { StdioProtocolTransport } from './stdio-protocol-transport';
 
 interface LocalSessionResult {
@@ -66,6 +67,7 @@ export class LocalAgentSessionHost {
     process: ChildProcess,
     transport: StdioProtocolTransport,
     startTime: number,
+    private readonly ownership?: OwnedProcess,
   ) {
     this.ref = ref;
     this._process = process;
@@ -96,8 +98,18 @@ export class LocalAgentSessionHost {
     return this._process.pid;
   }
 
+  get cleanupCompletion(): Promise<void> {
+    return this.ownership?.closed ?? Promise.resolve();
+  }
+
   get resultPromise(): Promise<LocalSessionResult> {
-    return this._resultPromise;
+    if (!this.ownership) {
+      return this._resultPromise;
+    }
+    return this._resultPromise.then(async (result) => {
+      await this.cleanupCompletion;
+      return result;
+    });
   }
 
   addStreamHandler(handler: (event: AgentOutputStreamEvent) => void): void {
@@ -116,9 +128,17 @@ export class LocalAgentSessionHost {
     if (!pending) {
       return false;
     }
+    if (
+      pending.kind === 'permission'
+        ? typeof payload['granted'] !== 'boolean' || payload['answer'] !== undefined
+        : typeof payload['answer'] !== 'string' || payload['granted'] !== undefined
+    ) {
+      return false;
+    }
 
+    let sent: boolean;
     if (pending.kind === 'permission') {
-      this._transport.send(
+      sent = this._transport.send(
         createProtocolMessage(
           'permission_response',
           { granted: payload['granted'] === true, reason: payload['reason'] as string | undefined },
@@ -126,13 +146,17 @@ export class LocalAgentSessionHost {
         ),
       );
     } else {
-      this._transport.send(
+      sent = this._transport.send(
         createProtocolMessage(
           'clarification_response',
           { answer: (payload['answer'] as string | undefined) ?? '' },
           requestId,
         ),
       );
+    }
+
+    if (!sent) {
+      return false;
     }
 
     this._pendingRequests.delete(requestId);
@@ -182,17 +206,15 @@ export class LocalAgentSessionHost {
   setTimeout(timeoutMs: number): void {
     this._overallTimer = setTimeout(() => {
       if (this._state !== 'completed' && this._state !== 'failed' && this._state !== 'aborted') {
+        this._state = 'failed';
+        const error = `Session timed out after ${String(timeoutMs)}ms`;
         this.finishResult({
           status: 'timeout',
-          error: `Session timed out after ${String(timeoutMs)}ms`,
+          error,
           durationMs: Date.now() - this._startTime,
         });
-        this._state = 'failed';
-        try {
-          this._process.kill('SIGTERM');
-        } catch {
-          /* already exited */
-        }
+        this.resolveAdvance({ kind: 'failed', error });
+        this.cleanup();
       }
     }, timeoutMs);
   }
@@ -203,6 +225,9 @@ export class LocalAgentSessionHost {
 
   private setupMessageHandling(): void {
     this._transport.onMessage((_msg: ProtocolMessage) => {
+      if (this._state === 'completed' || this._state === 'failed' || this._state === 'aborted') {
+        return;
+      }
       const message = _msg as AgentToOrchestratorMessage;
       this._lastProtocolTimestamp = message.timestamp;
 
@@ -249,6 +274,7 @@ export class LocalAgentSessionHost {
           this.handleClarificationRequest(message);
           break;
         case 'done': {
+          this._finalTokenUsage = message.payload.tokenUsage ?? this._finalTokenUsage;
           this.clearTimer();
           this._state = 'completed';
           const doneResult = {
@@ -258,6 +284,9 @@ export class LocalAgentSessionHost {
             durationMs: Date.now() - this._startTime,
           };
           this.finishResult(doneResult);
+          if (this.ownership) {
+            this.cleanup();
+          }
           this.resolveAdvance({
             kind: 'completed',
             artifactContent: doneResult.artifactContent,
@@ -269,6 +298,9 @@ export class LocalAgentSessionHost {
         case 'error': {
           this.clearTimer();
           this._state = 'failed';
+          if (this.ownership) {
+            this.cleanup();
+          }
           const errMsg = `Agent error [${message.payload.code}]: ${message.payload.message}`;
           this.finishResult({
             status: 'failure',
@@ -419,6 +451,7 @@ export class LocalAgentSessionHost {
   }
 
   private finishResult(result: LocalSessionResult): void {
+    this._pendingRequests.clear();
     if (this._resultResolve) {
       const tokenUsage = result.tokenUsage ?? this.getTokenUsage();
       this._resultResolve(tokenUsage ? { ...result, tokenUsage } : result);
@@ -433,11 +466,19 @@ export class LocalAgentSessionHost {
     }
   }
 
+  private stopProcess(): void {
+    if (this.ownership) {
+      this.ownership.kill();
+    } else {
+      this._process.kill('SIGTERM');
+    }
+  }
+
   private cleanup(): void {
     this.clearTimer();
     this._transport.close();
     try {
-      this._process.kill('SIGTERM');
+      this.stopProcess();
     } catch {
       /* already exited */
     }

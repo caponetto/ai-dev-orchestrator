@@ -18,6 +18,20 @@ function createRegistry(
 
 describe('DefaultRoleRegistry', () => {
   describe('RoleRegistry interface', () => {
+    it('resolves the next tier from the last model used for the role', () => {
+      const registry = new DefaultRoleRegistry(TEST_ROLES, {
+        assignments: { planner: { model: 'small' } },
+        tierConfig: {
+          tiers: [
+            { model: 'small', tier: 1 },
+            { model: 'medium', tier: 2 },
+            { model: 'large', tier: 3 },
+          ],
+        },
+      });
+      expect(registry.getNextTier('planner', 'medium')?.model).toBe('large');
+      expect(registry.getNextTier('planner', 'large')).toBeNull();
+    });
     it('getRole returns role by ID', () => {
       const registry = createRegistry();
       const role = registry.getRole('planner');

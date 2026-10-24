@@ -1,3 +1,7 @@
+import { realpathSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { basename, dirname, join, normalize, resolve, sep } from 'node:path';
+
 import type { PermissionRequestPayload } from '@ai-dev-orchestrator/agent-protocol';
 import type {
   PermissionContext,
@@ -71,7 +75,7 @@ export class DefaultPermissionPolicy implements PermissionPolicy {
       }
     }
 
-    if (targetsRunDirectory(request)) {
+    if (targetsRunDirectory(request, context)) {
       return {
         action: 'grant',
         reason: 'Auto-approved: operation targets .ai run directory',
@@ -101,6 +105,10 @@ export class DefaultPermissionPolicy implements PermissionPolicy {
       };
     }
 
+    if (isDestructiveCommand(request)) {
+      return { action: 'ask_human', reason: 'Destructive command requires human approval' };
+    }
+
     if (isSafeToolCall(request, this.config.safeCommands)) {
       return {
         action: 'grant',
@@ -113,10 +121,6 @@ export class DefaultPermissionPolicy implements PermissionPolicy {
         action: 'grant',
         reason: `Auto-approved: role "${context.role}" has medium trust for low risk`,
       };
-    }
-
-    if (isDestructiveCommand(request)) {
-      return { action: 'ask_human', reason: 'Destructive command requires human approval' };
     }
 
     return { action: this.config.defaultAction, reason: 'Default policy action' };
@@ -146,10 +150,21 @@ export class DefaultPermissionPolicy implements PermissionPolicy {
       if (rule.action !== request.action) {
         return false;
       }
-      if (rule.pattern && !resourceMatchesPattern(request.resource, rule.pattern, repoRoot)) {
+      if (
+        decision === 'grant' &&
+        (request.action === 'file_read' || request.action === 'file_write') &&
+        request.resource.split(/[/\\]/).includes('..')
+      ) {
         return false;
       }
-      if (rule.scope && !resourceMatchesPattern(request.resource, rule.scope, repoRoot)) {
+      const resource =
+        request.action === 'file_read' || request.action === 'file_write'
+          ? normalize(request.resource)
+          : request.resource;
+      if (rule.pattern && !resourceMatchesPattern(resource, rule.pattern, repoRoot)) {
+        return false;
+      }
+      if (rule.scope && !resourceMatchesPattern(resource, rule.scope, repoRoot)) {
         return false;
       }
       return true;
@@ -237,6 +252,9 @@ const SAFE_SHELL_COMMANDS =
   /^\s*(cat|awk|grep|egrep|fgrep|rg|head|tail|wc|sort|uniq|cut|tr|sed|jq|yq|less|more|file|stat|du|df|ls|find|echo|printf|diff|comm|tee|xargs|curl|env|printenv|python3|node)\b/;
 
 function isSafeShellCommand(command: string, projectSafeCommands?: readonly string[]): boolean {
+  if (/[|;&\n\r`<>]|\$[({]/.test(command)) {
+    return false;
+  }
   if (SAFE_SHELL_COMMANDS.test(command)) {
     return true;
   }
@@ -254,6 +272,10 @@ function isSafeToolCall(
   request: PermissionRequestPayload,
   projectSafeCommands?: readonly string[],
 ): boolean {
+  if (request.action === 'shell_execute') {
+    const command = request.toolInput?.['command'];
+    return typeof command === 'string' && isSafeShellCommand(command, projectSafeCommands);
+  }
   const detail = request.detail;
   const toolName = detail.split(':')[0].trim();
   if (SAFE_TOOLS.has(toolName)) {
@@ -261,12 +283,6 @@ function isSafeToolCall(
   }
   if (request.action === 'file_read') {
     return true;
-  }
-  if (request.action === 'shell_execute') {
-    const command = request.toolInput?.['command'];
-    if (typeof command === 'string') {
-      return isSafeShellCommand(command, projectSafeCommands);
-    }
   }
   return false;
 }
@@ -279,16 +295,46 @@ function isDestructiveCommand(request: PermissionRequestPayload): boolean {
   return DESTRUCTIVE_PATTERNS.some((pattern) => pattern.test(command));
 }
 
-const AI_DIR_SEGMENT = `/${AI_CONFIG_DIR_NAME}/`;
+function canonicalPath(path: string): string | null {
+  try {
+    return realpathSync(path);
+  } catch (error: unknown) {
+    if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) {
+      return null;
+    }
+    const parent = dirname(path);
+    const resolvedParent = parent === path ? null : canonicalPath(parent);
+    return resolvedParent === null ? null : join(resolvedParent, basename(path));
+  }
+}
 
-function targetsRunDirectory(request: PermissionRequestPayload): boolean {
+function targetsRunDirectory(
+  request: PermissionRequestPayload,
+  context: PermissionContext,
+): boolean {
+  if (request.action !== 'file_write' || /[/\\]/.test(context.runId)) {
+    return false;
+  }
+  const roots = [join(homedir(), AI_CONFIG_DIR_NAME, 'runs', context.runId)];
+  if (context.repoRoot) {
+    roots.push(join(context.repoRoot, AI_CONFIG_DIR_NAME, 'runs', context.runId));
+  }
+  const allowed = roots.map((root) => canonicalPath(resolve(root))).filter((root) => root !== null);
   const candidates = [
     request.resource,
     typeof request.toolInput?.['file_path'] === 'string' ? request.toolInput['file_path'] : '',
     typeof request.toolInput?.['path'] === 'string' ? request.toolInput['path'] : '',
-    typeof request.toolInput?.['command'] === 'string' ? request.toolInput['command'] : '',
   ];
-  return candidates.some((c) => c.includes(AI_DIR_SEGMENT));
+  return candidates
+    .filter((candidate) => candidate.length > 0)
+    .some((candidate) => {
+      if (candidate.split(/[/\\]/).includes('..')) {
+        return false;
+      }
+      const expanded = candidate.replace(/^~(?=\/)/, homedir());
+      const path = canonicalPath(resolve(context.repoRoot ?? '.', expanded));
+      return path !== null && allowed.some((root) => path === root || path.startsWith(root + sep));
+    });
 }
 
 const READ_ONLY_TOOLS = new Set([
@@ -354,17 +400,18 @@ function isReadOnlyOperation(request: PermissionRequestPayload): boolean {
   if (request.action === 'file_read') {
     return true;
   }
-
-  const toolName = request.detail.split(':')[0].trim();
-  if (READ_ONLY_TOOLS.has(toolName)) {
-    return true;
+  if (request.action === 'file_write') {
+    return false;
   }
 
   if (request.action === 'shell_execute') {
     const command = request.toolInput?.['command'];
-    if (typeof command === 'string') {
-      return isReadOnlyVcsCommand(command);
-    }
+    return typeof command === 'string' && isReadOnlyVcsCommand(command);
+  }
+
+  const toolName = request.detail.split(':')[0].trim();
+  if (request.action === 'custom' && READ_ONLY_TOOLS.has(toolName)) {
+    return true;
   }
 
   return false;
@@ -375,6 +422,7 @@ const SAFE_READ_ONLY_UTILITIES = new Set([
   'echo',
   'head',
   'printf',
+  'jq',
   'sort',
   'tail',
   'uniq',
@@ -382,7 +430,10 @@ const SAFE_READ_ONLY_UTILITIES = new Set([
 ]);
 
 function isReadOnlyVcsCommand(command: string): boolean {
-  const segments = command.split(/&&|\|\||;/);
+  if (/[`]|\$[({]/.test(command) || command.replaceAll(/\d?>&\d\b|&&/g, '').includes('&')) {
+    return false;
+  }
+  const segments = command.split(/&&|\|\||;|\||[\n\r]/);
   if (segments.length === 0) {
     return false;
   }
@@ -390,10 +441,13 @@ function isReadOnlyVcsCommand(command: string): boolean {
 }
 
 function hasFileOutputRedirection(segment: string): boolean {
-  return /(?<![12&])>\s*\S/.test(segment);
+  return /[<>]/.test(segment.replaceAll(/\d?>&\d\b/g, ''));
 }
 
 function isReadOnlySegment(segment: string): boolean {
+  if (hasFileOutputRedirection(segment)) {
+    return false;
+  }
   const pipeHead = segment.split('|')[0].trim();
   const cleaned = pipeHead.replaceAll(/[12]?>&?\d*/g, ' ').trim();
   if (!cleaned) {
@@ -412,6 +466,21 @@ function isReadOnlySegment(segment: string): boolean {
     return false;
   }
   const cmd = cleaned.split(/\s+/)[0];
+  if (
+    cmd === 'sort' &&
+    /(?:^|\s)(?:-[^\s]*o|--output(?:=|\s)|--compress-program(?:=|\s))/.test(cleaned)
+  ) {
+    return false;
+  }
+  if (
+    cmd === 'uniq' &&
+    cleaned
+      .split(/\s+/)
+      .slice(1)
+      .filter((part) => !part.startsWith('-')).length > 1
+  ) {
+    return false;
+  }
   return SAFE_READ_ONLY_UTILITIES.has(cmd);
 }
 

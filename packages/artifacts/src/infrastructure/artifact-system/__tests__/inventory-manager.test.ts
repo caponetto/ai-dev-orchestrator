@@ -6,6 +6,8 @@ import type { ArtifactSummary } from '@ai-dev-orchestrator/schemas';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 
+import { InventoryCorruptionError } from '../../../domain/artifact-system/errors';
+import { computeChecksum } from '../checksum-engine';
 import { InventoryManager } from '../inventory-manager';
 
 function tempRunDir(): string {
@@ -30,6 +32,31 @@ function makeSummary(type: string, name: string, version: number): ArtifactSumma
 }
 
 describe('InventoryManager', () => {
+  it.each(['{{invalid-yaml', 'null', 'artifacts: [null]', 'artifacts: [{type: unknown}]'])(
+    'fails closed on invalid inventory data: %s',
+    (content) => {
+      const dir = tempRunDir();
+      writeFileSync(join(dir, 'inventory.yaml'), content);
+      expect(() => new InventoryManager(dir, 'run-test').getInventory()).toThrow(
+        InventoryCorruptionError,
+      );
+    },
+  );
+
+  it('rejects inconsistent summary identity instead of returning the wrong artifact ref', () => {
+    const dir = tempRunDir();
+    const summary = makeSummary('plan', 'main', 1);
+    writeFileSync(
+      join(dir, 'inventory.yaml'),
+      JSON.stringify({
+        artifacts: [{ ...summary, ref: { ...summary.ref, name: 'different' } }],
+      }),
+    );
+    expect(() => new InventoryManager(dir, 'run-test').getInventory()).toThrow(
+      InventoryCorruptionError,
+    );
+  });
+
   it('starts with empty inventory', () => {
     const dir = tempRunDir();
     const mgr = new InventoryManager(dir, 'run-test');
@@ -111,7 +138,7 @@ describe('InventoryManager', () => {
 
     writeFileSync(
       join(planDir, 'plan_v1.meta.yaml'),
-      'type: plan\nname: plan\nversion: 1\nchecksum: "sha256:abc"\nproducedBy: planner\npredecessorRef: null\ncreatedAt: "2025-01-15T10:00:00Z"\nsizeBytes: 50\n',
+      `type: plan\nname: plan\nversion: 1\nchecksum: "${computeChecksum('plan content')}"\nproducedBy: planner\npredecessorRef: null\ncreatedAt: "2025-01-15T10:00:00Z"\nsizeBytes: 12\n`,
     );
     writeFileSync(join(planDir, 'plan_v1.md'), 'plan content');
 

@@ -1,5 +1,7 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import type { ChildProcess } from 'node:child_process';
+import { EventEmitter } from 'node:events';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -10,15 +12,24 @@ import type { AgentSessionSupervisor, AgentStreamBus } from '@ai-dev-orchestrato
 import type { RunId } from '@ai-dev-orchestrator/schemas';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { loadAllWorkflows, loadWorkflowByName } from '../../composition-root';
+import {
+  loadAllWorkflows,
+  loadWorkflowByName,
+  preflightSelectedModels,
+} from '../../composition-root';
 import { getRunDir, getRunsDir } from '../../workspace-paths';
 import { DefaultDashboardActionHandler } from '../default-dashboard-action-handler';
 
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal();
+  const { EventEmitter } = await import('node:events');
   return {
     ...(actual as object),
-    spawn: vi.fn().mockReturnValue({ unref: vi.fn() }),
+    spawn: vi.fn().mockImplementation(() => {
+      const child = Object.assign(new EventEmitter(), { unref: vi.fn() });
+      queueMicrotask(() => child.emit('spawn'));
+      return child;
+    }),
   };
 });
 
@@ -44,6 +55,7 @@ vi.mock('../../workspace-paths', async (importOriginal) => {
 vi.mock('../../composition-root', () => ({
   loadWorkflowByName: vi.fn(),
   loadAllWorkflows: vi.fn(),
+  preflightSelectedModels: vi.fn().mockResolvedValue({ warnings: [], receipt: 'checked' }),
 }));
 
 vi.mock('@ai-dev-orchestrator/dashboard-server', () => ({
@@ -111,6 +123,246 @@ describe('DefaultDashboardActionHandler', () => {
     } as unknown as Parameters<typeof persistence.save>[0]);
   }
 
+  it('waits for child spawn before acknowledging retry or publishing its request', async () => {
+    await seedRunState('spawn-stage', { currentState: 'FAILED', previousState: 'WORK' });
+    const child = Object.assign(new EventEmitter(), { unref: vi.fn() });
+    vi.mocked(spawn).mockReturnValueOnce(child as unknown as ChildProcess);
+    const bus = makeStreamBus();
+    const publish = vi.spyOn(bus, 'publish');
+    const handler = new DefaultDashboardActionHandler(undefined, bus);
+    let settled = false;
+    const pending = handler.retry('spawn-stage').then((result) => {
+      settled = true;
+      return result;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    expect(publish).not.toHaveBeenCalled();
+    expect(child.unref).not.toHaveBeenCalled();
+    child.emit('spawn');
+    expect(await pending).toMatchObject({ success: true, outcome: 'started' });
+    expect(child.unref).toHaveBeenCalledOnce();
+  });
+
+  it('reports asynchronous spawn failure without publishing a retry and permits another attempt', async () => {
+    await seedRunState('async-failure', { currentState: 'FAILED', previousState: 'WORK' });
+    const child = Object.assign(new EventEmitter(), { unref: vi.fn() });
+    vi.mocked(spawn).mockReturnValueOnce(child as unknown as ChildProcess);
+    const bus = makeStreamBus();
+    const publish = vi.spyOn(bus, 'publish');
+    const handler = new DefaultDashboardActionHandler(undefined, bus);
+    const pending = handler.retry('async-failure');
+    child.emit('error', new Error('asynchronous launch failure'));
+    expect(await pending).toEqual({ success: false, error: 'asynchronous launch failure' });
+    expect(publish).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        structuredData: { action: 'request_failed', error: 'asynchronous launch failure' },
+        stateId: 'FAILED',
+      }),
+    );
+    expect(await handler.retry('async-failure')).toMatchObject({
+      success: true,
+      outcome: 'started',
+    });
+  });
+
+  it('coalesces duplicate retry clicks while launch is pending and clears the pending entry', async () => {
+    await seedRunState('duplicates', { currentState: 'FAILED', previousState: 'WORK' });
+    vi.mocked(spawn).mockClear();
+    const child = Object.assign(new EventEmitter(), { unref: vi.fn() });
+    vi.mocked(spawn).mockReturnValueOnce(child as unknown as ChildProcess);
+    const handler = new DefaultDashboardActionHandler();
+    const a = handler.retry('duplicates');
+    const b = handler.retry('duplicates');
+    expect(spawn).toHaveBeenCalledOnce();
+    child.emit('spawn');
+    expect(await a).toEqual(await b);
+    expect(await handler.retry('duplicates')).toMatchObject({ success: true, outcome: 'started' });
+    expect(spawn).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects a conflicting control while another launch for the same run is pending', async () => {
+    await seedRunState('conflicting', {});
+    vi.mocked(spawn).mockClear();
+    const child = Object.assign(new EventEmitter(), { unref: vi.fn() });
+    vi.mocked(spawn).mockReturnValueOnce(child as unknown as ChildProcess);
+    const handler = new DefaultDashboardActionHandler();
+    const first = handler.approve('conflicting', {});
+    await Promise.resolve();
+    expect(await handler.reject('conflicting', {})).toMatchObject({
+      success: false,
+      error: expect.stringContaining('already starting') as unknown,
+    });
+    child.emit('spawn');
+    expect(await first).toMatchObject({ success: true, outcome: 'started' });
+    expect(spawn).toHaveBeenCalledOnce();
+  });
+
+  it.each(['launch', 'abort'])(
+    'keeps a successful %s outcome when stream notification fails',
+    async (action) => {
+      await seedRunState('notify-fails', {
+        currentState: action === 'launch' ? 'FAILED' : 'WAITING_FOR_HUMAN',
+        previousState: 'WORK',
+      });
+      const bus = makeStreamBus();
+      const publish = vi.spyOn(bus, 'publish');
+      publish.mockImplementation(() => {
+        throw new Error('stream unavailable');
+      });
+      const handler = new DefaultDashboardActionHandler(undefined, bus);
+      const result =
+        action === 'launch'
+          ? await handler.retry('notify-fails')
+          : await handler.abort('notify-fails', {});
+      expect(result).toMatchObject({
+        success: true,
+        outcome: action === 'launch' ? 'started' : 'aborted',
+      });
+    },
+  );
+
+  it('does not publish an abort when checkpoint persistence fails', async () => {
+    await seedRunState('abort-save-fails', {});
+    const save = vi
+      .spyOn(DefaultStatePersistence.prototype, 'save')
+      .mockRejectedValue(new Error('save unavailable'));
+    try {
+      const bus = makeStreamBus();
+      const publish = vi.spyOn(bus, 'publish');
+      expect(
+        await new DefaultDashboardActionHandler(undefined, bus).abort('abort-save-fails', {}),
+      ).toEqual({ success: false, error: 'save unavailable' });
+      expect(publish).not.toHaveBeenCalled();
+    } finally {
+      save.mockRestore();
+    }
+  });
+
+  it.each(['approve', 'reject', 'answer'])(
+    'rejects a stale %s request after the run has completed',
+    async (action) => {
+      await seedRunState('stale-control', { currentState: 'DONE' });
+      vi.mocked(spawn).mockClear();
+      const handler = new DefaultDashboardActionHandler();
+      const result =
+        action === 'answer'
+          ? await handler.answer('stale-control', { content: 'text' })
+          : action === 'approve'
+            ? await handler.approve('stale-control', {})
+            : await handler.reject('stale-control', {});
+      expect(result).toMatchObject({
+        success: false,
+        error: expect.stringContaining('terminal state') as unknown,
+      });
+      expect(spawn).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([new Error('read unavailable'), 'read unavailable'])(
+    'reports state inspection failure without launching: %s',
+    async (failure) => {
+      await seedRunState('read-fails', {});
+      vi.mocked(spawn).mockClear();
+      const load = vi.spyOn(DefaultStatePersistence.prototype, 'load').mockImplementation(() => {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error -- Exercise non-Error persistence failures.
+        throw failure;
+      });
+      try {
+        expect(await new DefaultDashboardActionHandler().approve('read-fails', {})).toEqual({
+          success: false,
+          error: 'read unavailable',
+        });
+        expect(spawn).not.toHaveBeenCalled();
+      } finally {
+        load.mockRestore();
+      }
+    },
+  );
+
+  it.each(['new-session', undefined])(
+    'rechecks session identity after owner release (%s)',
+    async (liveSessionId) => {
+      await seedRunState('session-moved', { waitingContext: { liveSessionId: 'old-session' } });
+      vi.mocked(spawn).mockClear();
+      const store = new DefaultStatePersistence(getRunsDir());
+      const state = store.load('session-moved' as RunId);
+      if (!state) {
+        throw new Error('missing state');
+      }
+      const waitingContext = state.waitingContext;
+      if (!waitingContext) {
+        throw new Error('missing waiting context');
+      }
+      let reads = 0;
+      const load = vi.spyOn(DefaultStatePersistence.prototype, 'load').mockImplementation(() => {
+        if (reads++ === 0) {
+          return state;
+        }
+        return {
+          ...state,
+          waitingContext: liveSessionId ? { ...waitingContext, liveSessionId } : undefined,
+        };
+      });
+      try {
+        expect(
+          await new DefaultDashboardActionHandler().approve('session-moved', {
+            sessionId: 'old-session',
+          }),
+        ).toMatchObject({
+          success: false,
+          error: expect.stringContaining('Session ID mismatch') as unknown,
+        });
+        expect(spawn).not.toHaveBeenCalled();
+      } finally {
+        load.mockRestore();
+      }
+    },
+  );
+
+  it('reports completion winning an abort race without publishing an aborted event', async () => {
+    const runId = 'completion-wins';
+    await seedRunState(runId, { currentState: 'DONE' });
+    const path = join(getRunDir(runId), 'state.yaml');
+    const done = readFileSync(path, 'utf8');
+    await seedRunState(runId, { currentState: 'WAITING_FOR_HUMAN' });
+    const store = new DefaultStatePersistence(getRunsDir());
+    const acquire = store.acquireLock.bind(store);
+    const lock = vi
+      .spyOn(DefaultStatePersistence.prototype, 'acquireLock')
+      .mockImplementation((id) => {
+        writeFileSync(path, done);
+        return acquire(id);
+      });
+    try {
+      const bus = makeStreamBus();
+      const publish = vi.spyOn(bus, 'publish');
+      expect(
+        await new DefaultDashboardActionHandler(undefined, bus).abort(runId, {}),
+      ).toMatchObject({
+        success: true,
+        outcome: 'already_terminal',
+        finalState: 'DONE',
+      });
+      expect(publish).not.toHaveBeenCalled();
+    } finally {
+      lock.mockRestore();
+    }
+  });
+
+  it('aborts pending terminal cleanup instead of announcing an already-finished run', async () => {
+    await seedRunState('pending-abort', {
+      currentState: 'DONE',
+      pendingTerminalState: 'DONE',
+      terminalRecoveryState: 'WORK',
+    });
+    expect(await new DefaultDashboardActionHandler().abort('pending-abort', {})).toMatchObject({
+      success: true,
+      outcome: 'aborted',
+      finalState: 'ABORTED',
+    });
+  });
+
   it('abort calls supervisor.abort with liveSessionId from state', async () => {
     const abortMock = vi.fn().mockResolvedValue(true);
     const supervisor = makeSupervisor({ abort: abortMock });
@@ -127,6 +379,57 @@ describe('DefaultDashboardActionHandler', () => {
     const result = await handler.abort('run-1', {});
     expect(result.success).toBe(true);
     expect(abortMock).toHaveBeenCalledWith('sess-42', 'Aborted via dashboard');
+  });
+
+  it('does not cancel a session when the abort request loses run ownership', async () => {
+    await seedRunState('run-losing-abort', { waitingContext: { liveSessionId: 'session' } });
+    const abort = vi.fn().mockResolvedValue(true);
+    const acquire = vi
+      .spyOn(DefaultStatePersistence.prototype, 'acquireLock')
+      .mockImplementation(() => {
+        throw new Error('owned elsewhere');
+      });
+    try {
+      const result = await new DefaultDashboardActionHandler(makeSupervisor({ abort })).abort(
+        'run-losing-abort',
+        {},
+      );
+      expect(result).toEqual({ success: false, error: 'owned elsewhere' });
+      expect(abort).not.toHaveBeenCalled();
+    } finally {
+      acquire.mockRestore();
+    }
+  });
+
+  it('rejects a stale session abort before signalling the current run process', async () => {
+    const abort = vi.fn().mockResolvedValue(true);
+    const supervisor = makeSupervisor({ abort });
+    const streamBus = makeStreamBus();
+    const publish = vi.spyOn(streamBus, 'publish');
+    const handler = new DefaultDashboardActionHandler(supervisor, streamBus);
+    await seedRunState('run-stale-abort', {
+      waitingContext: { liveSessionId: 'current-session' },
+    });
+    const lockPath = join(getRunDir('run-stale-abort'), 'run.lock');
+    const lockContent = JSON.stringify({ pid: 424242, hostname: hostname() });
+    writeFileSync(lockPath, lockContent);
+    const kill = vi.spyOn(process, 'kill').mockReturnValue(true);
+    try {
+      const result = await handler.abort('run-stale-abort', { sessionId: 'stale-session' });
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Session ID mismatch: expected current-session, got stale-session',
+      });
+      expect(kill).not.toHaveBeenCalled();
+      expect(abort).not.toHaveBeenCalled();
+      expect(publish).not.toHaveBeenCalled();
+      expect(
+        new DefaultStatePersistence(getRunsDir()).load('run-stale-abort' as RunId),
+      ).toMatchObject({ currentState: 'WAITING_FOR_HUMAN' });
+    } finally {
+      kill.mockRestore();
+    }
   });
 
   it('abort calls supervisor.abort with explicit sessionId', async () => {
@@ -210,11 +513,84 @@ describe('DefaultDashboardActionHandler', () => {
   });
 
   describe('retry', () => {
+    it('leaves a failed checkpoint intact when the retry process cannot be started', async () => {
+      await seedRunState('run-spawn-failure', {
+        currentState: 'FAILED',
+        previousState: 'IMPLEMENTATION',
+      });
+      const persistence = new DefaultStatePersistence(getRunsDir());
+      const original = persistence.load('run-spawn-failure' as RunId);
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        throw new Error('cannot start retry process');
+      });
+
+      const result = await new DefaultDashboardActionHandler().retry('run-spawn-failure');
+
+      expect(result).toEqual({ success: false, error: 'cannot start retry process' });
+      expect(persistence.load('run-spawn-failure' as RunId)).toEqual(original);
+    });
+
+    it('rejects retry of a completed success without changing its checkpoint', async () => {
+      await seedRunState('run-completed', { currentState: 'DONE', previousState: 'WRAP_UP' });
+      const result = await new DefaultDashboardActionHandler().retry('run-completed');
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('completed');
+      expect(
+        new DefaultStatePersistence(getRunsDir()).load('run-completed' as RunId)?.currentState,
+      ).toBe('DONE');
+    });
+
+    it('rejects retry while unfinished terminal cleanup has a live owner', async () => {
+      await seedRunState('run-owned-cleanup', {
+        currentState: 'WRAP_UP',
+        previousState: 'WRAP_UP',
+        pendingTerminalState: 'DONE',
+      });
+      const persistence = new DefaultStatePersistence(getRunsDir());
+      const lock = persistence.acquireLock('run-owned-cleanup' as RunId);
+      const kill = vi.spyOn(process, 'kill').mockReturnValue(true);
+      try {
+        const result = await new DefaultDashboardActionHandler().retry('run-owned-cleanup');
+        expect(result.success).toBe(false);
+        expect(result.error).toContain('active');
+        expect(kill).not.toHaveBeenCalledWith(-process.pid, 'SIGTERM');
+        expect(existsSync(lock.lockPath)).toBe(true);
+      } finally {
+        kill.mockRestore();
+        persistence.releaseLock(lock);
+      }
+    });
+
     it('returns error when run directory does not exist', async () => {
       const handler = new DefaultDashboardActionHandler();
       const result = await handler.retry('nonexistent-run');
       expect(result.success).toBe(false);
       expect(result.error).toContain('not found');
+    });
+
+    it('retries pending terminal cleanup without rewinding the source state or clearing its cursor', async () => {
+      await seedRunState('run-pending', {
+        currentState: 'WRAP_UP',
+        previousState: 'WRAP_UP',
+        pendingTerminalState: 'DONE',
+        terminalRecoveryState: 'WRAP_UP',
+        entryActionContinuation: {
+          stateId: 'DONE',
+          nextActionIndex: 1,
+          completedResults: [
+            {
+              action: { type: 'notify_human', params: { reason: 'completed first action' } },
+              success: true,
+            },
+          ],
+        },
+      });
+      const result = await new DefaultDashboardActionHandler().retry('run-pending');
+      expect(result.success).toBe(true);
+      const saved = new DefaultStatePersistence(getRunsDir()).load('run-pending' as RunId);
+      expect(saved?.currentState).toBe('WRAP_UP');
+      expect(saved?.pendingTerminalState).toBe('DONE');
+      expect(saved?.entryActionContinuation?.nextActionIndex).toBe(1);
     });
 
     it('returns error when run is not in a terminal state', async () => {
@@ -254,7 +630,7 @@ describe('DefaultDashboardActionHandler', () => {
       expect(result.error).toContain('terminal state');
     });
 
-    it('rewrites checkpoint and spawns CLI on valid aborted run', async () => {
+    it('spawns retry without rewriting an aborted checkpoint before the child owns its lock', async () => {
       const handler = new DefaultDashboardActionHandler();
       await seedRunState('run-1', {
         currentState: 'ABORTED',
@@ -268,10 +644,10 @@ describe('DefaultDashboardActionHandler', () => {
       const runsDir = getRunsDir();
       const persistence = new DefaultStatePersistence(runsDir);
       const state = persistence.load('run-1' as RunId);
-      expect(state?.currentState).toBe('IMPLEMENTATION');
+      expect(state?.currentState).toBe('ABORTED');
     });
 
-    it('rewrites checkpoint for FAILED runs', async () => {
+    it('preserves a FAILED checkpoint for the engine to retry under its lock', async () => {
       const handler = new DefaultDashboardActionHandler();
       await seedRunState('run-1', {
         currentState: 'FAILED',
@@ -285,7 +661,7 @@ describe('DefaultDashboardActionHandler', () => {
       const runsDir = getRunsDir();
       const persistence = new DefaultStatePersistence(runsDir);
       const state = persistence.load('run-1' as RunId);
-      expect(state?.currentState).toBe('CODE_REVIEW');
+      expect(state?.currentState).toBe('FAILED');
     });
   });
 
@@ -428,8 +804,8 @@ describe('DefaultDashboardActionHandler', () => {
           type: 'status',
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           structuredData: expect.objectContaining({
-            action: 'approved',
-            granted: true,
+            action: 'approval_requested',
+            outcome: 'started',
           }),
         }),
       );
@@ -445,7 +821,7 @@ describe('DefaultDashboardActionHandler', () => {
       expect(vi.mocked(streamBus.publish)).toHaveBeenCalledWith(
         expect.objectContaining({
           runId: 'run-no-req',
-          content: 'Approved',
+          content: 'Approval requested',
         }),
       );
     });
@@ -476,7 +852,7 @@ describe('DefaultDashboardActionHandler', () => {
       expect(vi.mocked(streamBus.publish)).toHaveBeenCalledWith(
         expect.objectContaining({
           runId: 'run-rej-noreq',
-          content: 'Rejected',
+          content: 'Rejection requested',
         }),
       );
     });
@@ -500,8 +876,8 @@ describe('DefaultDashboardActionHandler', () => {
           runId: 'run-rej-bus',
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           structuredData: expect.objectContaining({
-            action: 'rejected',
-            granted: false,
+            action: 'rejection_requested',
+            outcome: 'started',
           }),
         }),
       );
@@ -549,8 +925,8 @@ describe('DefaultDashboardActionHandler', () => {
           runId: 'run-ans-bus',
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           structuredData: expect.objectContaining({
-            action: 'answered',
-            messageType: 'clarification_response',
+            action: 'text_requested',
+            outcome: 'started',
           }),
         }),
       );
@@ -599,7 +975,7 @@ describe('DefaultDashboardActionHandler', () => {
           runId: 'run-retry-bus',
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           structuredData: expect.objectContaining({
-            action: 'retrying',
+            action: 'retry_requested',
             fromState: 'IMPLEMENTATION',
           }),
         }),
@@ -788,7 +1164,7 @@ describe('DefaultDashboardActionHandler', () => {
       );
       expect(errorEvent).toBeDefined();
       expect((errorEvent?.[0] as unknown as Record<string, unknown>).structuredData).toEqual(
-        expect.objectContaining({ action: 'error', error: 'spawn failed' }),
+        expect.objectContaining({ action: 'request_failed', error: 'spawn failed' }),
       );
     });
 
@@ -812,6 +1188,17 @@ describe('DefaultDashboardActionHandler', () => {
   });
 
   describe('createRun', () => {
+    it('returns model failures without spawning a CLI process', async () => {
+      vi.mocked(spawn).mockClear();
+      vi.mocked(preflightSelectedModels).mockRejectedValueOnce(new Error('Model retired: planner'));
+      const handler = new DefaultDashboardActionHandler();
+
+      const result = await handler.createRun({ prompt: 'Build a feature' });
+
+      expect(result).toEqual({ success: false, error: 'Model retired: planner' });
+      expect(spawn).not.toHaveBeenCalled();
+    });
+
     it('returns error for empty prompt', async () => {
       const handler = new DefaultDashboardActionHandler();
       const result = await handler.createRun({ prompt: '   ' });
@@ -825,6 +1212,8 @@ describe('DefaultDashboardActionHandler', () => {
       const result = await handler.createRun({ prompt: 'Build a feature' });
       expect(result.success).toBe(true);
       expect(vi.mocked(spawn)).toHaveBeenCalled();
+      const options = vi.mocked(spawn).mock.calls[0]?.[2];
+      expect(options.env?.['AI_ORCHESTRATOR_MODEL_PREFLIGHT']).toBe('checked');
     });
 
     it('returns error when spawn throws', async () => {
@@ -850,7 +1239,12 @@ describe('DefaultDashboardActionHandler', () => {
 
   it('force aborts a lock-only run before the first checkpoint exists', async () => {
     const handler = new DefaultDashboardActionHandler();
-    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation((_pid, signal) => {
+      if (signal === 0) {
+        throw Object.assign(new Error('terminated'), { code: 'ESRCH' });
+      }
+      return true;
+    });
     const runId = 'run-1';
     const runDir = getRunDir(runId);
     const lockPath = join(runDir, 'run.lock');

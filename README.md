@@ -61,7 +61,10 @@ ai config show           # Display merged configuration
 ai version               # Version, commit SHA, build info
 ```
 
-All commands accept `--json` for machine-readable output and `--verbose` for detail. `run`, `resume`, and `retry` also accept `--repo <path>`.
+All commands accept `--json` for machine-readable output and `--verbose` for detail.
+Workflow commands return exit code 3 for FAILED and 4 for ABORTED; zero also covers a pause for
+human input. Inspect `outcome` and `finalState` in JSON results to distinguish completion from a
+pause (see [CLI result semantics](docs/subsystems/cli.md#workflow-results-and-process-exit-codes)). `run`, `resume`, and `retry` also accept `--repo <path>`.
 
 ## Architecture
 

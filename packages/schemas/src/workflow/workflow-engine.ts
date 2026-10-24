@@ -366,6 +366,7 @@ export const runResultSchema = z.object({
   finalState: z.string(),
   artifactInventory: z.array(artifactRefSchema).readonly(),
   manifest: runManifestSchema,
+  answerAccepted: z.boolean().optional(),
 });
 export type RunResult = z.infer<typeof runResultSchema>;
 
@@ -373,6 +374,15 @@ export const humanInputSchema = z.object({
   type: z.enum(['text', 'approval', 'rejection']),
   content: z.string(),
   artifactRef: artifactRefSchema.optional(),
+  sessionId: z.string().min(1).optional(),
+  requestId: z.string().min(1).optional(),
+  waitIdentity: z
+    .object({
+      stateId: z.string(),
+      requestingState: z.string(),
+      waitingSince: z.string(),
+    })
+    .optional(),
 });
 export type HumanInput = z.infer<typeof humanInputSchema>;
 
@@ -446,6 +456,10 @@ export const workerResultSchema = z.object({
   errorType: workerErrorTypeSchema.optional(),
   artifactRef: artifactRefSchema.optional(),
   model: z.string().optional(),
+  taskId: z.string().optional(),
+  sessionOutcome: sessionDispatchOutcomeSchema.optional(),
+  sessionRef: agentSessionRefSchema.optional(),
+  pendingRequest: sessionPendingRequestSchema.optional(),
 });
 export type WorkerResult = z.infer<typeof workerResultSchema>;
 

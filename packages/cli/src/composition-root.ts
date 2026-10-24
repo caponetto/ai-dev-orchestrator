@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -89,7 +90,6 @@ import {
   FilesystemManifestWriter,
 } from '@ai-dev-orchestrator/run-manifest';
 import {
-  AgentSessionReaper,
   AgentSessionRegistry,
   CliAgentRunner,
   CompositeAgentSessionSupervisor,
@@ -102,7 +102,6 @@ import {
   HttpAgentRunner,
   LocalAgentSessionSupervisor,
   RemoteAgentSessionSupervisor,
-  WebSocketProtocolTransport,
 } from '@ai-dev-orchestrator/runner';
 import type { LiveRequestStore } from '@ai-dev-orchestrator/runner';
 import type {
@@ -125,7 +124,12 @@ import { LifecycleController } from '@ai-dev-orchestrator/workflow';
 
 import type { ConfigSnapshot } from './config-snapshot';
 import { configSnapshotSchema, resolveRunModelAssignments } from './config-snapshot';
+import { connectRemoteWebSocket } from './connect-remote-websocket';
+import { installShutdownDeadline } from './install-shutdown-deadline';
+import { validateSelectedModels } from './model-preflight';
 import { loadDefaultWorkflow, loadProjectConfig } from './project-config';
+import { ResumeStatePersistence } from './resume-state-persistence';
+import { loadLatestRunState } from './run-state-recovery';
 import {
   getAiDir,
   getConfigSnapshotPath,
@@ -390,6 +394,46 @@ function validateRunnerAvailability(
   }
 }
 
+function buildRoleRegistry(
+  roleContracts: readonly RoleContract[],
+  modelAssignments: Readonly<Record<string, { model: string; maxTokens?: number }>>,
+  dispatchOverrides?: Readonly<Record<string, DispatchOverride>>,
+): DefaultRoleRegistry {
+  const defaultModel = loadRunnerRegistry()[0]?.models[0];
+  if (!defaultModel) {
+    throw new Error('Runner registry is empty — no default model available');
+  }
+  return new DefaultRoleRegistry(
+    roleContracts,
+    { assignments: modelAssignments, defaultAssignment: { model: defaultModel } },
+    dispatchOverrides,
+  );
+}
+
+/** Verify configured models before allocating a run or spawning a detached CLI. */
+export async function preflightSelectedModels(
+  repoRoot: string,
+): Promise<{ warnings: string[]; receipt?: string }> {
+  const config = loadConfiguration();
+  if (config.isFixture) {
+    return { warnings: [] };
+  }
+  const registry = buildRoleRegistry(
+    loadRoleContracts(),
+    config.configModelAssignments,
+    config.configDispatchOverrides,
+  );
+  const fingerprint = createHash('sha256')
+    .update(JSON.stringify({ repoRoot, config: config.mergedConfig, roles: registry.listRoles() }))
+    .digest('hex');
+  const [verifiedFingerprint, checkedAt] =
+    process.env['AI_ORCHESTRATOR_MODEL_PREFLIGHT']?.split(':') ?? [];
+  const age = Date.now() - Number(checkedAt);
+  const verified = verifiedFingerprint === fingerprint && age >= 0 && age < 60_000;
+  const warnings = await validateSelectedModels(registry, repoRoot, verified);
+  return { warnings, receipt: `${fingerprint}:${String(Date.now())}` };
+}
+
 function loadRoleContracts(): RoleContract[] {
   const rolesPath = join(getAiDir(), 'roles.yaml');
   if (existsSync(rolesPath)) {
@@ -433,6 +477,7 @@ function buildFixtureDispatchOverrides(
 // ---------------------------------------------------------------------------
 
 interface InfraParams {
+  readonly statePersistence?: DefaultStatePersistence;
   readonly runId: string;
   readonly runDir: string;
   readonly repoRoot: string;
@@ -452,34 +497,6 @@ interface InfraResult {
   readonly roleRegistry: DefaultRoleRegistry;
 }
 
-function createWebSocketTransportFactory(supervisor: RemoteAgentSessionSupervisor): void {
-  supervisor.setTransportFactory(async (_ref, meta) => {
-    const baseUrl = meta.websocketUrl ?? meta.reconnectUrl;
-    let wsUrl = baseUrl;
-    if (meta.authHeader) {
-      const headers: Record<string, string> = {};
-      const [key, ...rest] = meta.authHeader.split(':');
-      if (key && rest.length > 0) {
-        headers[key.trim()] = rest.join(':').trim();
-      }
-      const authValue = headers['Authorization'];
-      if (authValue) {
-        wsUrl = `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}auth=${encodeURIComponent(authValue)}`;
-      }
-    }
-    const ws = new globalThis.WebSocket(wsUrl);
-    await new Promise<void>((resolve, reject) => {
-      ws.addEventListener('open', () => {
-        resolve();
-      });
-      ws.addEventListener('error', () => {
-        reject(new Error('WebSocket connection failed'));
-      });
-    });
-    return new WebSocketProtocolTransport(ws);
-  });
-}
-
 async function buildOrchestratorInfra(params: InfraParams): Promise<InfraResult> {
   const { runId, runDir, repoRoot, journalWriter } = params;
   const runsDir = getRunsDir();
@@ -497,7 +514,7 @@ async function buildOrchestratorInfra(params: InfraParams): Promise<InfraResult>
     readPersistedConfigSnapshot(runDir),
   );
 
-  const statePersistence = new DefaultStatePersistence(runsDir);
+  const statePersistence = params.statePersistence ?? new DefaultStatePersistence(runsDir);
   const manifestProducer = new DefaultManifestProducer();
 
   const eventBus = new InMemoryEventBus({ runId });
@@ -517,19 +534,7 @@ async function buildOrchestratorInfra(params: InfraParams): Promise<InfraResult>
     : Object.keys(configDispatchOverrides).length > 0
       ? configDispatchOverrides
       : undefined;
-  const runnerRegistryEntries = loadRunnerRegistry();
-  const defaultModel = runnerRegistryEntries[0]?.models[0];
-  if (!defaultModel) {
-    throw new Error('Runner registry is empty — no default model available');
-  }
-  const roleRegistry = new DefaultRoleRegistry(
-    roleContracts,
-    {
-      assignments: configModelAssignments,
-      defaultAssignment: { model: defaultModel },
-    },
-    dispatchOverrides,
-  );
+  const roleRegistry = buildRoleRegistry(roleContracts, configModelAssignments, dispatchOverrides);
 
   const templateRegistry = new DefaultTemplateRegistry();
   for (const t of loadPromptTemplates()) {
@@ -562,7 +567,9 @@ async function buildOrchestratorInfra(params: InfraParams): Promise<InfraResult>
   const sessionRegistry = new AgentSessionRegistry(sessionStore);
   const localSupervisor = new LocalAgentSessionSupervisor(sessionRegistry);
   const remoteSupervisor = new RemoteAgentSessionSupervisor(sessionRegistry);
-  createWebSocketTransportFactory(remoteSupervisor);
+  remoteSupervisor.setTransportFactory((_ref, meta, signal) =>
+    connectRemoteWebSocket(meta, signal),
+  );
   const sessionSupervisor = new CompositeAgentSessionSupervisor([
     localSupervisor,
     remoteSupervisor,
@@ -627,7 +634,6 @@ async function buildOrchestratorInfra(params: InfraParams): Promise<InfraResult>
   const agentStreamBus = new FileBackedAgentStreamBus(runsDir);
 
   const shutdownCoordinator = new ShutdownCoordinator(statePersistence, journalWriter);
-  shutdownCoordinator.install();
 
   const engine = new LifecycleController({
     runner,
@@ -649,6 +655,8 @@ async function buildOrchestratorInfra(params: InfraParams): Promise<InfraResult>
     logger,
   });
 
+  installShutdownDeadline(shutdownCoordinator, logger);
+
   return {
     engine,
     statePersistence,
@@ -669,6 +677,7 @@ async function buildOrchestratorInfra(params: InfraParams): Promise<InfraResult>
 
 /** Wire all infrastructure and create a fresh orchestrator context for a new run. */
 export async function createOrchestrator(repoRoot: string): Promise<OrchestratorContext> {
+  const { warnings: modelWarnings } = await preflightSelectedModels(repoRoot);
   const runId = createRunId();
   const runDir = getRunDir(runId);
   mkdirSync(runDir, { recursive: true });
@@ -679,27 +688,36 @@ export async function createOrchestrator(repoRoot: string): Promise<Orchestrator
 
   const infra = await buildOrchestratorInfra({ runId, runDir, repoRoot, journalWriter });
 
-  writeFileSync(
-    getConfigSnapshotPath(runDir),
-    JSON.stringify(sanitizeConfigForDashboard(infra.config, infra.roleRegistry, repoRoot), null, 2),
-    'utf8',
-  );
+  try {
+    writeFileSync(
+      getConfigSnapshotPath(runDir),
+      JSON.stringify(
+        sanitizeConfigForDashboard(infra.config, infra.roleRegistry, repoRoot),
+        null,
+        2,
+      ),
+      'utf8',
+    );
 
-  return {
-    engine: infra.engine,
-    journalWriter,
-    journalReader,
-    statePersistence: infra.statePersistence,
-    agentStreamBus: infra.agentStreamBus,
-    liveRequestStore: infra.liveRequestStore,
-    artifactStore: infra.artifactStore,
-    runId,
-    runDir,
-    warnings: infra.warnings,
-    budgetConfig: infra.config.governance.budget,
-    reportOutputPath: infra.config.runtime.reportOutputPath,
-    shutdownCoordinator: infra.shutdownCoordinator,
-  };
+    return {
+      engine: infra.engine,
+      journalWriter,
+      journalReader,
+      statePersistence: infra.statePersistence,
+      agentStreamBus: infra.agentStreamBus,
+      liveRequestStore: infra.liveRequestStore,
+      artifactStore: infra.artifactStore,
+      runId,
+      runDir,
+      warnings: [...modelWarnings, ...infra.warnings],
+      budgetConfig: infra.config.governance.budget,
+      reportOutputPath: infra.config.runtime.reportOutputPath,
+      shutdownCoordinator: infra.shutdownCoordinator,
+    };
+  } catch (error: unknown) {
+    infra.shutdownCoordinator.uninstall();
+    throw error;
+  }
 }
 
 /** Re-wire the orchestrator from an existing run's persisted state. */
@@ -707,65 +725,76 @@ export async function resumeOrchestrator(
   repoRoot: string,
   runId: string,
 ): Promise<OrchestratorContext> {
+  const statePersistence = new ResumeStatePersistence(getRunsDir(), runId);
   const runDir = getRunDir(runId);
   const journalPath = getJournalPath(runDir);
 
   const journalReader = new DefaultJournalReader(journalPath);
   const existingEvents = journalReader.readAll();
-  const startSequence = existingEvents.length;
-
-  const journalWriter = new DefaultJournalWriter(journalPath, runId, startSequence);
-
-  const infra = await buildOrchestratorInfra({ runId, runDir, repoRoot, journalWriter });
-
-  await infra.sessionRegistry.rebuild();
-
-  const sessionStore = new DefaultAgentSessionStore(getRunsDir());
-  const reaper = new AgentSessionReaper(sessionStore, {
-    retentionMs: 0,
-    reapOrphans: true,
-    reapTerminal: false,
-  });
-  void reaper.reap(runId).catch(() => {
-    /* best-effort orphan cleanup */
-  });
-
-  let checkpoint = infra.statePersistence.load(runId as RunId);
-  checkpoint ??= infra.statePersistence.reconstructFromJournal(
-    runId as RunId,
-    journalReader.readAll(),
+  const startSequence = existingEvents.reduce(
+    (maximum, event) => Math.max(maximum, event.sequence),
+    0,
   );
-  if (checkpoint) {
-    const workflow = resolveWorkflowForResume(runDir, checkpoint);
-    const sources = readPersistedSources(runDir);
-    infra.engine.restore(
-      createRunConfig(runId, sources, workflow, {
-        maxTokens:
-          workflow.budget?.maxTokensPerRun ?? infra.config.governance.budget?.maxTokensPerRun,
-        alertThresholds: infra.config.governance.budget?.alertThresholds,
-        reportOutputPath: infra.config.runtime.reportOutputPath,
-        runDir,
-        repoRoot,
-      }),
-      checkpoint,
-    );
-  }
 
-  return {
-    engine: infra.engine,
-    journalWriter,
-    journalReader,
-    statePersistence: infra.statePersistence,
-    agentStreamBus: infra.agentStreamBus,
-    liveRequestStore: infra.liveRequestStore,
-    artifactStore: infra.artifactStore,
+  const journalWriter = statePersistence.guardJournal(
+    new DefaultJournalWriter(journalPath, runId, startSequence),
+  );
+
+  const { state: checkpoint } = loadLatestRunState(
+    statePersistence,
+    runId as RunId,
+    existingEvents,
+  );
+  repoRoot = checkpoint?.repoRoot ?? repoRoot;
+  const infra = await buildOrchestratorInfra({
     runId,
     runDir,
-    warnings: infra.warnings,
-    budgetConfig: infra.config.governance.budget,
-    reportOutputPath: infra.config.runtime.reportOutputPath,
-    shutdownCoordinator: infra.shutdownCoordinator,
-  };
+    repoRoot,
+    journalWriter,
+    statePersistence,
+  });
+
+  try {
+    await infra.sessionRegistry.rebuild();
+
+    // Session discovery is read-only. Orphan cleanup must not race a live owner;
+    // session reconciliation/finalization is performed by the engine after acquiring ownership.
+
+    if (checkpoint) {
+      const workflow = resolveWorkflowForResume(runDir, checkpoint);
+      const sources = readPersistedSources(runDir);
+      infra.engine.restore(
+        createRunConfig(runId, sources, workflow, {
+          maxTokens:
+            workflow.budget?.maxTokensPerRun ?? infra.config.governance.budget?.maxTokensPerRun,
+          alertThresholds: infra.config.governance.budget?.alertThresholds,
+          reportOutputPath: infra.config.runtime.reportOutputPath,
+          runDir,
+          repoRoot,
+        }),
+        checkpoint,
+      );
+    }
+
+    return {
+      engine: infra.engine,
+      journalWriter,
+      journalReader,
+      statePersistence: infra.statePersistence,
+      agentStreamBus: infra.agentStreamBus,
+      liveRequestStore: infra.liveRequestStore,
+      artifactStore: infra.artifactStore,
+      runId,
+      runDir,
+      warnings: infra.warnings,
+      budgetConfig: infra.config.governance.budget,
+      reportOutputPath: infra.config.runtime.reportOutputPath,
+      shutdownCoordinator: infra.shutdownCoordinator,
+    };
+  } catch (error: unknown) {
+    infra.shutdownCoordinator.uninstall();
+    throw error;
+  }
 }
 
 // ---------------------------------------------------------------------------

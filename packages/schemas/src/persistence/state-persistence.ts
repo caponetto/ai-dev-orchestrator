@@ -3,7 +3,21 @@ import { z } from 'zod/v4';
 import { artifactRefSchema } from '../artifacts/artifact-system';
 import { runIdSchema } from '../shared/shared';
 import { liveRequestKindSchema, sessionTransportSchema } from '../shared/string-enums';
-import type { ActionResult } from '../workflow/workflow-engine';
+import type { ActionResult, HumanInput } from '../workflow/workflow-engine';
+
+export const entryActionContinuationSchema = z.object({
+  stateId: z.string(),
+  completedResults: z.array(z.custom<ActionResult>()).readonly(),
+  nextActionIndex: z.number().int().nonnegative(),
+  waitRequestingState: z.string().optional(),
+  completedExitResults: z.array(z.custom<ActionResult>()).readonly().optional(),
+  humanFeedback: z.string().optional(),
+  previousReviewContent: z.string().optional(),
+  iterationCount: z.number().optional(),
+  resumeInput: z.custom<HumanInput>().optional(),
+  resumeWaitingContext: z.custom<PersistedWaitingContext>().optional(),
+});
+export type EntryActionContinuation = z.infer<typeof entryActionContinuationSchema>;
 
 export const budgetExhaustionContextSchema = z.object({
   limitType: z.literal('token'),
@@ -51,6 +65,10 @@ export const persistedStateSchema = z.object({
   cumulativeInputTokens: z.number().optional(),
   cumulativeOutputTokens: z.number().optional(),
   hasReceivedUsage: z.boolean().optional(),
+  budgetApproved: z.boolean().optional(),
+  executionPaused: z.boolean().optional(),
+  pendingTerminalState: z.string().optional(),
+  terminalRecoveryState: z.string().optional(),
   governanceDecisionCount: z.number().optional(),
   escalationCount: z.number().optional(),
   workerMetricsByRole: z
@@ -68,6 +86,14 @@ export const persistedStateSchema = z.object({
   dispatchCounter: z.number().optional(),
   firedThresholdIndex: z.number().optional(),
   lastHumanFeedback: z.string().optional(),
+  lastHumanAnswer: z
+    .object({
+      stateId: z.string(),
+      requestingState: z.string(),
+      waitingSince: z.string(),
+      content: z.string(),
+    })
+    .optional(),
   lastReviewContent: z.string().optional(),
   lastTrigger: z.string().optional(),
   stateTimestamps: z
@@ -82,6 +108,7 @@ export const persistedStateSchema = z.object({
     .optional(),
   /** Action results completed before a post-action budget pause. */
   interruptedActionResults: z.array(z.custom<ActionResult>()).readonly().optional(),
+  entryActionContinuation: entryActionContinuationSchema.optional(),
 });
 export type PersistedState = z.infer<typeof persistedStateSchema>;
 
@@ -98,5 +125,6 @@ export const lockHandleSchema = z.object({
   acquiredAt: z.string(),
   lockPath: z.string(),
   hostname: z.string(),
+  ownershipToken: z.uuid().optional(),
 });
 export type LockHandle = z.infer<typeof lockHandleSchema>;

@@ -195,3 +195,39 @@ describe('ParallelManager', () => {
     expect(peakConcurrency).toBe(5);
   });
 });
+
+describe('parallel dispatch cancellation', () => {
+  it('does not start queued workers after cancellation', async () => {
+    let finish!: (result: DispatchResult) => void;
+    const dispatch = vi.fn<DispatchFn>().mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const cancellation = new AbortController();
+    const running = new ParallelManager(dispatch, 1).dispatchAll(
+      [makeRequest('architect'), makeRequest('reviewer')],
+      undefined,
+      cancellation.signal,
+    );
+    cancellation.abort();
+    finish(makeResult('architect'));
+    const results = await running;
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(results[1]?.status).toBe('failure');
+  });
+
+  it('rejects an already cancelled unbounded batch without dispatching', async () => {
+    const dispatch = vi.fn<DispatchFn>();
+    const cancellation = new AbortController();
+    cancellation.abort();
+    const results = await new ParallelManager(dispatch).dispatchAll(
+      [makeRequest('architect')],
+      undefined,
+      cancellation.signal,
+    );
+    expect(results[0]?.status).toBe('failure');
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+});

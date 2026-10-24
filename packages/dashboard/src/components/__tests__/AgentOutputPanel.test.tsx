@@ -1,14 +1,17 @@
 // @vitest-environment jsdom
-import { fireEvent, screen } from '@testing-library/react';
+import type { DashboardWaitingContext } from '@ai-dev-orchestrator/schemas';
+import { act, fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
+import { api } from '../../api/client';
 import type { DashboardAgentStreamEvent } from '../../hooks/use-agent-stream';
 import { renderWithRouter } from '../../test/render';
 import { AgentOutputPanel, PromptModal } from '../output';
 
 vi.mock('../../api/client', () => ({
   api: {
+    approve: vi.fn(),
     respondPermission: vi.fn().mockResolvedValue(undefined),
     respondAction: vi.fn().mockResolvedValue(undefined),
   },
@@ -49,6 +52,141 @@ function makeGroups(
 }
 
 describe('AgentOutputPanel', () => {
+  it('restores answered clarification history and expires unanswered requests on dispatch completion', () => {
+    const question = makeLine({
+      type: 'clarification_request',
+      requestMessageId: 'question',
+      content: 'Question',
+      protocolMessage: {
+        messageType: 'clarification_request',
+        payload: { question: 'Which color?', options: ['Blue'] },
+      },
+    });
+    const { rerender } = renderWithRouter(
+      <AgentOutputPanel groups={makeGroups([question])} status="connected" runId="run-1" />,
+    );
+    expect(screen.getByRole('textbox', { name: 'Clarification answer' })).toBeInTheDocument();
+    const answer = makeLine({
+      requestMessageId: 'question',
+      timestamp: '2024-01-01T00:00:01Z',
+      protocolMessage: { messageType: 'clarification_response', payload: { answer: 'Blue' } },
+    });
+    rerender(
+      <AgentOutputPanel groups={makeGroups([question, answer])} status="connected" runId="run-1" />,
+    );
+    expect(screen.getByText('Answer submitted')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Clarification answer' })).not.toBeInTheDocument();
+    const done = makeLine({
+      timestamp: '2024-01-01T00:00:02Z',
+      protocolMessage: { messageType: 'done', payload: { summary: 'done' } },
+    });
+    rerender(
+      <AgentOutputPanel groups={makeGroups([question, done])} status="connected" runId="run-1" />,
+    );
+    expect(screen.getByText('Request expired (agent finished)')).toBeInTheDocument();
+  });
+
+  it('requires clarification identity and resets the form when a new request replaces it', async () => {
+    const question = makeLine({
+      type: 'clarification_request',
+      protocolMessage: {
+        messageType: 'clarification_request',
+        payload: { question: 'Which color?' },
+      },
+    });
+    const { rerender } = renderWithRouter(
+      <AgentOutputPanel groups={makeGroups([question])} status="connected" runId="run-1" />,
+    );
+    expect(screen.queryByRole('textbox', { name: 'Clarification answer' })).not.toBeInTheDocument();
+    rerender(
+      <AgentOutputPanel
+        groups={makeGroups([{ ...question, structuredData: { messageId: 'first' } }])}
+        status="connected"
+        runId="run-1"
+      />,
+    );
+    await userEvent
+      .setup()
+      .type(screen.getByRole('textbox', { name: 'Clarification answer' }), 'Blue');
+    rerender(
+      <AgentOutputPanel
+        groups={makeGroups([{ ...question, requestMessageId: 'second' }])}
+        status="connected"
+        runId="run-1"
+      />,
+    );
+    expect(screen.getByRole('textbox', { name: 'Clarification answer' })).toHaveValue('');
+  });
+
+  it('keeps pending controls mounted and resets the response for a new wait', async () => {
+    let resolveRequest!: (result: { success: boolean; outcome: 'started' }) => void;
+    vi.mocked(api.approve).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRequest = resolve;
+        }),
+    );
+    const waitingContext: DashboardWaitingContext = {
+      reason: 'approval',
+      requiredInput: 'approval',
+      requestingState: 'WORK',
+      autoResumeSafe: false,
+      presentedArtifacts: [],
+      waitingSince: '2026-01-01T00:00:00Z',
+    };
+    const onAction = vi.fn();
+    const { rerender } = renderWithRouter(
+      <AgentOutputPanel
+        groups={new Map()}
+        status="connected"
+        runId="run-1"
+        waitingContext={waitingContext}
+        onAction={onAction}
+      />,
+    );
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Approve' }));
+    expect(screen.getByTestId('action-bar')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Processing...' })).toBeDisabled();
+    await act(async () => {
+      resolveRequest({ success: true, outcome: 'started' });
+      await Promise.resolve();
+    });
+    expect(screen.getByText('Approval requested for work')).toBeInTheDocument();
+    expect(onAction).toHaveBeenCalledOnce();
+    rerender(
+      <AgentOutputPanel
+        groups={new Map()}
+        status="connected"
+        runId="run-1"
+        waitingContext={{ ...waitingContext, waitingSince: '2026-01-02T00:00:00Z' }}
+        onAction={onAction}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeEnabled();
+    expect(screen.queryByText('Approval requested for work')).not.toBeInTheDocument();
+  });
+  it('keeps a failed human-control request visible and retryable instead of unmounting it on submit', async () => {
+    vi.mocked(api.approve).mockResolvedValueOnce({ success: false, error: 'launch rejected' });
+    renderWithRouter(
+      <AgentOutputPanel
+        groups={new Map()}
+        status="connected"
+        runId="run-1"
+        waitingContext={{
+          reason: 'approval',
+          requiredInput: 'approval',
+          requestingState: 'WORK',
+          autoResumeSafe: false,
+          presentedArtifacts: [],
+          waitingSince: '2026-01-01T00:00:00Z',
+        }}
+        onAction={vi.fn()}
+      />,
+    );
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Approve' }));
+    expect(await screen.findByText('launch rejected')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeEnabled();
+  });
   it('renders the waiting message when empty', () => {
     renderWithRouter(<AgentOutputPanel groups={new Map()} status="connected" />);
     expect(screen.getByText('Waiting for output...')).toBeInTheDocument();

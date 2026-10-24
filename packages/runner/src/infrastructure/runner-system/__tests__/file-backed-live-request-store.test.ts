@@ -1,4 +1,4 @@
-import { mkdtemp, rm, readFile, readdir, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, readFile, readdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -37,7 +37,64 @@ describe('FileBackedLiveRequestStore', () => {
     ...overrides,
   });
 
+  it('requires an existing request for user submissions while retaining internal early responses', async () => {
+    await expect(store.writeResponse(makeResponse(), { requireRequest: true })).rejects.toThrow(
+      'not found',
+    );
+    await expect(store.writeResponse(makeResponse())).resolves.toBe('response_written');
+  });
+
+  it('retains an immutable decision through cleanup, restart and attempts to reuse the request ID', async () => {
+    await store.writeRequest(makeRequest());
+    await store.writeResponse(makeResponse());
+    expect(await store.cleanupResolved('run-1')).toBe(1);
+    const restarted = new FileBackedLiveRequestStore(baseDir);
+    expect(await restarted.writeResponse(makeResponse(), { requireRequest: true })).toBe(
+      'already_responded',
+    );
+    await expect(
+      restarted.writeResponse(makeResponse({ payload: { granted: false } }), {
+        requireRequest: true,
+      }),
+    ).rejects.toThrow('already has a response');
+    await expect(restarted.writeRequest(makeRequest())).rejects.toThrow('retired');
+    expect(await restarted.listPendingRequests('run-1')).toEqual([]);
+    expect(await readdir(join(baseDir, 'run-1', 'live-responses'))).toEqual([]);
+  });
+
   describe('writeRequest', () => {
+    it('allows identical request replay without extending expiry but rejects reuse for another operation', async () => {
+      const original = makeRequest({ expiresAt: '2090-01-01T00:05:00Z' });
+      await store.writeRequest(original);
+      await store.writeResponse(makeResponse());
+      await store.writeRequest({
+        ...original,
+        createdAt: '2026-01-01T01:00:00Z',
+        expiresAt: '2099-01-01T00:00:00Z',
+      });
+      expect(
+        JSON.parse(
+          await readFile(join(baseDir, 'run-1/live-requests/msg-1.json'), 'utf8'),
+        ) as unknown,
+      ).toEqual(original);
+      await expect(
+        store.writeRequest(
+          makeRequest({ payload: { action: 'file_write', resource: '/different' } }),
+        ),
+      ).rejects.toThrow('different request');
+      await expect(
+        store.writeRequest(
+          makeRequest({ kind: 'clarification', payload: { question: 'different?' } }),
+        ),
+      ).rejects.toThrow('different request');
+    });
+
+    it('rejects run identifiers that traverse into another run namespace', async () => {
+      await expect(store.writeRequest(makeRequest({ runId: 'run-1/../run-2' }))).rejects.toThrow(
+        'identifier',
+      );
+    });
+
     it('creates a JSON file under live-requests/', async () => {
       await store.writeRequest(makeRequest());
 
@@ -61,6 +118,56 @@ describe('FileBackedLiveRequestStore', () => {
   });
 
   describe('writeResponse', () => {
+    it('rejects an expired grant while allowing a terminal timeout and identical retries', async () => {
+      await store.writeRequest(makeRequest({ expiresAt: '2020-01-01T00:00:00Z' }));
+      await expect(store.writeResponse(makeResponse())).rejects.toThrow('expired');
+      const timeout = makeResponse({ payload: { timedOut: true, granted: false } });
+      await store.writeResponse(timeout);
+      await store.writeResponse(timeout);
+      expect((await store.awaitResponse('run-1', 'msg-1', 1))?.payload).toEqual(timeout.payload);
+    });
+
+    it.each(['permission', 'clarification'] as const)(
+      'does not consume a %s request with the wrong response kind',
+      async (kind) => {
+        await store.writeRequest(makeRequest({ kind }));
+        await expect(
+          store.writeResponse(
+            makeResponse({
+              payload: kind === 'permission' ? { answer: 'main' } : { granted: true },
+            }),
+          ),
+        ).rejects.toThrow('response kind');
+        expect(await store.listPendingRequests('run-1')).toHaveLength(1);
+      },
+    );
+
+    it('rejects message identifiers that escape the response directory', async () => {
+      await expect(store.writeResponse(makeResponse({ messageId: '../state' }))).rejects.toThrow(
+        'identifier',
+      );
+    });
+
+    it('accepts identical retries but does not overwrite a prior decision with a conflicting response', async () => {
+      const original = makeResponse();
+      await store.writeResponse(original);
+      await store.writeResponse({ ...original, respondedAt: '2026-01-01T00:00:02Z' });
+      await expect(
+        store.writeResponse(makeResponse({ payload: { granted: false } })),
+      ).rejects.toThrow('already');
+      expect(await store.awaitResponse('run-1', 'msg-1', 100)).toEqual(original);
+    });
+
+    it('publishes only one decision when conflicting responses arrive concurrently', async () => {
+      const results = await Promise.allSettled([
+        store.writeResponse(makeResponse({ payload: { granted: true } })),
+        store.writeResponse(makeResponse({ payload: { granted: false } })),
+      ]);
+      expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+      expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+      expect(await readdir(join(baseDir, 'run-1', 'live-responses'))).toEqual(['msg-1.json']);
+    });
+
     it('creates a JSON file under live-responses/', async () => {
       await store.writeResponse(makeResponse());
 
@@ -73,6 +180,31 @@ describe('FileBackedLiveRequestStore', () => {
   });
 
   describe('awaitResponse', () => {
+    it.each([
+      makeResponse({ runId: 'another-run' }),
+      makeResponse({ messageId: 'another-message' }),
+    ])(
+      'ignores a response whose embedded identity does not match its filename',
+      async (response) => {
+        await store.writeRequest(makeRequest({ expiresAt: '2099-01-01T00:00:00Z' }));
+        const dir = join(baseDir, 'run-1', 'live-responses');
+        await mkdir(dir, { recursive: true });
+        await writeFile(join(dir, 'msg-1.json'), JSON.stringify(response));
+        expect(await store.awaitResponse('run-1', 'msg-1', 20)).toBeNull();
+        expect(await store.listPendingRequests('run-1')).toHaveLength(1);
+        expect(await store.cleanupResolved('run-1')).toBe(0);
+      },
+    );
+
+    it('keeps a request visible when its response is truncated or invalid', async () => {
+      await store.writeRequest(makeRequest({ expiresAt: '2099-01-01T00:00:00Z' }));
+      const dir = join(baseDir, 'run-1', 'live-responses');
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, 'msg-1.json'), '{"runId":');
+      expect(await store.listPendingRequests('run-1')).toHaveLength(1);
+      expect(await store.cleanupResolved('run-1')).toBe(0);
+    });
+
     it('returns the response when it exists before the timeout', async () => {
       await store.writeResponse(makeResponse());
 

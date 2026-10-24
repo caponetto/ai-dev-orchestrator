@@ -1,7 +1,7 @@
 import { REVIEW_ARTIFACT_TYPES, safeJsonParse } from '@ai-dev-orchestrator/artifacts';
 import type { ArtifactStore, IterationContractRegistry, Logger } from '@ai-dev-orchestrator/ports';
 import { noopLogger } from '@ai-dev-orchestrator/ports';
-import type { ActionResult, ArtifactType, TransitionTrigger } from '@ai-dev-orchestrator/schemas';
+import type { ActionResult, ArtifactRef, TransitionTrigger } from '@ai-dev-orchestrator/schemas';
 import { FRONTMATTER_REGEX } from '@ai-dev-orchestrator/utils';
 import { z } from 'zod';
 
@@ -62,7 +62,10 @@ export class ReviewResultInterpreter {
     if (hardFailures.length === 0) {
       return false;
     }
-    if (actionResults.some((r) => r.success)) {
+    if (
+      hardFailures.every((r) => r.action.type === 'dispatch_parallel_workers') &&
+      actionResults.some((r) => r.action.type === 'dispatch_parallel_workers' && r.success)
+    ) {
       for (const f of hardFailures) {
         this.logger.warn(
           `[ReviewInterpreter] worker failed but continuing with partial results: ${f.error ?? 'unknown error'}`,
@@ -160,10 +163,7 @@ export class ReviewResultInterpreter {
   ): Promise<TransitionTrigger> {
     for (const result of actionResults) {
       if (result.artifactRef?.type === 'judge_decision') {
-        const approved = await this.readApprovalField(
-          result.artifactRef.type,
-          result.artifactRef.name,
-        );
+        const approved = await this.readApprovalField(result.artifactRef);
         if (approved) {
           return 'judge_approved';
         }
@@ -210,10 +210,7 @@ export class ReviewResultInterpreter {
       this.logger.debug(
         `[ReviewInterpreter] checking artifact: type=${result.artifactRef.type}, name=${result.artifactRef.name}`,
       );
-      const approved = await this.readApprovalField(
-        result.artifactRef.type,
-        result.artifactRef.name,
-      );
+      const approved = await this.readApprovalField(result.artifactRef);
       this.logger.debug(`[ReviewInterpreter] artifact approved=${String(approved)}`);
       if (!approved) {
         return false;
@@ -241,10 +238,13 @@ export class ReviewResultInterpreter {
     return true;
   }
 
-  private async readApprovalField(type: ArtifactType, name: string): Promise<boolean> {
+  private async readApprovalField(ref: ArtifactRef): Promise<boolean> {
     try {
-      const artifact = await this.artifactStore.getLatest(type, name);
-      if (!artifact) {
+      if (!(await this.artifactStore.verify(ref)).valid) {
+        return false;
+      }
+      const artifact = await this.artifactStore.get(ref);
+      if (artifact.metadata?.validationFailed === true) {
         return false;
       }
 

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { dirname, join, normalize, sep } from 'node:path';
 
 import type { PermissionApprovalEntry, PermissionApprovalFile } from '@ai-dev-orchestrator/schemas';
 import { permissionApprovalFileSchema } from '@ai-dev-orchestrator/schemas';
@@ -28,7 +28,7 @@ export class FileBackedPermissionApprovalStore implements PermissionApprovalStor
       return undefined;
     }
     return data.approvals.find(
-      (entry) => entry.action === action && resource.startsWith(entry.resource),
+      (entry) => entry.action === action && matchesApproval(action, resource, entry.resource),
     );
   }
 
@@ -110,4 +110,25 @@ export class FileBackedPermissionApprovalStore implements PermissionApprovalStor
     await writeFile(tmpPath, JSON.stringify(data, null, 2));
     await rename(tmpPath, this.filePath);
   }
+}
+
+function matchesApproval(action: string, resource: string, approved: string): boolean {
+  if (resource === approved) {
+    return true;
+  }
+  if (action === 'shell_execute') {
+    const suffix = resource.slice(approved.length);
+    return (
+      resource.startsWith(approved) && /^\s/.test(suffix) && !/[|;&\n\r`<>]|\$[({]/.test(suffix)
+    );
+  }
+  if (action === 'file_read' || action === 'file_write') {
+    if (resource.split(/[/\\]/).includes('..')) {
+      return false;
+    }
+    const path = normalize(resource);
+    const prefix = normalize(approved).replace(/[\\/]$/, '');
+    return path === prefix || path.startsWith(prefix + sep);
+  }
+  return false;
 }

@@ -8,6 +8,7 @@ import { PassThrough } from 'node:stream';
 import { createProtocolMessage } from '@ai-dev-orchestrator/agent-protocol';
 import type { AgentOutputStreamEvent } from '@ai-dev-orchestrator/ports';
 import type { AgentSessionRef } from '@ai-dev-orchestrator/schemas';
+import { OwnedProcess } from '@ai-dev-orchestrator/utils/owned-process';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { AgentSessionRegistry } from '../agent-session-registry';
@@ -568,6 +569,40 @@ describe('LocalAgentSessionSupervisor', () => {
     });
     return { getLastProcess: () => lastProc as ReturnType<typeof createMockProcess> };
   }
+
+  it.each(['abort', 'completed'])(
+    'waits for native close before acknowledging %s',
+    async (mode) => {
+      const proc = createMockProcess();
+      const owner = new OwnedProcess(proc, { graceMs: 100 });
+      const transport = new StdioProtocolTransport({
+        stdin: proc.mockStdin,
+        stdout: proc.mockStdout,
+      });
+      const host = new LocalAgentSessionHost(REF, proc, transport, Date.now(), owner);
+      await supervisor.registerHost(host);
+      let settled = false;
+      const pending =
+        mode === 'abort'
+          ? supervisor.abort(REF.sessionId, 'shutdown')
+          : supervisor.waitForAdvance(REF.sessionId);
+      void pending.then(() => {
+        settled = true;
+      });
+      if (mode === 'completed') {
+        sendProtocolLine(proc.mockStdout, createProtocolMessage('done', { summary: 'done' }));
+      }
+      proc.emit('exit', 0, null);
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(settled).toBe(false);
+      proc.emit('close', 0, null);
+      await pending;
+      expect(settled).toBe(true);
+      expect((await supervisor.getSnapshot(REF.sessionId))?.state).toBe(
+        mode === 'abort' ? 'aborted' : 'completed',
+      );
+    },
+  );
 
   it('creates a session and persists snapshot', async () => {
     setupFactory();

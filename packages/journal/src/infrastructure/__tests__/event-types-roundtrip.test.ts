@@ -7,6 +7,7 @@ import type {
   JournalEventData,
   JournalEventType,
 } from '@ai-dev-orchestrator/schemas';
+import { JOURNAL_EVENT_TYPES } from '@ai-dev-orchestrator/schemas';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { DefaultJournalReader } from '../default-journal-reader';
@@ -23,6 +24,55 @@ afterEach(() => {
 });
 
 const EVENT_DATA: Record<JournalEventType, JournalEventData> = {
+  workflow_checkpoint: {
+    kind: 'workflow_checkpoint',
+    state: {
+      runId: 'roundtrip',
+      schemaVersion: 2,
+      currentState: 'WORK',
+      previousState: null,
+      stateEnteredAt: '',
+      transitionCount: 0,
+      stateHistory: ['WORK'],
+      iterationCounts: {},
+      activeArtifacts: [],
+      lastProducedArtifact: null,
+      workflowName: 'test',
+      workflowVersion: '1',
+      persistedAt: '',
+      persistenceVersion: 1,
+      checksum: '',
+    },
+  },
+  run_failed: {
+    kind: 'run_lifecycle',
+    workflowName: 'default',
+    workflowVersion: '1',
+    finalState: 'FAILED',
+  },
+  script_started: { kind: 'script', script: 'prepare.ts', stateId: 'WORK' },
+  script_completed: {
+    kind: 'script',
+    script: 'prepare.ts',
+    stateId: 'WORK',
+    exitCode: 0,
+    success: true,
+  },
+  artifact_staleness_detected: {
+    kind: 'artifact_staleness',
+    trigger: 'source_changed',
+    staleCount: 0,
+    rebuildOrder: [],
+  },
+  model_escalation: {
+    kind: 'model_escalation',
+    roleId: 'planner',
+    fromModel: 'small',
+    toModel: 'large',
+    confidenceScore: 0.5,
+    heuristicScore: 0.5,
+    finalScore: 0.5,
+  },
   run_started: { kind: 'run_lifecycle', workflowName: 'default', workflowVersion: '1.0.0' },
   run_completed: {
     kind: 'run_lifecycle',
@@ -154,13 +204,13 @@ const EVENT_DATA: Record<JournalEventType, JournalEventData> = {
 };
 
 describe('Journal event types round-trip', () => {
-  it('writes and reads back all 21 event types', () => {
+  it('writes and reads back every supported event type', () => {
     const filePath = join(TEST_DIR, 'journal.md');
     const writer = new DefaultJournalWriter(filePath, 'run-rt');
     const reader = new DefaultJournalReader(filePath);
 
     const eventTypes = Object.keys(EVENT_DATA) as JournalEventType[];
-    expect(eventTypes).toHaveLength(20);
+    expect([...eventTypes].sort()).toEqual([...JOURNAL_EVENT_TYPES].sort());
 
     for (const type of eventTypes) {
       writer.append({
@@ -173,7 +223,7 @@ describe('Journal event types round-trip', () => {
     }
 
     const events = reader.readAll();
-    expect(events).toHaveLength(20);
+    expect(events).toHaveLength(eventTypes.length);
 
     for (let i = 0; i < eventTypes.length; i++) {
       const event = events[i];
@@ -205,7 +255,7 @@ describe('Journal event types round-trip', () => {
       expect(read).toBeDefined();
       expect(read.type).toBe(type);
       expect(read.runId).toBe('run-single');
-      expect(read.data.kind).toBe(original.data.kind);
+      expect(read.data).toEqual(original.data);
     }
   });
 
@@ -230,7 +280,7 @@ describe('Journal event types round-trip', () => {
     writer.appendBatch(batch);
 
     const events = reader.readAll();
-    expect(events).toHaveLength(20);
+    expect(events).toHaveLength(eventTypes.length);
 
     for (let i = 0; i < eventTypes.length; i++) {
       expect(events[i].type).toBe(eventTypes[i]);

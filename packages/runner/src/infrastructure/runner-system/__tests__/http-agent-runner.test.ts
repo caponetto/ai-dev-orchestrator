@@ -556,13 +556,21 @@ describe('HttpAgentRunner', () => {
           endpoint: 'https://api.example.com/agents',
         });
 
-        const result = await runner.dispatch(
-          makeTask({ constraints: { timeout: 30_000, requiredOutputType: 'implementation' } }),
-        );
-
-        expect(WebSocketMock).toHaveBeenCalledWith('ws://localhost:9999/ws/task-1');
-        expect(result.status).toBe('failure');
-        expect(result.error).toContain('handshake');
+        vi.useFakeTimers();
+        try {
+          const pending = runner.dispatch(
+            makeTask({ constraints: { timeout: 30_000, requiredOutputType: 'implementation' } }),
+          );
+          await vi.advanceTimersByTimeAsync(5_000);
+          const result = await pending;
+          expect(WebSocketMock).toHaveBeenCalledWith('ws://localhost:9999/ws/task-1');
+          expect(result.status).toBe('failure');
+          expect(result.error).toContain('handshake');
+          expect(mockWs.close).toHaveBeenCalledOnce();
+          expect(vi.getTimerCount()).toBe(0);
+        } finally {
+          vi.useRealTimers();
+        }
       },
     );
 

@@ -32,7 +32,14 @@ vi.mock('@ai-dev-orchestrator/core', async (importOriginal) => {
     DefaultStatePersistence: vi.fn().mockImplementation(function (this: {
       load: ReturnType<typeof vi.fn>;
     }) {
-      this.load = vi.fn().mockReturnValue(null);
+      this.load = vi.fn().mockReturnValue({
+        currentState: 'WAITING_FOR_HUMAN',
+        waitingContext: {
+          requiredInput: 'text',
+          requestingState: 'REFINEMENT',
+          waitingSince: 'wait-1',
+        },
+      });
     }),
   };
 });
@@ -47,6 +54,7 @@ function makeRunResult(overrides: Partial<RunResult> = {}): RunResult {
   return {
     runId: 'run-001',
     finalState: 'REFINEMENT',
+    answerAccepted: true,
     artifactInventory: [],
     manifest: {} as unknown as RunManifest,
     ...overrides,
@@ -95,6 +103,161 @@ describe('answerCommand', () => {
     if (existsSync(baseDir)) {
       rmSync(baseDir, { recursive: true, force: true });
     }
+  });
+
+  it.each([true, false])(
+    'does not report the previous answer file as a newly accepted answer (JSON: %s)',
+    async (json) => {
+      const runId = createRunId();
+      const dir = join(getRunDir(runId), 'artifacts');
+      mkdirSync(dir, { recursive: true });
+      const path = join(dir, 'clarification_answers_v1.md');
+      writeFileSync(path, 'previous');
+      mockEngineContext(
+        runId,
+        getRunDir(runId),
+        vi
+          .fn()
+          .mockResolvedValue(
+            makeRunResult({ runId, finalState: 'WAITING_FOR_HUMAN', answerAccepted: false }),
+          ),
+      );
+      expect(
+        await answerCommand(
+          {
+            runId,
+            inputFile: null,
+            messageId: null,
+            answers: ['pending answer'],
+            json,
+            verbose: false,
+          },
+          new OutputFormatter({ json }),
+        ),
+      ).toBe(ExitCode.SUCCESS);
+      expect(readFileSync(path, 'utf8')).toBe('previous');
+      if (json) {
+        const output = JSON.parse(stdoutChunks[0] ?? '') as Record<string, unknown>;
+        expect(output.accepted).toBe(false);
+        expect(output).not.toHaveProperty('artifactPath');
+      } else {
+        expect(stdoutChunks.join('')).toContain('Answer not accepted');
+      }
+    },
+  );
+
+  it('preserves an accepted answer when bootstrap fails before run ownership', async () => {
+    const runId = createRunId();
+    const dir = join(getRunDir(runId), 'artifacts');
+    mkdirSync(dir, { recursive: true });
+    const path = join(dir, 'clarification_answers_v1.md');
+    writeFileSync(path, 'accepted answer');
+    mockResumeOrchestrator.mockRejectedValueOnce(new Error('bootstrap failed'));
+    const code = await answerCommand(
+      {
+        runId,
+        inputFile: null,
+        messageId: null,
+        answers: ['losing answer'],
+        json: false,
+        verbose: false,
+      },
+      new OutputFormatter(),
+    );
+    expect(code).toBe(ExitCode.CONFIGURATION_ERROR);
+    expect(readFileSync(path, 'utf8')).toBe('accepted answer');
+  });
+  it.each(['positional', 'file'])(
+    'rejects blank %s input before bootstrap or artifact mutation',
+    async (mode) => {
+      const runId = createRunId();
+      mkdirSync(getRunDir(runId), { recursive: true });
+      const file = join(getRunDir(runId), 'empty.txt');
+      writeFileSync(file, '  ');
+      expect(
+        await answerCommand(
+          {
+            runId,
+            inputFile: mode === 'file' ? file : null,
+            messageId: null,
+            answers: ['  '],
+            json: true,
+            verbose: false,
+          },
+          new OutputFormatter({ json: true }),
+        ),
+      ).toBe(ExitCode.INVALID_ARGUMENTS);
+      expect(mockResumeOrchestrator).not.toHaveBeenCalled();
+      expect(existsSync(join(getRunDir(runId), 'artifacts'))).toBe(false);
+    },
+  );
+
+  it.each([null, { requiredInput: 'approval' }, { requiredInput: 'text', liveSessionId: 'live' }])(
+    'rejects a missing or incompatible text wait without changing an old answer (%s)',
+    async (waitingContext) => {
+      const runId = createRunId();
+      const dir = join(getRunDir(runId), 'artifacts');
+      mkdirSync(dir, { recursive: true });
+      const path = join(dir, 'clarification_answers_v1.md');
+      writeFileSync(path, 'previous');
+      vi.mocked(DefaultStatePersistence).mockImplementationOnce(function (this: {
+        load: ReturnType<typeof vi.fn>;
+      }) {
+        this.load = vi.fn().mockReturnValue({ currentState: 'WAIT', waitingContext });
+      } as never);
+      const resume = vi.fn();
+      mockEngineContext(runId, getRunDir(runId), resume);
+      expect(
+        await answerCommand(
+          {
+            runId,
+            inputFile: null,
+            messageId: null,
+            answers: ['replacement'],
+            json: false,
+            verbose: false,
+          },
+          new OutputFormatter(),
+        ),
+      ).toBe(ExitCode.INVALID_ARGUMENTS);
+      expect(resume).not.toHaveBeenCalled();
+      expect(readFileSync(path, 'utf8')).toBe('previous');
+    },
+  );
+  it('refuses to replace an answer already committed in an interrupted transition', async () => {
+    const runId = createRunId();
+    mkdirSync(getRunDir(runId), { recursive: true });
+    vi.mocked(DefaultStatePersistence).mockImplementationOnce(function (this: {
+      load: ReturnType<typeof vi.fn>;
+    }) {
+      this.load = vi.fn().mockReturnValue({
+        currentState: 'WAIT',
+        entryActionContinuation: {
+          resumeInput: { type: 'text', content: 'accepted' },
+          resumeWaitingContext: {
+            requiredInput: 'text',
+            requestingState: 'WORK',
+            waitingSince: 'wait-1',
+          },
+        },
+      });
+    } as never);
+    const resume = vi.fn();
+    mockEngineContext(runId, getRunDir(runId), resume);
+    expect(
+      await answerCommand(
+        {
+          runId,
+          inputFile: null,
+          messageId: null,
+          answers: ['replacement'],
+          json: true,
+          verbose: false,
+        },
+        new OutputFormatter({ json: true }),
+      ),
+    ).toBe(ExitCode.INVALID_ARGUMENTS);
+    expect(resume).not.toHaveBeenCalled();
   });
 
   it('returns GENERAL_ERROR when no run found', async () => {
@@ -177,7 +340,15 @@ describe('answerCommand', () => {
     );
 
     expect(code).toBe(ExitCode.SUCCESS);
-    expect(mockResume).toHaveBeenCalledWith({ type: 'text', content: 'Yes, use OAuth2' });
+    expect(mockResume).toHaveBeenCalledWith({
+      type: 'text',
+      content: 'Yes, use OAuth2',
+      waitIdentity: {
+        stateId: 'WAITING_FOR_HUMAN',
+        requestingState: 'REFINEMENT',
+        waitingSince: 'wait-1',
+      },
+    });
   });
 
   it('joins multiple positional answers with newlines', async () => {
@@ -201,7 +372,15 @@ describe('answerCommand', () => {
       formatter,
     );
 
-    expect(mockResume).toHaveBeenCalledWith({ type: 'text', content: 'first\nsecond' });
+    expect(mockResume).toHaveBeenCalledWith({
+      type: 'text',
+      content: 'first\nsecond',
+      waitIdentity: {
+        stateId: 'WAITING_FOR_HUMAN',
+        requestingState: 'REFINEMENT',
+        waitingSince: 'wait-1',
+      },
+    });
   });
 
   it('accepts answers from --input-file', async () => {
@@ -222,10 +401,18 @@ describe('answerCommand', () => {
     );
 
     expect(code).toBe(ExitCode.SUCCESS);
-    expect(mockResume).toHaveBeenCalledWith({ type: 'text', content: 'Answer 1\nAnswer 2' });
+    expect(mockResume).toHaveBeenCalledWith({
+      type: 'text',
+      content: 'Answer 1\nAnswer 2',
+      waitIdentity: {
+        stateId: 'WAITING_FOR_HUMAN',
+        requestingState: 'REFINEMENT',
+        waitingSince: 'wait-1',
+      },
+    });
   });
 
-  it('writes clarification artifact before resuming engine', async () => {
+  it('delegates answer persistence to the owned engine instead of writing before resume', async () => {
     const runId = createRunId();
     const runDir = getRunDir(runId);
     mkdirSync(runDir, { recursive: true });
@@ -247,8 +434,8 @@ describe('answerCommand', () => {
     );
 
     const artifactPath = join(runDir, 'artifacts', 'clarification_answers_v1.md');
-    expect(existsSync(artifactPath)).toBe(true);
-    expect(readFileSync(artifactPath, 'utf8')).toBe('my answer');
+    expect(existsSync(artifactPath)).toBe(false);
+    expect(mockResume).toHaveBeenCalledOnce();
   });
 
   it('produces valid JSON output', async () => {
@@ -308,6 +495,52 @@ describe('answerCommand', () => {
 
     expect(code).toBe(ExitCode.RUN_FAILED);
   });
+
+  it.each([true, false])(
+    'acknowledges a live clarification retry after cleanup (JSON: %s)',
+    async (json) => {
+      const runId = createRunId();
+      mkdirSync(getRunDir(runId), { recursive: true });
+      const store = new FileBackedLiveRequestStore(getRunsDir());
+      await store.writeRequest({
+        runId,
+        messageId: 'clar-retry',
+        kind: 'clarification',
+        createdAt: '',
+        payload: {},
+      });
+      await store.writeResponse({
+        runId,
+        messageId: 'clar-retry',
+        respondedAt: '',
+        payload: { answer: 'same' },
+      });
+      await store.cleanupResolved(runId);
+      const formatter = new OutputFormatter({ json, noColor: true });
+      const success = vi.spyOn(formatter, 'success');
+      const options = {
+        runId,
+        inputFile: null,
+        messageId: 'clar-retry',
+        answers: ['same'],
+        json,
+        verbose: false,
+      };
+      expect(await answerCommand(options, formatter)).toBe(ExitCode.SUCCESS);
+      if (json) {
+        expect(JSON.parse(stdoutChunks[0] ?? '')).toMatchObject({
+          outcome: 'already_responded',
+          exitCode: 0,
+        });
+      } else {
+        expect(success).toHaveBeenCalledWith(expect.stringContaining('already recorded'));
+      }
+      expect(await answerCommand({ ...options, answers: ['different'] }, formatter)).toBe(
+        ExitCode.GENERAL_ERROR,
+      );
+      expect(mockResumeOrchestrator).not.toHaveBeenCalled();
+    },
+  );
 
   it('answers targeted live clarification when --message-id matches', async () => {
     const runId = createRunId();
@@ -399,7 +632,15 @@ describe('answerCommand', () => {
 
     expect(code).toBe(ExitCode.SUCCESS);
     expect(mockResumeOrchestrator).toHaveBeenCalled();
-    expect(mockResume).toHaveBeenCalledWith({ type: 'text', content: 'React' });
+    expect(mockResume).toHaveBeenCalledWith({
+      type: 'text',
+      content: 'React',
+      waitIdentity: {
+        stateId: 'WAITING_FOR_HUMAN',
+        requestingState: 'REFINEMENT',
+        waitingSince: 'wait-1',
+      },
+    });
   });
 
   it('produces JSON output for targeted live clarification', async () => {
@@ -435,6 +676,10 @@ describe('answerCommand', () => {
     expect(parsed.runId).toBe(runId);
     expect(parsed.messageId).toBe('clar-json');
     expect(parsed.status).toBe('live_clarification_answered');
+    expect(parsed.outcome).toBe('response_written');
+    expect(parsed.exitCode).toBe(ExitCode.SUCCESS);
+    expect(parsed).not.toHaveProperty('finalState');
+    expect(mockResumeOrchestrator).not.toHaveBeenCalled();
   });
 });
 
@@ -543,7 +788,12 @@ describe('answerCommand session path', () => {
 
     expect(code).toBe(ExitCode.SUCCESS);
     expect(mockResumeOrchestrator).toHaveBeenCalled();
-    expect(mockResume).toHaveBeenCalledWith({ type: 'text', content: 'Use Redis' });
+    expect(mockResume).toHaveBeenCalledWith({
+      type: 'text',
+      content: 'Use Redis',
+      sessionId: 'session-abc',
+      requestId: 'req-123',
+    });
   });
 
   it('returns GENERAL_ERROR when messageId does not match session pending request', async () => {

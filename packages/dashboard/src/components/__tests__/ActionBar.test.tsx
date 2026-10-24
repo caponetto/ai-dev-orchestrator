@@ -18,6 +18,24 @@ const baseContext: DashboardWaitingContext = {
 };
 
 describe('ActionBar', () => {
+  it('lets the user send another response after a launch acknowledgement', async () => {
+    server.use(
+      http.post('/api/runs/run-1/reject', () =>
+        HttpResponse.json({ success: true, outcome: 'started' }),
+      ),
+    );
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+    renderWithRouter(<ActionBar runId="run-1" waitingContext={baseContext} onAction={vi.fn()} />);
+    await user.click(screen.getByRole('button', { name: 'Reject' }));
+    await user.type(screen.getByPlaceholderText('Reason for rejection...'), 'Needs changes');
+    await user.click(screen.getByRole('button', { name: 'Confirm Rejection' }));
+    expect(await screen.findByText(/Rejection requested for plan review/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Send another response' }));
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Reject' })).toBeEnabled();
+    expect(screen.queryByPlaceholderText('Reason for rejection...')).not.toBeInTheDocument();
+  });
   it('renders for persisted waiting state', () => {
     renderWithRouter(<ActionBar runId="run-1" waitingContext={baseContext} onAction={() => {}} />);
     expect(screen.getByTestId('action-bar')).toBeInTheDocument();
@@ -129,7 +147,7 @@ describe('ActionBar', () => {
     await user.click(screen.getByText('Approve'));
 
     await waitFor(() => {
-      expect(screen.getByText(/Approved plan review/i)).toBeInTheDocument();
+      expect(screen.getByText(/Approval requested for plan review/i)).toBeInTheDocument();
     });
   });
 
@@ -198,7 +216,7 @@ describe('ActionBar', () => {
     await user.click(screen.getByText('Confirm Rejection'));
 
     await waitFor(() => {
-      expect(screen.getByText(/Rejected plan review/i)).toBeInTheDocument();
+      expect(screen.getByText(/Rejection requested for plan review/i)).toBeInTheDocument();
     });
     expect(screen.getByText(/Needs revision/)).toBeInTheDocument();
   });

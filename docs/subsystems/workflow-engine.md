@@ -14,6 +14,151 @@ The current engine:
 - appends journal events
 - produces a manifest and report near terminal completion
 
+Start, resume, and retry allow one execution loop per controller. Abort acquires ownership when idle, then sets `ABORTED` before awaiting cancellation, blocks a new execution until cancellation finishes, and prevents in-flight cleanup from reporting success. Workers cancelled during context or prompt preparation cannot launch an agent afterward; cancellation also stops queued parallel workers. Resume requested during a manual pause waits for the active action to settle and checkpoint its cursor before acquiring the next run lock. Concurrent execution or restore operations are rejected. Starting a new run clears previous usage, worker metrics, feedback, action cursors, and iteration counters.
+
+Retry accepts a restored `FAILED` or `ABORTED` run without an external checkpoint rewrite.
+It acquires the run lock, checkpoints the previous non-terminal action state, and executes
+that state's actions again, preserving prior usage and iteration counters. A missing, terminal,
+or human-wait source is rejected. Completed successful runs cannot be retried. Unfinished
+terminal cleanup retains its cursor and continues without rewinding or rerunning workers.
+
+Governance escalation pauses without advancing the requested transition and releases the run lock for resume. Model escalation evaluates the stronger model's output, reruns dependent entry actions such as agreement generation, preserves feedback and iteration context, tries each available higher tier once per state visit, and waits for a human after the tier ladder is exhausted. Completed redispatch usage counts once, including when it causes a budget pause.
+
+If no transition matches a completed state's trigger and guards, the engine records an error and checkpoints `FAILED` when that terminal state is declared, falling back to `ABORTED` if available. Workflows with neither failure terminal checkpoint the current state and throw `TransitionError`, allowing an explicit retry. All paths release the run lock.
+
+Live-session completion uses the session role's first owned artifact type and the `<role>-output` name from its configured role contract. Missing contracts, missing output, and artifact storage failures follow the state's failure transitions. Cancellation is checked after session attachment and response delivery before any further session action. An initial session failure returns a worker failure. A dead resumed session follows the requesting state's declared failure transition and terminal cleanup. Session token usage is included in run budgets and emitted in worker journal events so journal-only recovery preserves the same usage totals.
+
+Entry actions stop on failure or a live-session wait. Live-session waits and token budget pauses apply to action, wait, and terminal states, including exit actions. Exit cursors retain completed entry and exit work so approval resumes without redispatching workers or charging usage again. Dynamic workers retain task and session identities, handle pending task sessions in turn, and produce the task specification aggregate after those sessions finish. Their cursors preserve completed work and usage through approval or session reattachment. A wait-state session returns to the ordinary human gate after its remaining entry actions finish. Manual pauses preserve that gate’s original requesting state through restore. Required wait-state entry failures evaluate the state's declared failure transitions, including priorities, guards, and custom targets, instead of presenting approval as safe. Scripts with `storeOutput` fail when stdout is empty or artifact storage fails. A checkpoint stores completed results, the next action index, and dispatch context so resume continues remaining actions after the session output is stored. Parallel review results already received remain part of the review decision. A transient attach, response, or advance error preserves the waiting context and releases the lock for retry.
+
+Cancellation is checked between actions and after asynchronous guard evaluation before any transition or escalation is applied. A manual pause stops the active action batch at the next boundary, checkpoints completed entry or exit actions, and releases the run lock. Approval resumes the remaining actions without repeating completed work; rejection aborts the paused run. Workflow deadlines are checked between actions and after entry, exit, guard, and terminal work, so an overdue final action cannot report success. Failed exit or terminal actions cannot leave the run successful: the engine enters `FAILED` or `ABORTED`, or throws an action error when no failure terminal can complete. Terminal cleanup is attempted at most once per terminal state per execution. While cleanup is pending, checkpoints retain the last stable source state with `pendingTerminalState`, `terminalRecoveryState`, and a terminal action cursor. Each completed cleanup action is checkpointed before the next starts. Retry, including dashboard retry, continues unfinished cleanup without rerunning workers or completed actions. A terminal completion journal event clears pending cleanup only after all required actions succeed; journal-only recovery also honors pending terminal transitions.
+
+Approved budget extensions survive checkpoint restore and journal replay. Completed results are checkpointed before approval resumes execution. Run locks are released even when error journaling fails, and the original execution error is preserved. Rejecting a budget extension aborts the run, including workflows that do not define a human-wait state. Review feedback and the last trigger are included in the next-state checkpoint before the next worker runs.
+
+Each checkpoint is durably journaled as `workflow_checkpoint` before the checkpoint file is written. These events preserve live-session identity, pending requests, dispatch context, budget decisions, and action cursors, so journal-only recovery resumes completed terminal work without repeating it. Session completion events include the updated entry and exit action cursor alongside token usage. Journal replay applies both together, so a crash before the next checkpoint cannot re-request the completed session’s approval or charge its completion twice. Transition counters prevent replaying a transition already included in a checkpoint event. Older session events retain their session identifier; recovery without that identifier fails instead of advancing past the worker.
+
+Overlapping pause and abort checkpoints append their snapshots synchronously and commit state-file
+writes in the same order. A failed save is reported to its caller and does not prevent a later
+cancellation checkpoint from committing. Active execution retains the run lock until its pending
+cancellation and abort cleanup settle, including when an earlier checkpoint fails.
+
+Signal cancellation is subscribed once per owned start/resume/retry execution and unsubscribed
+when that execution settles. It includes session attachment/advancement, rather than only the
+main transition loop. Shutdown before dispatch also produces ABORTED. Worker/session errors caused
+by cancellation preserve the interruption result; failed abort cleanup or checkpointing remains
+an error with retryable progress. A signal cannot overwrite observed completion or mutate an idle
+controller through a leftover listener.
+
+Worker, session and active script cancellation start independently. Live sessions are selected from
+the current run, deduplicated by session ID, and terminal/foreign sessions are excluded. One backend
+failure cannot prevent the other cancellation attempts. Ownership remains held while execution
+or abort cleanup is outstanding. The CLI's deadline may terminate the process with that lock still
+present; a fresh process recovers the last durable journal/checkpoint and reclaims dead ownership.
+Remote cancellation remains best-effort and does not prove that external effects stopped.
+
+`ShutdownCoordinator.install(onTimeout?)` accepts a deadline policy; library callers choose that
+policy, while the CLI installs forced termination. `onShutdown` returns an unsubscribe function,
+delivers the first request once, and immediately notifies late subscribers. Repeated installation
+is idempotent, and uninstall clears the deadline and signal handlers. Normal engine shutdown writes
+full workflow snapshots; it does not use the coordinator's legacy minimal `initiateShutdown` helper.
+Session I/O failures arriving after cancellation has committed still finish unstarted abort
+cleanup before releasing ownership. Failed cleanup remains available for an explicit retry.
+
+A session completion arriving during a manual pause preserves the manual gate and records the
+completed cursor and usage before resume. If cancellation arrives during output or aggregate
+storage, completed session usage is still journaled/checkpointed, while cancelled work cursors
+cannot replace abort cleanup. A late pause cannot overwrite an aborted run.
+
+A new permission or clarification arriving during manual pause also preserves the manual gate.
+The controller refreshes the matching entry/exit action and nested worker request IDs, preserving
+other workers and their completed output. Unpausing exposes that newest request for a separate
+decision rather than granting it or resending the previous answer. Checkpoint and journal restore
+retain the updated cursor, including for legacy single-worker cursors reconstructed on advance.
+
+Before responding, reattached sessions must match the run, session and persisted worker identity
+(state and role). Legacy waits without a worker reference use their requesting state. Refused
+delivery is an error and does not advance the workflow. A reattached session already running
+without pending requests, or already terminal, is observed without replaying the saved approval.
+If the agent's pending request has changed since the checkpoint, the controller persists the
+current request and reports the mismatch without sending the old answer; a separate response is
+required after reviewing the refreshed request.
+The human-input journal event records received intent; it is not a transport delivery receipt.
+
+Human input supports optional `sessionId` and `requestId` targets. The controller checks those
+targets against its current wait before changing state or attaching a session. CLI `permit` and
+session `answer` retain the IDs selected before rebuilding the run, so a composition reload
+cannot redirect that answer to a newer request. Existing unbound inputs remain compatible and
+mean approval of the current gate; they do not provide stale-client request targeting.
+
+Recovery avoids repeating work whose completion cursor is durably recorded. External effects and
+their journal records are not a transaction: a process crash after an effect completes but before
+its completion record is appended can cause that effect to run again. Actions with external
+effects should therefore tolerate retry; checkpoints do not guarantee exactly-once execution.
+
+Journal-only recovery preserves ordered state visits and rebuilds token totals from completed and failed workers. Transition events carry exact iteration and judge-arbitration snapshots; older journals use the shared built-in state-to-contract mapping. Human rejection resets review rounds, matching normal execution.
+
+Resume reconciles a valid checkpoint with subsequent durable journal events, including terminal action cursors written before a checkpoint-file failure. Intentional checkpoint edits such as dashboard retry take precedence over older journal snapshots. The persisted repository path is restored before rebuilding run infrastructure, so workers continue in a repository selected by a setup script.
+
+Human text responses become feedback for the next worker. States declared with `type: wait` expose their waiting context regardless of their name and require resume rather than retry. Human-driven transitions execute the source state's exit actions; their cursors retain the original response and waiting context across session, budget, and manual pauses. Aborting a paused run executes every declared `ABORTED` entry action and checkpoints terminal cleanup progress. Completing a dynamic task session updates only the matching session, preserving completed peer artifacts. Review and judge artifacts marked as having failed validation cannot approve a transition, including artifacts produced after session reattachment.
+
+## Completion handoff and recovery
+
+Completed session artifacts carry their run/session identity in metadata. If a restart occurs
+after artifact storage returns but before the completion journal/checkpoint, the controller reuses
+matching output only after verifying its content and checksum. A changed or corrupt completion
+fails instead of silently producing another version. This lookup also handles completed peer
+versions under the same role output name.
+
+The session completion journal event retains its cursor, output reference, duration and available
+usage. Replay restores both cumulative tokens and per-role metrics before continuing, so a crash
+between that event and the next checkpoint neither redispatches the worker nor charges completion
+again. Real-component and fresh-process comparisons cover these handoff boundaries.
+
+Missing output and artifact schema failures cannot report workflow success. A final manifest
+failure is surfaced after durable completion; the saved `DONE` state and usage remain authoritative,
+and CLI inspection reconciles a stale interim manifest's running status without executing work.
+Custom report-path failures remain best-effort and do not undo completed output.
+
+Artifact content, metadata, inventory and workflow journal writes are separate effects. The
+artifact store now retains a prepared write record and finishes an interrupted write before
+serving its next operation. Completion lookup can therefore reuse the same indexed reference
+after a crash between content, metadata or inventory writes. Legacy orphan files and corrupt or
+conflicting evidence can still require explicit reconciliation. See [artifact recovery](artifacts.md)
+for the write boundary and repair rules. These boundaries do not provide a transaction across
+all files, external effects or a power-loss guarantee.
+
+## Ownership at cancellation boundaries
+
+Idle pause and abort acquire the run lock before changing state, cancelling workers or journaling.
+If acquisition fails, the controller preserves its previous state and performs none of those
+effects. Active execution retains its existing ownership until cancellation, checkpointing and
+terminal cleanup finish. Pause releases a lock it acquired for an idle operation after its
+checkpoint completes, including when checkpointing fails.
+
+CLI restoration additionally fences stale contexts against checkpoint and journal revisions;
+see [concurrent run control](cli.md#concurrent-control-of-an-existing-run). Mutual exclusion alone
+is insufficient if state and journal sequence were loaded before another owner made progress.
+
+## Execution module boundaries
+
+`LifecycleController` owns the active execution, run lock, transition state and durable action
+cursors. Collaborators receive explicit snapshots or narrow capabilities; none receives the
+controller instance.
+
+| Module                        | Responsibility and boundary                                                                                         |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `execution-accounting.ts`     | Owns token totals, worker metrics/failures/models and fired budget alerts; restores copied persisted values         |
+| `workflow-checkpoint.ts`      | Constructs the existing checkpoint schema from an execution snapshot; performs no I/O                               |
+| `run-reporting.ts`            | Builds/writes manifests and reports; reads current reporting values after asynchronous inventory collection         |
+| `session-continuation.ts`     | Attaches/responds/awaits with cancellation checks, stores completion output and merges the matching parallel result |
+| `terminal-action-executor.ts` | Executes remaining terminal actions and checkpoints each completed cursor before observing pauses/stops             |
+
+The controller still orders journal checkpoint append → state save → interim manifest. It alone
+applies session results to transitions and continuation cursors, accounts for new work and routes
+terminal failures. The terminal executor receives separate persist, dispatch, usage, pause and
+stop capabilities so moving the loop does not give another component ownership of workflow state.
+Reporting retains best-effort interim/report writes and propagates required final-manifest writer
+failures. Public engine methods, persisted field names and recovery semantics are unchanged.
+
 ## Workflow Sources
 
 The repository currently ships built-in workflows from `packages/config-templates/src/static/workflows/`.
@@ -32,7 +177,7 @@ The workflow schema and runtime currently support entry actions including:
 
 - `dispatch_worker`
 - `dispatch_parallel_workers`
-- `run_script` — executes a named script from `~/.ai/scripts/` (TypeScript via Node; other executables via shebang). Scripts may write `{"message":"..."}` to `$ORCHESTRATOR_SCRIPT_RESULT` for chat display.
+- `run_script` — executes a named script from `~/.ai/scripts/` (TypeScript via Node; other executables via shebang). Scripts may write `{"message":"..."}` to `$ORCHESTRATOR_SCRIPT_RESULT` for chat display. Exceeding the timeout fails the action even if a signal handler exits with code zero.
 - `notify_human`
 - `generate_agreement`
 - `produce_manifest`
@@ -66,6 +211,10 @@ The built-in `dev` workflow contains these states:
 
 ## PR Review Workflow
 
+The built-in `pr-review` workflow has a default budget of 7,000,000 tokens per run,
+which takes precedence over the global governance budget. Existing runs retain their saved
+workflow definition and budget.
+
 The `pr-review` workflow is a production-hardened review pipeline:
 
 1. `SETUP` — Clone PR repository and check out the PR branch
@@ -96,6 +245,10 @@ The CLI intake router (`packages/cli/src/intake-router.ts`) parses typed source 
 
 Parsed metadata flows into `rawFields` on `IntermediateRequirements` so downstream roles receive structured context.
 
+## Task Breakdown Workflow
+
+The `task-breakdown` workflow reviews decomposition for at most three rounds, aborting if the third review rejects it. Dynamic specification workers retain their original task IDs in the aggregate output even when earlier workers fail. Items without an ID use their original input index for the generated task ID.
+
 ## Key Runtime Files
 
 See `packages/workflow/src/infrastructure/workflow-engine/` for the full set. Core files include:
@@ -120,3 +273,51 @@ Prefer:
 - `packages/config-templates/src/static/workflows/dev.yaml`
 - `packages/config-templates/src/static/workflows/pr-review.yaml`
 - `packages/config-templates/src/static/workflows/task-breakdown.yaml`
+
+## Review evidence and partial batches
+
+Review and judge decisions read the exact artifact reference produced by the action, including version/checksum, rather than a later version with the same name. Missing/unreadable evidence or artifacts marked invalid cannot approve. Existing parallel-review policy tolerates provider-failed reviewers when surviving reviewers produce valid approvals; a successful/semantic-failure reviewer missing its required evidence cannot approve. This is partial-review policy, not a guarantee that every configured reviewer ran successfully.
+
+Dynamic batches preserve original task identities when workers fail or pause. They can retain partial successful results, but failure to persist the required aggregate is an action failure; an older aggregate must not make that action appear successful.
+
+The workflow execution timeout applies to one controller execution. Restore and explicit retry start a new execution timeout; token/iteration totals and budget approvals remain persisted. Agent transient retries share their original dispatch timeout.
+
+For PR-review publishing, a crash after `gh gist create` succeeds but before the result/cursor is saved has an uncertain external outcome. Before retrying PUBLISH_FINDINGS, inspect the authenticated account's Gists for `PR Review Findings — run <runId>` and reconcile the existing URL to avoid duplicate publishing. PR-review clone cleanup is best-effort; inspect retained temporary clones after a failed or forced run. Setup failures remove newly allocated clones before a repository directive can be saved.
+
+## Accepted text answers
+
+Human input may include an optional `waitIdentity` (current wait state, requesting state and
+waiting timestamp). The engine rejects a mismatched identity or blank targeted answer before
+ownership-dependent effects. The CLI supplies this identity for persisted text waits; legacy
+unbound engine inputs and session/request identity fields remain supported.
+
+A matched non-session text transition checkpoints `lastHumanAnswer` and its `resumeInput`
+continuation before exit actions. Explicitly paused text waits also retain the accepted receipt.
+The receipt survives consumption of transient worker feedback and later checkpoints, so recovery
+can reconstruct the CLI compatibility answer file under the lock. An interrupted transition
+replays its saved input; a different incoming answer cannot replace that committed input.
+A response without a matching transition does not replace the prior accepted receipt.
+
+Targeted answers journal an `answer_checkpointed` diagnostic only after durable acceptance.
+Recovery treats that diagnostic as informational; the checkpoint owns waiting/continuation state.
+A crash while evaluating a not-yet-accepted answer therefore leaves its text wait intact, and a
+delayed diagnostic cannot clear a newer wait. Targeted resume results include optional
+`answerAccepted` evidence, so governance escalation cannot falsely acknowledge an answer.
+
+## Script process ownership
+
+Workflow cancellation invalidates scripts still preparing and stops active scripts. Later abort
+cleanup actions can start scripts under a fresh cancellation generation. Cancellation and timeout
+fail the action even when the script traps SIGTERM and exits zero. The workflow retains its lock
+while execution and owned process cleanup settle.
+
+On POSIX, scripts launch in private process groups. Completion, timeout and cancellation clean up
+in-group descendants, including background children that retain pipes or outlive the parent.
+Cleanup sends SIGTERM, escalates to SIGKILL after five seconds, and waits for native child close
+and completion of the group termination policy. It clears timers and tracking on completion.
+A successful script therefore cannot leave a background service running in its owned group.
+
+Windows cleanup covers the direct child only. Descendants that create another session/group escape
+this ownership boundary. OS permission failures can prevent termination; the CLI shutdown deadline
+still bounds a responsive orchestrator. SIGKILL acceptance does not prove that arbitrary external
+work has stopped, and grandchild zombies remain the operating system reaper's responsibility.

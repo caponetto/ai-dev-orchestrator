@@ -37,3 +37,7 @@ src/
 - `lockFileContentSchema`, `LockFileContent` -- lock file structure
 - `RepairResult` -- result of an artifact repair operation
 - `StateRebuilder` -- interface for custom state rebuilding strategies
+
+## Artifact consistency maintenance
+
+`ArtifactConsistencyChecker` scans nested artifact type directories and matches `name_vN.md` with `name_vN.meta.yaml`; legacy `content.md.meta.yaml` pairs remain supported. Repair removes reported orphan files and does not follow directory symlinks. It preserves complete pairs. The checker is an explicit API and is not automatically invoked by CLI checkpoint/journal recovery. Stop all writers before repairing; afterward rebuild the artifact inventory if necessary.

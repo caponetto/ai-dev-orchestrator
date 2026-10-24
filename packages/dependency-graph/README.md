@@ -34,3 +34,7 @@ src/
 - `DefaultImpactAnalyzer` -- determines which artifacts are affected by a change
 - `DefaultStalenessDetector` -- identifies artifacts that are out of date relative to their dependencies
 - `InMemoryProvenanceTracker` -- tracks the origin and lineage of artifacts in memory
+
+## Staleness scope
+
+Staleness uses recorded provenance and versions announced through `computeStaleSet`. Publishing a newer input invalidates consumers of older versions and propagates through unchanged intermediate references. Direct checks refresh their lookup cache as provenance changes. This synchronous detector does not query the asynchronous artifact store; callers must record derivations/announce writes and reconstruct provenance after restart before relying on impact results.

@@ -468,3 +468,16 @@ describe('error handling', () => {
     }
   });
 });
+
+it.each(['started', 'aborted', 'already_terminal'] as const)(
+  'retains the %s action outcome through client response validation',
+  async (outcome) => {
+    const response = {
+      success: true,
+      outcome,
+      ...(outcome === 'started' ? {} : { finalState: 'DONE' }),
+    };
+    mockFetch.mockReturnValue(jsonResponse(response));
+    expect(await (outcome === 'started' ? api.retry('run') : api.abort('run'))).toEqual(response);
+  },
+);

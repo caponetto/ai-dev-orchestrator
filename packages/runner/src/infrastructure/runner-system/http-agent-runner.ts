@@ -593,6 +593,7 @@ export class HttpAgentRunner implements SessionCapableRunner {
           return;
         }
         resolved = true;
+        clearTimeout(overallTimer);
         transport.close();
         resolve(result);
       };
@@ -667,7 +668,6 @@ export class HttpAgentRunner implements SessionCapableRunner {
             void this.handleHttpClarificationRequest(message, task, transport, onStreamEvent);
             break;
           case 'done': {
-            clearTimeout(overallTimer);
             const d = message.payload;
             finish({
               taskId: task.taskId,
@@ -678,7 +678,6 @@ export class HttpAgentRunner implements SessionCapableRunner {
             break;
           }
           case 'error': {
-            clearTimeout(overallTimer);
             const e = message.payload;
             finish({
               taskId: task.taskId,
@@ -698,7 +697,6 @@ export class HttpAgentRunner implements SessionCapableRunner {
       });
 
       transport.onError(() => {
-        clearTimeout(overallTimer);
         finish({
           taskId: task.taskId,
           status: 'failure',

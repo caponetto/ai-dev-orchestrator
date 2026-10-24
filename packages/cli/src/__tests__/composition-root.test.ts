@@ -1,11 +1,18 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { generateAll } from '@ai-dev-orchestrator/config-templates';
 import { DefaultStatePersistence } from '@ai-dev-orchestrator/core';
+import { ShutdownCoordinator } from '@ai-dev-orchestrator/recovery';
+import {
+  AgentSessionReaper,
+  DefaultAgentSessionStore,
+  RemoteAgentSessionSupervisor,
+} from '@ai-dev-orchestrator/runner';
 import { AI_CONFIG_DIR_NAME } from '@ai-dev-orchestrator/schemas';
-import type { PersistedState, RunId } from '@ai-dev-orchestrator/schemas';
+import type { PersistedState, RunId, WorkflowDefinition } from '@ai-dev-orchestrator/schemas';
+import { LifecycleController } from '@ai-dev-orchestrator/workflow';
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 
 import {
@@ -15,12 +22,14 @@ import {
   loadWorkflowByName,
   loadWorkflowFromConfig,
   resumeOrchestrator,
+  preflightSelectedModels,
 } from '../composition-root';
 import { getConfigSnapshotPath } from '../workspace-paths';
 
 const mockGlobalConfigPath = vi.hoisted(() => ({ value: '' }));
 const mockPaths = vi.hoisted(() => ({ aiDir: '', runsDir: '' }));
 const mockProbes = vi.hoisted(() => ({
+  probeModel: vi.fn(),
   probeClaudeCode: vi.fn(),
   probeCursor: vi.fn(),
   probeCodex: vi.fn(),
@@ -31,6 +40,7 @@ vi.mock('../workspace-paths', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...(actual as object),
+    getConfigSnapshotPath: vi.fn((runDir: string) => join(runDir, 'config-snapshot.json')),
     getGlobalConfigPath: () => mockGlobalConfigPath.value || '/nonexistent/global/config.yaml',
     getAiDir: () => mockPaths.aiDir,
     getRunsDir: () => mockPaths.runsDir,
@@ -43,6 +53,7 @@ vi.mock('@ai-dev-orchestrator/agent-adapters', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...(actual as object),
+    probeModelAvailability: mockProbes.probeModel,
     probeClaudeCodeCapabilities: mockProbes.probeClaudeCode,
     probeCursorCliCapabilities: mockProbes.probeCursor,
     probeCodexCliCapabilities: mockProbes.probeCodex,
@@ -65,9 +76,13 @@ describe('composition-root orchestrator creation', () => {
   beforeEach(() => {
     baseDir = join(tmpdir(), `comp-root-test-${String(Date.now())}`);
     mkdirSync(baseDir, { recursive: true });
+    vi.mocked(getConfigSnapshotPath)
+      .mockReset()
+      .mockImplementation((runDir: string) => join(runDir, 'config-snapshot.json'));
     mockPaths.aiDir = join(baseDir, '.ai');
     mockPaths.runsDir = join(baseDir, '.ai', 'runs');
 
+    mockProbes.probeModel.mockReset().mockResolvedValue({ available: true });
     mockProbes.probeClaudeCode.mockResolvedValue({
       adapterName: 'claude-code',
       probedAt: '2026-01-01T00:00:00Z',
@@ -127,7 +142,104 @@ describe('composition-root orchestrator creation', () => {
     process.removeAllListeners('SIGTERM');
     process.removeAllListeners('SIGINT');
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
     mockGlobalConfigPath.value = '';
+  });
+
+  it('wires remote reconnect cancellation into the production connection factory', async () => {
+    vi.stubEnv('AI_ORCHESTRATOR_FIXTURE', '1');
+    const factory = vi.spyOn(RemoteAgentSessionSupervisor.prototype, 'setTransportFactory');
+    const context = await createOrchestrator(baseDir);
+    try {
+      const controller = new AbortController();
+      controller.abort();
+      const connect = factory.mock.calls[0][0];
+      await expect(
+        connect(
+          {
+            sessionId: 'remote',
+            runId: 'run',
+            stateId: 'WORK',
+            role: 'planner',
+            transport: 'remote',
+          },
+          {
+            type: 'remote',
+            remoteSessionId: 'server-session',
+            reconnectUrl: 'ws://localhost/socket',
+          },
+          controller.signal,
+        ),
+      ).rejects.toThrow('WebSocket connection cancelled');
+    } finally {
+      context.shutdownCoordinator?.uninstall();
+    }
+  });
+  it('keeps orphan session files unchanged while constructing an unowned resume context', async () => {
+    vi.stubEnv('AI_ORCHESTRATOR_FIXTURE', '1');
+    const original = await createOrchestrator(baseDir);
+    const sessions = new DefaultAgentSessionStore(mockPaths.runsDir);
+    await sessions.saveSnapshot({
+      ref: {
+        sessionId: 'orphan',
+        runId: original.runId,
+        role: 'planner',
+        stateId: 'WORK',
+        transport: 'stdio',
+      },
+      state: 'running',
+      reconnect: { type: 'stdio', pid: 999999 },
+      pendingRequests: [],
+      createdAt: '',
+      updatedAt: '',
+      lastProtocolTimestamp: '',
+    });
+    const reaper = vi.spyOn(AgentSessionReaper.prototype, 'reap');
+    const before = await sessions.loadSnapshot('orphan', original.runId);
+    const restored = await resumeOrchestrator(baseDir, original.runId);
+    for (const result of reaper.mock.results) {
+      if (result.type === 'return') {
+        await result.value;
+      }
+    }
+    restored.shutdownCoordinator?.uninstall();
+    original.shutdownCoordinator?.uninstall();
+    expect(reaper).not.toHaveBeenCalled();
+    expect(await sessions.loadSnapshot('orphan', original.runId)).toEqual(before);
+  });
+
+  it('removes signal handlers if writing a new context snapshot fails', async () => {
+    vi.stubEnv('AI_ORCHESTRATOR_FIXTURE', '1');
+    writeFullAiConfig(baseDir);
+    const before = process.listenerCount('SIGINT');
+    const uninstall = vi.spyOn(ShutdownCoordinator.prototype, 'uninstall');
+    vi.mocked(getConfigSnapshotPath).mockReturnValue(baseDir);
+    await expect(createOrchestrator(baseDir)).rejects.toThrow();
+    expect(uninstall).toHaveBeenCalledOnce();
+    expect(process.listenerCount('SIGINT')).toBe(before);
+  });
+  it('removes signal handlers if restoring an existing context fails', async () => {
+    vi.stubEnv('AI_ORCHESTRATOR_FIXTURE', '1');
+    writeFullAiConfig(baseDir);
+    const context = await createOrchestrator(baseDir);
+    const definition: WorkflowDefinition = {
+      name: 'shutdown-context',
+      version: '1',
+      initialState: 'DONE',
+      terminalStates: ['DONE'],
+      states: { DONE: { type: 'terminal', description: '', transitions: [] } },
+    };
+    writeFileSync(join(context.runDir, 'workflow-definition.json'), JSON.stringify(definition));
+    await context.engine.start(createRunConfig(context.runId, [], definition));
+    context.shutdownCoordinator?.uninstall();
+    const before = process.listenerCount('SIGINT');
+    const uninstall = vi.spyOn(ShutdownCoordinator.prototype, 'uninstall');
+    vi.spyOn(LifecycleController.prototype, 'restore').mockImplementationOnce(() => {
+      throw new Error('restore failed');
+    });
+    await expect(resumeOrchestrator(baseDir, context.runId)).rejects.toThrow('restore failed');
+    expect(uninstall).toHaveBeenCalledOnce();
+    expect(process.listenerCount('SIGINT')).toBe(before);
   });
 
   it('succeeds when all roles are agent-dispatched and no provider key is set', async () => {
@@ -148,12 +260,66 @@ describe('composition-root orchestrator creation', () => {
         '    required_capabilities: [reasoning]',
         '    model: claude-opus-4-8',
         '    dispatch_type: agent',
+        '    runner: codex',
       ].join('\n'),
       'utf8',
     );
 
     const ctx = await createOrchestrator(baseDir);
     expect(ctx.runId).toBeTruthy();
+  });
+
+  it('rejects unavailable models before creating any run directory', async () => {
+    mockProbes.probeModel.mockResolvedValue({ available: false, detail: 'Model retired' });
+
+    await expect(createOrchestrator(baseDir)).rejects.toThrow(/Model retired/u);
+    expect(existsSync(mockPaths.runsDir)).toBe(false);
+  });
+
+  it('reuses a fresh dashboard preflight receipt without repeating inference', async () => {
+    const { receipt } = await preflightSelectedModels(baseDir);
+    expect(receipt).toBeTruthy();
+    vi.stubEnv('AI_ORCHESTRATOR_MODEL_PREFLIGHT', receipt);
+    mockProbes.probeModel.mockClear();
+
+    const ctx = await createOrchestrator(baseDir);
+    ctx.shutdownCoordinator?.uninstall();
+    expect(mockProbes.probeModel).not.toHaveBeenCalled();
+  });
+
+  it('rechecks models when the repository context changes', async () => {
+    const { receipt } = await preflightSelectedModels('/different/repo');
+    vi.stubEnv('AI_ORCHESTRATOR_MODEL_PREFLIGHT', receipt);
+    mockProbes.probeModel.mockClear();
+
+    const ctx = await createOrchestrator(baseDir);
+    ctx.shutdownCoordinator?.uninstall();
+    expect(mockProbes.probeModel).toHaveBeenCalled();
+  });
+
+  it('rechecks models when configuration changes after dashboard validation', async () => {
+    writeFullAiConfig(baseDir);
+    const { receipt } = await preflightSelectedModels(baseDir);
+    vi.stubEnv('AI_ORCHESTRATOR_MODEL_PREFLIGHT', receipt);
+    const configPath = join(mockPaths.aiDir, 'config.yaml');
+    const content = readFileSync(configPath, 'utf8');
+    writeFileSync(configPath, content.replace('log_level: info', 'log_level: debug'), 'utf8');
+    mockProbes.probeModel.mockClear();
+
+    const ctx = await createOrchestrator(baseDir);
+    ctx.shutdownCoordinator?.uninstall();
+    expect(mockProbes.probeModel).toHaveBeenCalled();
+  });
+
+  it('rechecks models when the dashboard preflight receipt expires', async () => {
+    const { receipt } = await preflightSelectedModels(baseDir);
+    const fingerprint = receipt?.split(':')[0] ?? '';
+    vi.stubEnv('AI_ORCHESTRATOR_MODEL_PREFLIGHT', `${fingerprint}:${String(Date.now() - 61_000)}`);
+    mockProbes.probeModel.mockClear();
+
+    const ctx = await createOrchestrator(baseDir);
+    ctx.shutdownCoordinator?.uninstall();
+    expect(mockProbes.probeModel).toHaveBeenCalled();
   });
 
   it('falls back silently when no .ai/ directory exists', async () => {
@@ -330,50 +496,119 @@ describe('composition-root orchestrator creation', () => {
     }
   });
 
-  it('resumeOrchestrator passes repoRoot through to the restored engine config', async () => {
-    process.env['AI_ORCHESTRATOR_FIXTURE'] = '1';
-    try {
-      const ctx = await createOrchestrator(baseDir);
-      const runId = ctx.runId;
-      const runDir = ctx.runDir;
-      ctx.shutdownCoordinator?.uninstall();
+  it.each([false, true])(
+    'resumeOrchestrator restores repoRoot with a persisted override: %s',
+    async (hasOverride) => {
+      process.env['AI_ORCHESTRATOR_FIXTURE'] = '1';
+      try {
+        const ctx = await createOrchestrator(baseDir);
+        const runId = ctx.runId;
+        const runDir = ctx.runDir;
+        ctx.shutdownCoordinator?.uninstall();
 
-      const statePersistence = new DefaultStatePersistence(mockPaths.runsDir);
-      const checkpoint: PersistedState = {
-        runId: runId as RunId,
-        schemaVersion: 2,
-        currentState: 'WAITING_FOR_HUMAN',
-        previousState: 'INTAKE',
-        stateEnteredAt: new Date().toISOString(),
-        transitionCount: 1,
-        stateHistory: ['INTAKE', 'WAITING_FOR_HUMAN'],
-        iterationCounts: {},
-        activeArtifacts: [],
-        lastProducedArtifact: null,
-        workflowName: 'dev',
-        workflowVersion: '1.0.0',
-        persistedAt: new Date().toISOString(),
-        persistenceVersion: 1,
-        checksum: '',
-      };
-      await statePersistence.save(checkpoint);
+        const statePersistence = new DefaultStatePersistence(mockPaths.runsDir);
+        const clonedRoot = join(baseDir, 'cloned');
+        mkdirSync(clonedRoot, { recursive: true });
+        const checkpoint: PersistedState = {
+          runId: runId as RunId,
+          schemaVersion: 2,
+          currentState: 'WAITING_FOR_HUMAN',
+          previousState: 'INTAKE',
+          stateEnteredAt: new Date().toISOString(),
+          transitionCount: 1,
+          stateHistory: ['INTAKE', 'WAITING_FOR_HUMAN'],
+          iterationCounts: {},
+          activeArtifacts: [],
+          lastProducedArtifact: null,
+          workflowName: 'dev',
+          workflowVersion: '1.0.0',
+          persistedAt: new Date().toISOString(),
+          persistenceVersion: 1,
+          checksum: '',
+          repoRoot: hasOverride ? clonedRoot : undefined,
+        };
+        await statePersistence.save(checkpoint);
 
-      writeFileSync(join(runDir, 'journal.md'), `# Journal — ${runId}\n`, 'utf8');
+        writeFileSync(join(runDir, 'journal.md'), `# Journal — ${runId}\n`, 'utf8');
 
-      const repoRoot = '/home/test-user/my-project';
-      const resumed = await resumeOrchestrator(repoRoot, runId);
-      resumed.shutdownCoordinator?.uninstall();
+        const repoRoot = '/home/test-user/my-project';
+        const resumed = await resumeOrchestrator(repoRoot, runId);
+        resumed.shutdownCoordinator?.uninstall();
 
-      const state = resumed.engine.getState();
-      expect(state.currentState).toBe('WAITING_FOR_HUMAN');
+        const state = resumed.engine.getState();
+        expect(state.currentState).toBe('WAITING_FOR_HUMAN');
 
-      await resumed.engine.resume({ type: 'approval', content: 'test' });
+        await resumed.engine.resume({ type: 'approval', content: 'test' });
 
-      const loaded = resumed.statePersistence.load(runId as RunId);
-      expect(loaded?.repoRoot).toBe(repoRoot);
-    } finally {
-      delete process.env['AI_ORCHESTRATOR_FIXTURE'];
-    }
+        const loaded = resumed.statePersistence.load(runId as RunId);
+        expect(loaded?.repoRoot).toBe(hasOverride ? clonedRoot : repoRoot);
+      } finally {
+        delete process.env['AI_ORCHESTRATOR_FIXTURE'];
+      }
+    },
+  );
+
+  it('resumes journaled cleanup after a checkpoint write failure without repeating completed actions', async () => {
+    vi.stubEnv('AI_ORCHESTRATOR_FIXTURE', '1');
+    const ctx = await createOrchestrator(baseDir);
+    ctx.shutdownCoordinator?.uninstall();
+    const workflow: WorkflowDefinition = {
+      name: 'checkpoint-recovery',
+      version: '1',
+      initialState: 'WORK',
+      terminalStates: ['DONE'],
+      states: {
+        WORK: {
+          type: 'action',
+          description: '',
+          transitions: [
+            {
+              target: 'DONE',
+              trigger: 'completion',
+              guards: [],
+              priority: 1,
+              governanceRequired: false,
+            },
+          ],
+        },
+        DONE: {
+          type: 'terminal',
+          description: '',
+          transitions: [],
+          entryActions: ['cleanup-a', 'cleanup-b'].map((name) => ({
+            type: 'store_artifact',
+            params: { type: 'intake_requirements', name, content: 'completed' },
+          })),
+        },
+      },
+    };
+    writeFileSync(join(ctx.runDir, 'workflow-definition.json'), JSON.stringify(workflow));
+    const save = ctx.statePersistence.save.bind(ctx.statePersistence);
+    let failed = false;
+    vi.spyOn(ctx.statePersistence, 'save').mockImplementation(async (state) => {
+      if (!failed && state.entryActionContinuation?.nextActionIndex === 1) {
+        failed = true;
+        throw new Error('checkpoint write failed');
+      }
+      await save(state);
+    });
+    await expect(
+      ctx.engine.start(
+        createRunConfig(ctx.runId, [], workflow, { repoRoot: baseDir, runDir: ctx.runDir }),
+      ),
+    ).rejects.toThrow('checkpoint write failed');
+    expect(
+      ctx.statePersistence.load(ctx.runId as RunId)?.entryActionContinuation?.nextActionIndex,
+    ).toBe(0);
+    const restored = await resumeOrchestrator(baseDir, ctx.runId);
+    restored.shutdownCoordinator?.uninstall();
+    expect((await restored.engine.retry()).finalState).toBe('DONE');
+    expect(await restored.artifactStore.history('intake_requirements', 'cleanup-a')).toHaveLength(
+      1,
+    );
+    expect(await restored.artifactStore.history('intake_requirements', 'cleanup-b')).toHaveLength(
+      1,
+    );
   });
 
   it('resumeOrchestrator restores sources from config-snapshot', async () => {

@@ -1,9 +1,13 @@
 import { existsSync, readFileSync } from 'node:fs';
 
 import type { ArtifactMetadata, ArtifactRef } from '@ai-dev-orchestrator/schemas';
+import { artifactMetadataSchema } from '@ai-dev-orchestrator/schemas';
 import { parse } from 'yaml';
 
-import { ArtifactNotFoundError } from '../../domain/artifact-system/errors';
+import {
+  ArtifactNotFoundError,
+  InventoryCorruptionError,
+} from '../../domain/artifact-system/errors';
 
 /** Read artifact content from disk. Throws ArtifactNotFoundError if the file does not exist. */
 export function readContent(filePath: string, ref: ArtifactRef): string {
@@ -19,7 +23,30 @@ export function readMetadata(filePath: string, ref: ArtifactRef): ArtifactMetada
     throw new ArtifactNotFoundError(ref);
   }
   const content = readFileSync(filePath, 'utf8');
-  return parse(content) as ArtifactMetadata;
+  try {
+    // Older sidecars omitted predecessorRef; preserve their read compatibility.
+    const metadata = artifactMetadataSchema
+      .extend({
+        predecessorRef: artifactMetadataSchema.shape.predecessorRef.default(null),
+      })
+      .parse(parse(content));
+    if (
+      metadata.type !== ref.type ||
+      metadata.name !== ref.name ||
+      metadata.version !== ref.version ||
+      !Number.isSafeInteger(metadata.version) ||
+      metadata.version < 1 ||
+      !Number.isSafeInteger(metadata.sizeBytes) ||
+      metadata.sizeBytes < 0
+    ) {
+      throw new Error('metadata identity or size is invalid');
+    }
+    return metadata;
+  } catch {
+    throw new InventoryCorruptionError(
+      `Invalid artifact metadata at ${filePath}; preserve and repair the sidecar before retrying`,
+    );
+  }
 }
 
 /** Check if a file exists on disk. */

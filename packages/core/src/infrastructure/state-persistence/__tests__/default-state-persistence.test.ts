@@ -517,7 +517,7 @@ describe('DefaultStatePersistence', () => {
       expect(result?.judgeArbitrationCounts).toEqual({});
     });
 
-    it('does not count JUDGE_ARBITRATION entry without contractId (legacy journals)', () => {
+    it('recovers built-in judge counts without contractId in legacy journals', () => {
       const persistence = new DefaultStatePersistence(TEST_DIR);
       const events: JournalEvent[] = [
         {
@@ -547,7 +547,7 @@ describe('DefaultStatePersistence', () => {
       const result = persistence.reconstructFromJournal(createRunId('run-001'), events);
 
       expect(result).not.toBeNull();
-      expect(result?.judgeArbitrationCounts).toEqual({});
+      expect(result?.judgeArbitrationCounts).toEqual({ implementation_review_loop: 1 });
     });
 
     it('reconstructs waitingContext from wait-state human_input_requested event', () => {

@@ -43,7 +43,15 @@ export function AbortDialog({
         showError(result.error ?? 'Abort failed');
         return;
       }
-      showSuccess('Run aborted');
+      showSuccess(
+        result.outcome === 'already_terminal'
+          ? result.finalState
+            ? `Run already in terminal state: ${result.finalState}`
+            : 'Run already terminal'
+          : result.outcome === 'aborted'
+            ? 'Run aborted'
+            : 'Abort request acknowledged',
+      );
       onOpenChange(false);
       onAborted();
     } catch (e: unknown) {
@@ -112,7 +120,7 @@ export function RetryDialog({
         showError(result.error ?? 'Retry failed');
         return;
       }
-      showSuccess('Run retried');
+      showSuccess('Retry requested');
       onOpenChange(false);
       onRetried();
     } catch (e: unknown) {
@@ -172,7 +180,7 @@ export function RerunDialog({
         showError(result.error ?? 'Rerun failed');
         return;
       }
-      showSuccess('New run started');
+      showSuccess('Run creation requested');
       onOpenChange(false);
       onRerun();
     } catch (e: unknown) {

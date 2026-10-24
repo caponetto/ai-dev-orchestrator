@@ -74,6 +74,9 @@
         "tsconfig.json",
         "tsconfig.base.json",
         "vitest.scripts.config.ts",
+        "turbo.json",
+        "packages/cli/turbo.json",
+        ".husky/pre-commit",
         "scripts/**/*.ts"
       ],
       "outputs": ["coverage-scripts/**", "test-report.scripts.junit.xml"]

@@ -35,6 +35,7 @@ export default defineConfig(
         typescript: {
           alwaysTryTypes: true,
           project: ['tsconfig.base.json', 'packages/*/tsconfig.json'],
+          noWarnOnMultipleProjects: true,
         },
       },
     },

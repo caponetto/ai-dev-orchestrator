@@ -48,9 +48,19 @@ describe('runner-registry', () => {
       expect(codex?.models).toContain('gpt-5.6-luna');
     });
 
-    it('opencode runner advertises OpenCode models', () => {
+    it('opencode runner matches the available models reported by CLI 1.19.4', () => {
       const opencode = loadRunnerRegistry().find((runner) => runner.id === 'opencode');
-      expect(opencode?.models).toContain('opencode/mimo-v2.6-flash-free');
+      expect(opencode?.models).toEqual([
+        'opencode/big-pickle',
+        'opencode/mimo-v2.6-flash-free',
+        'opencode/nemotron-3-ultra-free',
+        'opencode/nemotron-3.5-lightning-free',
+        'opencode/deepseek-v4.1-flash-free',
+        'opencode/nemotron-3.5-super-vl-free',
+        'opencode/beam-free',
+        'opencode/flint-40b-free',
+        'opencode/glm-5.3-flash-free',
+      ]);
     });
 
     it('returns same data on consecutive calls', () => {

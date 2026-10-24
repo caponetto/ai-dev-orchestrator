@@ -23,8 +23,8 @@ export interface RoleRegistry {
     calibrationData?: readonly ModelCalibrationEntry[],
   ): ModelAssignment;
 
-  /** Get the next model tier for a role, or null if already at the highest tier. */
-  getNextTier(roleId: RoleId): ModelAssignment | null;
+  /** Get the tier above currentModel (or the role's configured model), or null at the highest tier. */
+  getNextTier(roleId: RoleId, currentModel?: string): ModelAssignment | null;
 
   /** Validate the complete role configuration. */
   validate(): RoleValidationResult;

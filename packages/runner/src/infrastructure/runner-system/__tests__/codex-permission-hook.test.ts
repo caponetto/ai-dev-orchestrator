@@ -106,12 +106,13 @@ describe('handleCodexPermissionHook', () => {
     return contextPath;
   }
 
-  it('auto-grants writes under ~/.ai via permission policy', async () => {
-    const contextPath = await writeContext(makeContext());
+  it('auto-grants structured file writes inside the current run via permission policy', async () => {
+    const context = makeContext();
+    const contextPath = await writeContext(context);
     const stdin = JSON.stringify({
       tool_name: 'apply_patch',
       tool_input: {
-        command: 'write /Users/test/.ai/runs/run-hook-test/artifacts/spec.json',
+        file_path: join(context.repoRoot, '.ai', 'runs', context.runId, 'artifacts', 'spec.json'),
       },
     });
 
@@ -126,6 +127,23 @@ describe('handleCodexPermissionHook', () => {
     expect(stream).toContain('granted');
     expect(stream).toContain('"action":"file_write"');
     expect(stream).toContain('spec.json');
+  });
+
+  it('does not exempt unstructured patch text merely because it mentions a run path', async () => {
+    const context = makeContext({ role: 'security_reviewer' });
+    const contextPath = await writeContext(context);
+    const response = await handleCodexPermissionHook(
+      contextPath,
+      JSON.stringify({
+        tool_name: 'apply_patch',
+        tool_input: {
+          command: `*** Begin Patch\n*** Add File: ${join(context.repoRoot, '.ai', 'runs', context.runId, 'out.json')}`,
+        },
+      }),
+    );
+    expect(JSON.parse(response)).toMatchObject({
+      hookSpecificOutput: { decision: { behavior: 'deny' } },
+    });
   });
 
   it('creates a live request and waits for dashboard approval', async () => {

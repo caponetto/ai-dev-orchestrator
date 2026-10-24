@@ -9,20 +9,24 @@ export { NamedGithubActionsReporter } from './github-actions-reporter.js';
 
 const packagesDir = resolve(import.meta.dirname, '../../');
 
-export const workspaceAliases: Record<string, string> = Object.fromEntries(
-  readdirSync(packagesDir, { withFileTypes: true })
-    .filter((d) => d.isDirectory())
-    .map((d) => {
-      const pkgPath = resolve(packagesDir, d.name, 'package.json');
-      try {
-        const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as { name: string };
-        return [pkg.name, resolve(packagesDir, d.name, 'src', 'index.ts')];
-      } catch {
-        return null;
-      }
-    })
-    .filter((entry): entry is [string, string] => entry !== null),
-);
+export const workspaceAliases: Record<string, string> = {
+  // Subpaths must precede package aliases: Vite accepts the first prefix match.
+  '@ai-dev-orchestrator/utils/owned-process': resolve(packagesDir, 'utils/src/owned-process.ts'),
+  ...Object.fromEntries(
+    readdirSync(packagesDir, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => {
+        const pkgPath = resolve(packagesDir, d.name, 'package.json');
+        try {
+          const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as { name: string };
+          return [pkg.name, resolve(packagesDir, d.name, 'src', 'index.ts')];
+        } catch {
+          return null;
+        }
+      })
+      .filter((entry): entry is [string, string] => entry !== null),
+  ),
+};
 
 function detectPackageName(): string | undefined {
   try {

@@ -1,3 +1,7 @@
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import type { PermissionRequestPayload } from '@ai-dev-orchestrator/agent-protocol';
 import type { PermissionContext } from '@ai-dev-orchestrator/ports';
 import { describe, expect, it } from 'vitest';
@@ -25,6 +29,160 @@ function makeContext(overrides: Partial<PermissionContext> = {}): PermissionCont
 }
 
 describe('DefaultPermissionPolicy', () => {
+  it.each(['static_reviewer', 'verifier'])(
+    'uses the actual shell action instead of a read-only display label for %s',
+    (role) => {
+      const command = 'touch /tmp/changed-file';
+      const result = new DefaultPermissionPolicy().evaluate(
+        makeRequest({
+          action: 'shell_execute',
+          resource: command,
+          detail: 'Read: innocent',
+          riskLevel: 'high',
+          toolInput: { command },
+        }),
+        makeContext({ role }),
+      );
+      expect(result.action).not.toBe('grant');
+    },
+  );
+
+  it('allows its own run output but rejects a symlink escaping the run directory', () => {
+    const root = mkdtempSync(join(tmpdir(), 'permission-path-'));
+    try {
+      const run = join(root, '.ai', 'runs', 'run-1');
+      const outside = join(root, 'private');
+      mkdirSync(run, { recursive: true });
+      mkdirSync(outside);
+      symlinkSync(outside, join(run, 'escape'), 'dir');
+      const policy = new DefaultPermissionPolicy();
+      const context = makeContext({ role: 'static_reviewer', repoRoot: root });
+      expect(
+        policy.evaluate(
+          makeRequest({
+            resource: join(run, 'review.json'),
+            riskLevel: 'high',
+          }),
+          context,
+        ).action,
+      ).toBe('grant');
+      expect(
+        policy.evaluate(
+          makeRequest({
+            resource: join(run, 'escape', 'private.json'),
+            riskLevel: 'high',
+          }),
+          context,
+        ).action,
+      ).toBe('deny');
+      expect(
+        policy.evaluate(
+          makeRequest({
+            resource: `${run}/escape/../private.json`,
+            riskLevel: 'high',
+          }),
+          context,
+        ).action,
+      ).toBe('deny');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not let path traversal escape an explicit repository file grant', () => {
+    const decision = new DefaultPermissionPolicy({
+      rules: [{ action: 'file_write', decision: 'grant', scope: '${repoRoot}/**' }],
+    }).evaluate(
+      makeRequest({ resource: '/repo/../outside/file.ts', riskLevel: 'high' }),
+      makeContext({ role: 'static_reviewer' }),
+    );
+    expect(decision.action).toBe('deny');
+  });
+
+  it('does not classify a file write as a read based on its display label', () => {
+    const decision = new DefaultPermissionPolicy().evaluate(
+      makeRequest({
+        action: 'file_write',
+        detail: 'Read: src/main.ts',
+        riskLevel: 'high',
+      }),
+      makeContext({ role: 'static_reviewer' }),
+    );
+    expect(decision.action).toBe('deny');
+  });
+
+  it('asks for destructive commands even when their reported risk is low', () => {
+    const command = 'rm -rf /tmp/data';
+    const decision = new DefaultPermissionPolicy().evaluate(
+      makeRequest({
+        action: 'shell_execute',
+        resource: command,
+        detail: `Bash: ${command}`,
+        riskLevel: 'low',
+        toolInput: { command },
+      }),
+      makeContext({ role: 'verifier' }),
+    );
+    expect(decision.action).toBe('ask_human');
+  });
+  it.each([
+    'git status | rm -rf /tmp/data',
+    'git diff > /tmp/changed-file',
+    'gh pr view 1 > /tmp/changed-file',
+    'git status $(touch /tmp/changed-file)',
+    'git status & touch /tmp/changed-file',
+    'git diff | sort -o /tmp/changed-file',
+    'git diff | uniq /dev/stdin /tmp/changed-file',
+    'rm -rf /tmp/data # /repo/.ai/runs/run-1/artifacts',
+  ])('does not classify a mutating shell request as read-only: %s', (command) => {
+    const decision = new DefaultPermissionPolicy().evaluate(
+      makeRequest({
+        action: 'shell_execute',
+        resource: command,
+        detail: `Bash: ${command}`,
+        riskLevel: 'high',
+        toolInput: { command },
+      }),
+      makeContext({ role: 'static_reviewer' }),
+    );
+    expect(decision.action).not.toBe('grant');
+  });
+
+  it.each([
+    '/repo/.ai/governance.yaml',
+    '/repo/.ai/runs/another-run/artifacts/review.json',
+    '/repo/.ai/runs/run-1/../../governance.yaml',
+  ])(
+    'does not grant a reviewer writes outside its own normalized run directory: %s',
+    (resource) => {
+      const decision = new DefaultPermissionPolicy().evaluate(
+        makeRequest({
+          action: 'file_write',
+          resource,
+          detail: `Write: ${resource}`,
+          riskLevel: 'high',
+        }),
+        makeContext({ role: 'static_reviewer' }),
+      );
+      expect(decision.action).toBe('deny');
+    },
+  );
+
+  it('does not grant a medium-trust pipeline just because its first command is safe', () => {
+    const command = 'cat input.json | sh';
+    const decision = new DefaultPermissionPolicy().evaluate(
+      makeRequest({
+        action: 'shell_execute',
+        resource: command,
+        detail: `Bash: ${command}`,
+        riskLevel: 'high',
+        toolInput: { command },
+      }),
+      makeContext({ role: 'verifier' }),
+    );
+    expect(decision.action).toBe('ask_human');
+  });
+
   describe('role trust levels', () => {
     it('auto-approves low risk for high-trust role (implementer)', () => {
       const policy = new DefaultPermissionPolicy();
@@ -346,7 +504,7 @@ describe('DefaultPermissionPolicy', () => {
           resource: '/repo/.ai/runs/run-123/artifacts/spec.json',
           riskLevel: 'medium',
         }),
-        makeContext({ role: 'verifier', repoRoot: '/repo' }),
+        makeContext({ role: 'verifier', repoRoot: '/repo', runId: 'run-123' }),
       );
       expect(decision.action).toBe('grant');
       expect(decision.reason).toContain('.ai run directory');
@@ -361,7 +519,7 @@ describe('DefaultPermissionPolicy', () => {
           riskLevel: 'medium',
           toolInput: { file_path: '/repo/.ai/runs/run-456/artifacts/output.json' },
         }),
-        makeContext({ role: 'context_analyst', repoRoot: '/repo' }),
+        makeContext({ role: 'context_analyst', repoRoot: '/repo', runId: 'run-456' }),
       );
       expect(decision.action).toBe('grant');
     });
@@ -415,7 +573,7 @@ describe('DefaultPermissionPolicy', () => {
           resource: '/repo/.ai/runs/run-789/artifacts/review.json',
           riskLevel: 'high',
         }),
-        makeContext({ role: 'static_reviewer', repoRoot: '/repo' }),
+        makeContext({ role: 'static_reviewer', repoRoot: '/repo', runId: 'run-789' }),
       );
       expect(decision.action).toBe('grant');
     });

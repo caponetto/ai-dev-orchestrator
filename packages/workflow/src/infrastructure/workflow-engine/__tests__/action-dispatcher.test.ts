@@ -8,8 +8,8 @@ import type {
   StalenessDetector,
 } from '@ai-dev-orchestrator/ports';
 import { createRunId } from '@ai-dev-orchestrator/ports';
-import type { Action, AgreementGateResult } from '@ai-dev-orchestrator/schemas';
-import { describe, expect, it, vi } from 'vitest';
+import type { Action, AgreementGateResult, DispatchResult } from '@ai-dev-orchestrator/schemas';
+import { assert, describe, expect, it, vi } from 'vitest';
 
 import { ActionDispatcher } from '../action-dispatcher';
 
@@ -92,6 +92,138 @@ function makeGate(): AgreementGate {
 }
 
 describe('ActionDispatcher', () => {
+  it('fails dynamic completion when its required aggregate cannot be stored', async () => {
+    const store = makeStore();
+    vi.mocked(store).store.mockRejectedValue(new Error('aggregate write failed'));
+    const dispatcher = new ActionDispatcher(makeRunner(), store, makeJournal());
+    const result = await dispatcher.finalizeDynamicResult({
+      action: {
+        type: 'dispatch_dynamic_workers',
+        params: { role: 'task_spec_writer', sourceArtifact: 'task_breakdown', itemsPath: 'tasks' },
+      },
+      success: true,
+      workerResults: [
+        {
+          taskId: 'A',
+          role: 'task_spec_writer',
+          success: true,
+          artifactRef: { type: 'canonical_specification', name: 'A', version: 1, checksum: 'abc' },
+        },
+      ],
+    });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('aggregate write failed');
+    expect(result.workerResults?.[0]?.taskId).toBe('A');
+  });
+
+  it.each(['failure', 'awaiting_human'] as const)(
+    'stops later entry actions after %s',
+    async (outcome) => {
+      const runner = makeRunner();
+      vi.mocked(runner).dispatch.mockResolvedValue({
+        workerId: 'worker',
+        role: 'planner',
+        status: outcome === 'failure' ? 'failure' : 'success',
+        outputArtifacts: [],
+        metrics: {
+          startedAt: '',
+          completedAt: '',
+          durationMs: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          retryCount: 0,
+          modelUsed: '',
+        },
+        ...(outcome === 'awaiting_human' ? { sessionOutcome: 'awaiting_human' as const } : {}),
+      });
+      const journal = makeJournal();
+      const results = await new ActionDispatcher(runner, makeStore(), journal).executeAll(
+        [
+          { type: 'dispatch_worker', params: { role: 'planner' } },
+          { type: 'record_journal', params: { event: 'run_completed' } },
+        ],
+        createRunId('run-001'),
+        'PLANNING',
+      );
+      expect(results).toHaveLength(1);
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- Assert the mock's recorded calls.
+      expect(vi.mocked(journal).append).not.toHaveBeenCalled();
+    },
+  );
+  /* eslint-disable @typescript-eslint/unbound-method -- Assertions inspect Vitest mock methods. */
+  it.each([0, 1])('preserves task IDs when dynamic worker %i fails', async (failedIndex) => {
+    const store = makeStore();
+    vi.mocked(store).list.mockResolvedValue([
+      { type: 'task_breakdown', name: 'tasks', version: 1, checksum: 'abc' },
+    ]);
+    vi.mocked(store).get.mockResolvedValue({
+      ref: { type: 'task_breakdown', name: 'tasks', version: 1, checksum: 'abc' },
+      type: 'task_breakdown',
+      name: 'tasks',
+      version: 1,
+      checksum: 'abc',
+      producedBy: 'decomposer',
+      createdAt: '',
+      sizeBytes: 0,
+      content: JSON.stringify({ tasks: [{ id: 'A' }, { id: 'B' }, {}] }),
+    });
+    const workers: DispatchResult[] = [0, 1, 2].map((index) => ({
+      workerId: String(index),
+      role: 'task_spec_writer',
+      status: index === failedIndex ? 'failure' : 'success',
+      outputArtifacts:
+        index === failedIndex
+          ? []
+          : [
+              {
+                type: 'canonical_specification',
+                name: `spec-${String(index)}`,
+                version: 1,
+                checksum: 'abc',
+              },
+            ],
+      metrics: {
+        startedAt: '',
+        completedAt: '',
+        durationMs: 1,
+        inputTokens: 0,
+        outputTokens: 0,
+        retryCount: 0,
+        modelUsed: '',
+      },
+    }));
+    const runner = makeRunner({ dispatchParallel: vi.fn().mockResolvedValue(workers) });
+    await new ActionDispatcher(runner, store, makeJournal()).executeAll(
+      [
+        {
+          type: 'dispatch_dynamic_workers',
+          params: {
+            role: 'task_spec_writer',
+            sourceArtifact: 'task_breakdown',
+            itemsPath: 'tasks',
+          },
+        },
+      ],
+      createRunId('run-001'),
+      'SPEC_AUTHORING',
+    );
+    const aggregate = vi
+      .mocked(store.store)
+      .mock.calls.find(([input]) => input.type === 'task_specifications')?.[0];
+    assert(aggregate);
+    expect(JSON.parse(aggregate.content) as unknown).toEqual(
+      expect.objectContaining({
+        tasks: [0, 1, 2]
+          .filter((index) => index !== failedIndex)
+          .map((index) => ({
+            taskId: ['A', 'B', 'task-002'][index],
+            specificationRef: workers[index].outputArtifacts[0],
+          })),
+      }),
+    );
+  });
+
+  /* eslint-enable @typescript-eslint/unbound-method */
   it('dispatches worker and returns result', async () => {
     const dispatcher = new ActionDispatcher(makeRunner(), makeStore(), makeJournal());
     const action: Action = { type: 'dispatch_worker', params: { role: 'planner' } };
@@ -271,7 +403,7 @@ describe('ActionDispatcher', () => {
     await dispatcher.executeAll([action], createRunId('run-001'), 'PLANNING');
 
     // eslint-disable-next-line @typescript-eslint/unbound-method
-    const dispatchMock = vi.mocked(runner.dispatch);
+    const dispatchMock = vi.mocked(runner).dispatch;
     const callback = dispatchMock.mock.calls[0][1] as unknown as (
       event: Record<string, string>,
     ) => void;
@@ -294,7 +426,7 @@ describe('ActionDispatcher', () => {
     await dispatcher.executeAll([action], createRunId('run-001'), 'PLANNING');
 
     // eslint-disable-next-line @typescript-eslint/unbound-method
-    const dispatchMock = vi.mocked(runner.dispatch);
+    const dispatchMock = vi.mocked(runner).dispatch;
     expect(dispatchMock.mock.calls[0][1]).toBeUndefined();
   });
 

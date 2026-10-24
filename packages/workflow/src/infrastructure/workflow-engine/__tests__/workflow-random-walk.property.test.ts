@@ -10,6 +10,7 @@ import * as fc from 'fast-check';
 import { describe, expect, it, vi } from 'vitest';
 
 import { TEST_WORKFLOW } from '../../../../test/fixtures/test-defaults';
+import { MaxTransitionsExceededError } from '../../../domain/workflow-engine/errors';
 import { LifecycleController } from '../lifecycle-controller';
 
 const TERMINAL_STATES = new Set(TEST_WORKFLOW.terminalStates);
@@ -480,37 +481,73 @@ describe('Workflow structural graph walk', () => {
     }
   });
 
-  it('random walks through the graph always terminate within bounded steps', () => {
-    fc.assert(
-      fc.property(fc.array(fc.nat({ max: 20 }), { minLength: 0, maxLength: 200 }), (choices) => {
-        let current = TEST_WORKFLOW.initialState;
-        const visitCounts: Record<string, number> = {};
-
-        for (const choice of choices) {
-          if (TERMINAL_STATES.has(current)) {
-            break;
-          }
-
-          visitCounts[current] = (visitCounts[current] ?? 0) + 1;
-
-          const state = TEST_WORKFLOW.states[current];
-          if (state.transitions.length === 0) {
-            break;
-          }
-
-          const idx = choice % state.transitions.length;
-          current = state.transitions[idx].target;
-        }
-
-        // Visit counts for any state should be bounded
-        for (const [stateName, count] of Object.entries(visitCounts)) {
-          expect(
-            count,
-            `State '${stateName}' visited ${String(count)} times — possible infinite loop`,
-          ).toBeLessThanOrEqual(200);
-        }
-      }),
-      { numRuns: 200 },
+  it('stops cyclic execution at the configured transition limit and releases its lock', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.integer({ min: 1, max: 30 }),
+        fc.integer({ min: 1, max: 4 }),
+        async (limit, cycleLength) => {
+          const stored = new Map<string, { version: number; content: string }>();
+          const runner = createDecisionRunner(stored, {
+            planReviewApprovals: [],
+            codeReviewApprovals: [],
+            judgeApprovals: [],
+            verificationPasses: [],
+          });
+          const dispatch = vi.spyOn(runner, 'dispatch');
+          const persistence = makePersistence();
+          const controller = new LifecycleController({
+            runner,
+            artifactStore: createDecisionStore(stored),
+            governanceEngine: makeGovernance(),
+            contractRegistry: new DefaultIterationContractRegistry(),
+            journalWriter: { append: vi.fn(), appendBatch: vi.fn() },
+            statePersistence: persistence,
+            manifestProducer: makeManifest(),
+          });
+          const states: WorkflowDefinition['states'] = Object.fromEntries(
+            Array.from({ length: cycleLength }, (_, index) => [
+              `STEP_${String(index)}`,
+              {
+                type: 'action',
+                description: 'Cyclic worker',
+                entryActions: [{ type: 'dispatch_worker', params: { role: 'planner' } }],
+                transitions: [
+                  {
+                    target: `STEP_${String((index + 1) % cycleLength)}`,
+                    trigger: 'completion',
+                    guards: [],
+                    governanceRequired: false,
+                    priority: 0,
+                  },
+                ],
+              },
+            ]),
+          );
+          await expect(
+            controller.start({
+              runId: 'cyclic-run',
+              workflowDefinition: {
+                name: 'cyclic',
+                version: '1',
+                initialState: 'STEP_0',
+                terminalStates: [],
+                states,
+              },
+              governancePolicy: {},
+              roleAssignments: {},
+              sources: [],
+              globalTransitionLimit: limit,
+            }),
+          ).rejects.toThrow(MaxTransitionsExceededError);
+          expect(controller.getState().transitionCount).toBe(limit);
+          expect(dispatch).toHaveBeenCalledTimes(limit);
+          expect(persistence.releaseLock).toHaveBeenCalledExactlyOnceWith(
+            persistence.acquireLock.mock.results[0].value,
+          );
+        },
+      ),
+      { numRuns: 30 },
     );
   });
 });

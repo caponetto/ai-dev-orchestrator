@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import type { ArtifactType } from '@ai-dev-orchestrator/schemas';
 
-const VERSION_PATTERN = /_v(\d+)\.\w+$/;
+const VERSION_PATTERN = /^_v(\d+)\.(?:md|meta\.yaml)$/;
 
 /** Manages monotonically increasing version numbers for artifacts. */
 export class VersionManager {
@@ -29,21 +29,18 @@ export class VersionManager {
     }
 
     const files = readdirSync(typeDir);
-    const versions: number[] = [];
+    const versions = new Set<number>();
 
     for (const file of files) {
       if (!file.startsWith(`${name}_v`)) {
         continue;
       }
-      if (file.endsWith('.meta.yaml')) {
-        continue;
-      }
-      const match = VERSION_PATTERN.exec(file);
+      const match = VERSION_PATTERN.exec(file.slice(name.length));
       if (match?.[1]) {
-        versions.push(Number(match[1]));
+        versions.add(Number(match[1]));
       }
     }
 
-    return versions.sort((a, b) => a - b);
+    return [...versions].sort((a, b) => a - b);
   }
 }

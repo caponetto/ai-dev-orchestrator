@@ -23,6 +23,7 @@ import type {
   RemoteReconnectMeta,
   SessionPendingRequest,
 } from '@ai-dev-orchestrator/schemas';
+import { agentSessionSnapshotSchema } from '@ai-dev-orchestrator/schemas';
 
 import type { AgentSessionRegistry } from './agent-session-registry';
 import type { WebSocketProtocolTransport } from './websocket-protocol-transport';
@@ -42,17 +43,25 @@ interface RemoteSessionHost {
   transport: WebSocketProtocolTransport | null;
   lastProtocolTimestamp: string;
   finalArtifact?: string;
+  completion?: NonNullable<AgentSessionSnapshot['completion']>;
+  completionWrite?: Promise<void>;
   startTime: number;
   streamHandlers: ((event: AgentOutputStreamEvent) => void)[];
   resultResolve?: (result: RemoteSessionResult) => void;
   resultPromise: Promise<RemoteSessionResult>;
   heartbeatTimer?: ReturnType<typeof setInterval>;
+  leaseTimer?: ReturnType<typeof setTimeout>;
+  reconnectEpoch: number;
+  finalizing: boolean;
+  reconnectAttempt?: Promise<AgentSessionHandle | null>;
+  cancelReconnect?: () => void;
   advanceResolve?: (result: SessionAdvanceResult) => void;
 }
 
 type RemoteTransportFactory = (
   ref: AgentSessionRef,
   reconnectMeta: RemoteReconnectMeta,
+  signal: AbortSignal,
 ) => Promise<WebSocketProtocolTransport>;
 
 /**
@@ -83,6 +92,19 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
       throw new Error('Remote sessions require reconnect metadata');
     }
 
+    const previous = this.hosts.get(ref.sessionId);
+    if (previous) {
+      this.invalidateReconnect(previous);
+      this.stopTimers(previous);
+      this.disconnect(previous);
+      this.resolveAdvance(previous, { kind: 'failed', error: 'Session replaced' });
+      previous.resultResolve?.({
+        status: 'failure',
+        error: 'Session replaced',
+        durationMs: Date.now() - previous.startTime,
+      });
+      previous.resultResolve = undefined;
+    }
     const host = this.createHost(ref, reconnectMeta, transport ?? null, onStreamEvent);
     this.hosts.set(ref.sessionId, host);
 
@@ -90,7 +112,27 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
       this.wireTransport(host, transport);
     }
 
-    await this.persistSnapshot(host);
+    try {
+      await this.persistSnapshot(host);
+    } catch (error: unknown) {
+      if (this.hosts.get(ref.sessionId) === host) {
+        this.invalidateReconnect(host);
+        this.stopTimers(host);
+        this.disconnect(host);
+        if (!isTerminal(host.state)) {
+          host.state = 'failed';
+          const message = 'Failed to persist remote session setup';
+          host.resultResolve?.({
+            status: 'failure',
+            error: message,
+            durationMs: Date.now() - host.startTime,
+          });
+          host.resultResolve = undefined;
+          this.resolveAdvance(host, { kind: 'failed', error: message });
+        }
+      }
+      throw error;
+    }
 
     return {
       ref: host.ref,
@@ -104,7 +146,19 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
     onStreamEvent?: (event: AgentOutputStreamEvent) => void,
   ): Promise<AgentSessionHandle | null> {
     const host = this.hosts.get(sessionId);
-    if (host) {
+    if (host?.finalizing) {
+      return null;
+    }
+    if (host && this.expireHost(host)) {
+      await this.persistSnapshot(host);
+      return null;
+    }
+    if (
+      host &&
+      (isTerminal(host.state) ||
+        !this.transportFactory ||
+        (host.transport && !host.reconnectAttempt))
+    ) {
       if (onStreamEvent) {
         host.streamHandlers.push(onStreamEvent);
       }
@@ -115,6 +169,14 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
       };
     }
 
+    const snapshot = this.registry.get(sessionId);
+    if (
+      snapshot?.ref.transport === 'remote' &&
+      snapshot.state === 'completed' &&
+      snapshot.completion
+    ) {
+      return { ref: snapshot.ref, state: 'completed', pendingRequests: [] };
+    }
     const handle = await this.reconnect(sessionId);
     if (handle && onStreamEvent) {
       const restored = this.hosts.get(sessionId);
@@ -126,65 +188,129 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
   }
 
   async reconnect(sessionId: string): Promise<AgentSessionHandle | null> {
-    const host = this.hosts.get(sessionId);
+    let host = this.hosts.get(sessionId);
     if (!host) {
-      const snap = this.registry.get(sessionId);
-      if (!snap || snap.reconnect?.type !== 'remote') {
+      const snapshot = this.registry.get(sessionId);
+      if (
+        !snapshot ||
+        snapshot.reconnect?.type !== 'remote' ||
+        isTerminal(snapshot.state) ||
+        !this.transportFactory
+      ) {
         return null;
       }
-
-      if (snap.reconnect.leaseExpiresAt && new Date(snap.reconnect.leaseExpiresAt) < new Date()) {
-        return null;
+      host = this.createHost(snapshot.ref, snapshot.reconnect, null);
+      for (const request of snapshot.pendingRequests) {
+        host.pendingRequests.set(request.requestId, request);
       }
-
-      if (!this.transportFactory) {
-        return null;
-      }
-
-      const ref = snap.ref;
-      const meta = snap.reconnect;
-      const transport = await this.transportFactory(ref, meta);
-      const restored = this.createHost(ref, meta, transport);
-      for (const pr of snap.pendingRequests) {
-        restored.pendingRequests.set(pr.requestId, pr);
-      }
-      restored.state = 'reconnecting';
-      this.hosts.set(sessionId, restored);
-      this.wireTransport(restored, transport);
-      restored.state = 'running';
-
-      await this.persistSnapshot(restored);
-      return {
-        ref: restored.ref,
-        state: restored.state,
-        pendingRequests: [...restored.pendingRequests.values()],
-      };
+      host.state = snapshot.state;
+      host.startTime = new Date(snapshot.createdAt).getTime();
+      host.lastProtocolTimestamp = snapshot.lastProtocolTimestamp;
+      // Publish ownership before awaiting the factory so abort/finalize can fence restored sessions.
+      this.hosts.set(sessionId, host);
     }
-
+    if (host.finalizing || isTerminal(host.state)) {
+      return null;
+    }
+    if (this.expireHost(host)) {
+      await this.persistSnapshot(host);
+      return null;
+    }
+    if (host.reconnectAttempt) {
+      return host.reconnectAttempt;
+    }
     if (host.transport) {
-      return {
-        ref: host.ref,
-        state: host.state,
-        pendingRequests: [...host.pendingRequests.values()],
-      };
+      return this.handle(host);
     }
-
-    if (!this.transportFactory) {
+    const factory = this.transportFactory;
+    if (!factory) {
       return null;
     }
 
-    host.state = 'reconnecting';
-    const transport = await this.transportFactory(host.ref, host.reconnectMeta);
-    host.transport = transport;
-    this.wireTransport(host, transport);
-    host.state = 'running';
+    const owned = host;
+    const epoch = ++owned.reconnectEpoch;
+    const previousState = owned.state;
+    owned.state = 'reconnecting';
+    const controller = new AbortController();
+    const cancellation = new Promise<null>((resolve) => {
+      owned.cancelReconnect = () => {
+        resolve(null);
+        controller.abort();
+      };
+    });
+    // Start in a microtask so even reentrant factories see the registered attempt.
+    const work = Promise.resolve().then(async () => {
+      let transport: WebSocketProtocolTransport | undefined;
+      try {
+        if (!this.ownsAttempt(owned, epoch)) {
+          return null;
+        }
+        transport = await factory(owned.ref, owned.reconnectMeta, controller.signal);
+        if (!this.ownsAttempt(owned, epoch) || this.expireHost(owned)) {
+          transport.close();
+          return null;
+        }
+        owned.transport = transport;
+        owned.state = owned.pendingRequests.size > 0 ? 'awaiting_human' : 'running';
+        this.wireTransport(owned, transport);
+        await this.persistSnapshot(owned);
+        if (
+          !this.ownsAttempt(owned, epoch) ||
+          owned.transport !== transport ||
+          this.expireHost(owned)
+        ) {
+          return null;
+        }
+        return this.handle(owned);
+      } catch (error: unknown) {
+        transport?.close();
+        if (!this.ownsAttempt(owned, epoch)) {
+          return null;
+        }
+        owned.transport = null;
+        owned.state = previousState;
+        throw error;
+      }
+    });
+    // Release callers even if a custom factory ignores cancellation; dispose any late result.
+    const attempt = Promise.race([work, cancellation]).finally(() => {
+      if (owned.reconnectAttempt === attempt) {
+        owned.reconnectAttempt = undefined;
+        owned.cancelReconnect = undefined;
+      }
+    });
+    owned.reconnectAttempt = attempt;
+    return attempt;
+  }
 
-    await this.persistSnapshot(host);
+  private handle(host: RemoteSessionHost): AgentSessionHandle {
     return {
       ref: host.ref,
       state: host.state,
       pendingRequests: [...host.pendingRequests.values()],
     };
+  }
+
+  private ownsAttempt(host: RemoteSessionHost, epoch: number): boolean {
+    return (
+      this.hosts.get(host.ref.sessionId) === host &&
+      host.reconnectEpoch === epoch &&
+      !host.finalizing &&
+      !isTerminal(host.state)
+    );
+  }
+
+  private invalidateReconnect(host: RemoteSessionHost): void {
+    host.reconnectEpoch += 1;
+    host.cancelReconnect?.();
+    host.cancelReconnect = undefined;
+    host.reconnectAttempt = undefined;
+  }
+
+  private disconnect(host: RemoteSessionHost): void {
+    const transport = host.transport;
+    host.transport = null;
+    transport?.close();
   }
 
   async sendHumanResponse(
@@ -193,17 +319,29 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
     response: SessionResponsePayload,
   ): Promise<boolean> {
     const host = this.hosts.get(sessionId);
-    if (!host?.transport) {
+    if (!host?.transport || isTerminal(host.state)) {
       return false;
     }
 
+    if (this.expireHost(host)) {
+      await this.persistSnapshot(host);
+      return false;
+    }
     const pending = host.pendingRequests.get(requestId);
     if (!pending) {
       return false;
     }
+    if (
+      pending.kind === 'permission'
+        ? typeof response.granted !== 'boolean' || response.answer !== undefined
+        : typeof response.answer !== 'string' || response.granted !== undefined
+    ) {
+      return false;
+    }
 
+    let sent: boolean;
     if (pending.kind === 'permission') {
-      host.transport.send(
+      sent = host.transport.send(
         createProtocolMessage(
           'permission_response',
           { granted: response.granted === true, reason: response.reason },
@@ -211,13 +349,17 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
         ),
       );
     } else {
-      host.transport.send(
+      sent = host.transport.send(
         createProtocolMessage(
           'clarification_response',
           { answer: response.answer ?? '' },
           requestId,
         ),
       );
+    }
+
+    if (!sent) {
+      return false;
     }
 
     host.pendingRequests.delete(requestId);
@@ -233,6 +375,7 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
     if (!host || isTerminal(host.state)) {
       return false;
     }
+    this.invalidateReconnect(host);
     host.state = 'paused';
     this.stopHeartbeat(host);
     if (host.transport) {
@@ -248,8 +391,10 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
     if (!host) {
       return false;
     }
+    this.invalidateReconnect(host);
     host.state = 'aborted';
-    this.stopHeartbeat(host);
+    host.pendingRequests.clear();
+    this.stopTimers(host);
     if (host.transport) {
       host.transport.send(createProtocolMessage('abort', { reason }));
       host.transport.close();
@@ -270,13 +415,21 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
   async finalize(sessionId: string): Promise<void> {
     const host = this.hosts.get(sessionId);
     if (host) {
-      this.stopHeartbeat(host);
+      host.finalizing = true;
+      this.invalidateReconnect(host);
+      this.stopTimers(host);
       if (host.transport) {
         host.transport.close();
         host.transport = null;
       }
-      await this.persistSnapshot(host);
-      this.hosts.delete(sessionId);
+      if (host.completion) {
+        await this.persistCompletion(host, host.completion);
+      } else {
+        await this.persistSnapshot(host);
+      }
+      if (this.hosts.get(sessionId) === host) {
+        this.hosts.delete(sessionId);
+      }
     }
   }
 
@@ -285,7 +438,8 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
     if (host) {
       return Promise.resolve(this.buildSnapshot(host));
     }
-    return Promise.resolve(this.registry.get(sessionId));
+    const snapshot = this.registry.get(sessionId);
+    return Promise.resolve(snapshot?.ref.transport === 'remote' ? snapshot : null);
   }
 
   getState(sessionId: string): AgentSessionState | null {
@@ -294,7 +448,7 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
       return host.state;
     }
     const snap = this.registry.get(sessionId);
-    return snap?.state ?? null;
+    return snap?.ref.transport === 'remote' ? snap.state : null;
   }
 
   listByRun(runId: string): Promise<readonly AgentSessionSnapshot[]> {
@@ -302,7 +456,9 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
     const result = new Map<string, AgentSessionSnapshot>();
 
     for (const snap of fromRegistry) {
-      result.set(snap.ref.sessionId, snap);
+      if (snap.ref.transport === 'remote') {
+        result.set(snap.ref.sessionId, snap);
+      }
     }
 
     for (const host of this.hosts.values()) {
@@ -317,28 +473,39 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
   async waitForAdvance(sessionId: string): Promise<SessionAdvanceResult> {
     const host = this.hosts.get(sessionId);
     if (!host) {
+      const snapshot = this.registry.get(sessionId);
+      if (
+        snapshot?.ref.transport === 'remote' &&
+        snapshot.state === 'completed' &&
+        snapshot.completion
+      ) {
+        return { kind: 'completed', ...snapshot.completion };
+      }
       return { kind: 'failed', error: `Session ${sessionId} not found` };
     }
 
     if (isTerminal(host.state)) {
       if (host.state === 'completed') {
-        return {
-          kind: 'completed',
-          artifactContent: host.finalArtifact,
-          durationMs: Date.now() - host.startTime,
-        };
+        return host.completion
+          ? this.persistCompletion(host, host.completion)
+          : { kind: 'failed', error: 'Session completion receipt is unavailable' };
       }
+      await this.persistSnapshot(host);
       return { kind: 'failed', error: 'Session already terminated' };
     }
 
     if (host.state === 'awaiting_human' && host.pendingRequests.size > 0) {
       const first = [...host.pendingRequests.values()][0];
+      await this.persistSnapshot(host);
       return { kind: 'awaiting_human', pendingRequest: first };
     }
 
     const result = await new Promise<SessionAdvanceResult>((resolve) => {
       host.advanceResolve = resolve;
     });
+    if (result.kind === 'completed' && host.completion) {
+      return this.persistCompletion(host, host.completion);
+    }
     await this.persistSnapshot(host);
     return result;
   }
@@ -346,10 +513,11 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
   isLeaseExpired(sessionId: string): boolean {
     const host = this.hosts.get(sessionId);
     const meta = host?.reconnectMeta;
-    if (!meta?.leaseExpiresAt) {
+    if (meta?.leaseExpiresAt === undefined) {
       return false;
     }
-    return new Date(meta.leaseExpiresAt) < new Date();
+    const deadline = Date.parse(meta.leaseExpiresAt);
+    return !Number.isFinite(deadline) || deadline <= Date.now();
   }
 
   getHost(sessionId: string): RemoteSessionHost | undefined {
@@ -378,17 +546,23 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
       streamHandlers: onStreamEvent ? [onStreamEvent] : [],
       resultResolve,
       resultPromise,
+      reconnectEpoch: 0,
+      finalizing: false,
     };
 
     if (reconnectMeta.heartbeatIntervalMs && reconnectMeta.heartbeatIntervalMs > 0) {
       this.startHeartbeat(host, reconnectMeta.heartbeatIntervalMs);
     }
 
+    this.scheduleLease(host);
     return host;
   }
 
   private wireTransport(host: RemoteSessionHost, transport: WebSocketProtocolTransport): void {
     transport.onMessage((_msg: ProtocolMessage) => {
+      if (isTerminal(host.state) || host.transport !== transport) {
+        return;
+      }
       const message = _msg as AgentToOrchestratorMessage;
       host.lastProtocolTimestamp = message.timestamp;
 
@@ -436,26 +610,28 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
           break;
         case 'done': {
           host.state = 'completed';
-          this.stopHeartbeat(host);
+          host.pendingRequests.clear();
+          this.stopTimers(host);
           const doneArtifact =
             host.finalArtifact ?? JSON.stringify({ summary: message.payload.summary });
-          const doneDur = Date.now() - host.startTime;
-          host.resultResolve?.({
-            status: 'success',
+          host.completion = {
             artifactContent: doneArtifact,
-            durationMs: doneDur,
-          });
-          host.resultResolve = undefined;
+            durationMs: Math.max(0, Date.now() - host.startTime),
+            tokenUsage: message.payload.tokenUsage,
+          };
+          // The transport callback cannot await I/O. Port observers await this same write;
+          // rejection is observed there, and an in-memory receipt remains retryable.
+          void this.persistCompletion(host, host.completion).catch(() => undefined);
           this.resolveAdvance(host, {
             kind: 'completed',
-            artifactContent: doneArtifact,
-            durationMs: doneDur,
+            ...host.completion,
           });
           break;
         }
         case 'error': {
           host.state = 'failed';
-          this.stopHeartbeat(host);
+          host.pendingRequests.clear();
+          this.stopTimers(host);
           const errMsg = `Agent error [${message.payload.code}]: ${message.payload.message}`;
           host.resultResolve?.({
             status: 'failure',
@@ -476,9 +652,11 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
     });
 
     transport.onError(() => {
-      if (!isTerminal(host.state)) {
+      if (host.transport === transport && !isTerminal(host.state)) {
+        this.invalidateReconnect(host);
         host.state = 'reconnecting';
-        host.transport = null;
+        this.disconnect(host);
+        void this.persistSnapshot(host).catch(() => undefined);
       }
     });
   }
@@ -555,19 +733,57 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
         this.stopHeartbeat(host);
         return;
       }
-      if (this.isLeaseExpired(host.ref.sessionId)) {
-        host.state = 'failed';
-        this.stopHeartbeat(host);
-        const leaseErr = 'Remote session lease expired';
-        host.resultResolve?.({
-          status: 'failure',
-          error: leaseErr,
-          durationMs: Date.now() - host.startTime,
-        });
-        host.resultResolve = undefined;
-        this.resolveAdvance(host, { kind: 'failed', error: leaseErr });
-      }
+      this.expireHost(host);
     }, intervalMs);
+  }
+
+  private scheduleLease(host: RemoteSessionHost): void {
+    const expiry = host.reconnectMeta.leaseExpiresAt;
+    if (expiry === undefined) {
+      return;
+    }
+    const remaining = Date.parse(expiry) - Date.now();
+    const delay = Number.isFinite(remaining) ? Math.min(0x7fff_ffff, Math.max(0, remaining)) : 0;
+    host.leaseTimer = setTimeout(() => {
+      if (
+        this.hosts.get(host.ref.sessionId) !== host ||
+        host.finalizing ||
+        isTerminal(host.state)
+      ) {
+        return;
+      }
+      if (!this.expireHost(host)) {
+        this.scheduleLease(host);
+      }
+    }, delay);
+  }
+
+  private expireHost(host: RemoteSessionHost): boolean {
+    if (isTerminal(host.state) || host.finalizing || !this.isLeaseExpired(host.ref.sessionId)) {
+      return false;
+    }
+    this.invalidateReconnect(host);
+    host.state = 'failed';
+    host.pendingRequests.clear();
+    this.stopTimers(host);
+    this.disconnect(host);
+    const error = 'Remote session lease expired';
+    host.resultResolve?.({
+      status: 'failure',
+      error,
+      durationMs: Math.max(0, Date.now() - host.startTime),
+    });
+    host.resultResolve = undefined;
+    this.resolveAdvance(host, { kind: 'failed', error });
+    // Timers cannot await persistence. Port observations retry a failed write explicitly.
+    void this.persistSnapshot(host).catch(() => undefined);
+    return true;
+  }
+
+  private stopTimers(host: RemoteSessionHost): void {
+    this.stopHeartbeat(host);
+    clearTimeout(host.leaseTimer);
+    host.leaseTimer = undefined;
   }
 
   private stopHeartbeat(host: RemoteSessionHost): void {
@@ -582,6 +798,29 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
     await this.registry.register(snapshot);
   }
 
+  private async persistCompletion(
+    host: RemoteSessionHost,
+    completion: NonNullable<AgentSessionSnapshot['completion']>,
+  ): Promise<SessionAdvanceResult> {
+    const receipt = agentSessionSnapshotSchema.shape.completion.unwrap().parse(completion);
+    host.completion = receipt;
+    const write = host.completionWrite ?? this.persistSnapshot(host);
+    host.completionWrite = write;
+    try {
+      await write;
+      if (host.state !== 'completed') {
+        return { kind: 'failed', error: 'Session already terminated' };
+      }
+      host.resultResolve?.({ status: 'success', ...receipt });
+      host.resultResolve = undefined;
+      return { kind: 'completed', ...receipt };
+    } finally {
+      if (host.completionWrite === write) {
+        host.completionWrite = undefined;
+      }
+    }
+  }
+
   private buildSnapshot(host: RemoteSessionHost): AgentSessionSnapshot {
     return {
       ref: host.ref,
@@ -593,6 +832,7 @@ export class RemoteAgentSessionSupervisor implements AgentSessionSupervisor {
       updatedAt: new Date().toISOString(),
       expiresAt: host.reconnectMeta.leaseExpiresAt,
       workerId: host.ref.sessionId,
+      completion: host.completion,
     };
   }
 }

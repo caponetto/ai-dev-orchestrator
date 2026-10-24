@@ -62,6 +62,7 @@ describe('permitCommand', () => {
     vi.mocked(DefaultStatePersistence).mockImplementation(
       class {
         load = vi.fn().mockReturnValue(null);
+        reconstructFromJournal = vi.fn().mockReturnValue(null);
       } as unknown as typeof DefaultStatePersistence,
     );
   });
@@ -95,6 +96,35 @@ describe('permitCommand', () => {
     const output = stdoutChunks.join('');
     expect(output).toContain('No pending permission requests');
   });
+  it('reports an explicit machine-readable no-pending outcome', async () => {
+    const runId = 'no-pending-json';
+    mkdirSync(getRunDir(runId), { recursive: true });
+    expect(
+      await permitCommand(
+        { runId, deny: false, messageId: null, json: true, verbose: false },
+        new OutputFormatter({ json: true }),
+      ),
+    ).toBe(0);
+    expect(JSON.parse(stdoutChunks[0] ?? '')).toEqual({
+      runId,
+      outcome: 'no_pending_requests',
+      exitCode: 0,
+    });
+  });
+  it.each(['', '   '])(
+    'does not silently select a permission when an explicit ID is blank (%s)',
+    async (messageId) => {
+      const runId = 'blank-permission-id';
+      mkdirSync(getRunDir(runId), { recursive: true });
+      mockSessionState({});
+      expect(
+        await permitCommand(
+          { runId, deny: false, messageId, json: true, verbose: false },
+          new OutputFormatter({ json: true }),
+        ),
+      ).toBe(ExitCode.INVALID_ARGUMENTS);
+    },
+  );
 
   it('approves a pending permission request', async () => {
     const runId = 'run-test-002';
@@ -241,7 +271,7 @@ describe('permitCommand', () => {
     );
     expect(code).toBe(ExitCode.GENERAL_ERROR);
     const output = stdoutChunks.join('');
-    expect(output).toContain('No pending permission request with message ID');
+    expect(output).toContain('not found');
     expect(output).toContain('msg-nonexistent');
   });
 
@@ -320,6 +350,99 @@ describe('permitCommand', () => {
 
   // --- Session supervisor path tests ---
 
+  it.each(
+    ['DONE', 'FAILED', 'ABORTED', 'WAITING_FOR_HUMAN', 'CUSTOM'].flatMap((finalState) =>
+      [true, false].flatMap((deny) => [true, false].map((json) => ({ finalState, deny, json }))),
+    ),
+  )('reports observed $finalState (deny=$deny, json=$json)', async ({ finalState, deny, json }) => {
+    const runId = 'observed-permit';
+    mkdirSync(getRunDir(runId), { recursive: true });
+    mockSessionState({});
+    const resume = vi.fn().mockResolvedValue({ runId, finalState });
+    vi.mocked(resumeOrchestrator).mockResolvedValue({ warnings: [], engine: { resume } } as never);
+    const formatter = new OutputFormatter({ json, noColor: true });
+    const success = vi.spyOn(formatter, 'success');
+    const code = await permitCommand(
+      { runId, deny, messageId: null, json, verbose: false },
+      formatter,
+    );
+    const exitCode = finalState === 'FAILED' ? 3 : finalState === 'ABORTED' ? 4 : 0;
+    expect(code).toBe(exitCode);
+    if (json) {
+      expect(JSON.parse(stdoutChunks[0] ?? '')).toMatchObject({
+        runId,
+        finalState,
+        exitCode,
+        action: deny ? 'denied' : 'granted',
+        outcome:
+          finalState === 'DONE'
+            ? 'completed'
+            : finalState === 'FAILED'
+              ? 'failed'
+              : finalState === 'ABORTED'
+                ? 'aborted'
+                : finalState === 'WAITING_FOR_HUMAN'
+                  ? 'waiting'
+                  : 'returned',
+      });
+    } else if (exitCode !== 0) {
+      expect(success).not.toHaveBeenCalled();
+    }
+  });
+
+  it('refuses to choose a replacement request when session request identity is missing', async () => {
+    const runId = 'missing-session-request';
+    mkdirSync(getRunDir(runId), { recursive: true });
+    mockSessionState({ pendingRequestId: undefined });
+    const resume = vi.fn();
+    vi.mocked(resumeOrchestrator).mockResolvedValue({ warnings: [], engine: { resume } } as never);
+    expect(
+      await permitCommand(
+        { runId, deny: false, messageId: null, json: false, verbose: false },
+        new OutputFormatter(),
+      ),
+    ).toBe(ExitCode.GENERAL_ERROR);
+    expect(resume).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])(
+    'acknowledges an explicit identical retry after the response leaves the pending list (JSON: %s)',
+    async (json) => {
+      const runId = 'duplicate-permit';
+      mkdirSync(getRunDir(runId), { recursive: true });
+      const store = new FileBackedLiveRequestStore(getRunsDir());
+      await store.writeRequest({
+        runId,
+        messageId: 'decision',
+        kind: 'permission',
+        createdAt: '',
+        payload: {},
+      });
+      await store.writeResponse({
+        runId,
+        messageId: 'decision',
+        respondedAt: '',
+        payload: { granted: true },
+      });
+      const formatter = new OutputFormatter({ json, noColor: true });
+      const info = vi.spyOn(formatter, 'info');
+      expect(
+        await permitCommand(
+          { runId, deny: false, messageId: 'decision', json, verbose: false },
+          formatter,
+        ),
+      ).toBe(0);
+      if (json) {
+        expect(JSON.parse(stdoutChunks[0] ?? '')).toMatchObject({
+          action: 'granted',
+          outcome: 'already_responded',
+        });
+      } else {
+        expect(info).toHaveBeenCalledWith(expect.stringContaining('already recorded'));
+      }
+    },
+  );
+
   function mockSessionState(overrides: {
     liveSessionId?: string;
     liveRequestType?: string;
@@ -341,6 +464,32 @@ describe('permitCommand', () => {
       } as unknown as typeof DefaultStatePersistence,
     );
   }
+
+  it('keeps the selected request identity when composition reloads newer session state', async () => {
+    const runId = 'run-reloaded-session';
+    mkdirSync(getRunDir(runId), { recursive: true });
+    mockSessionState({ liveSessionId: 'selected-session', pendingRequestId: 'selected-request' });
+    const resume = vi.fn().mockResolvedValue({ runId, finalState: 'DONE' });
+    (resumeOrchestrator as Mock).mockImplementation(() => {
+      mockSessionState({
+        liveSessionId: 'replacement-session',
+        pendingRequestId: 'replacement-request',
+      });
+      return Promise.resolve({ warnings: [], engine: { resume } });
+    });
+    expect(
+      await permitCommand(
+        { runId, deny: false, messageId: 'selected-request', json: false, verbose: false },
+        new OutputFormatter({ noColor: true }),
+      ),
+    ).toBe(ExitCode.SUCCESS);
+    expect(resume).toHaveBeenCalledExactlyOnceWith({
+      type: 'approval',
+      content: 'Approved',
+      sessionId: 'selected-session',
+      requestId: 'selected-request',
+    });
+  });
 
   it('returns GENERAL_ERROR when messageId does not match session pending request', async () => {
     const runId = 'run-test-session-mismatch';
@@ -400,7 +549,7 @@ describe('permitCommand', () => {
     (resumeOrchestrator as Mock).mockResolvedValue({
       warnings: ['Warning: token budget exceeded', 'Warning: model fallback used'],
       engine: {
-        resume: vi.fn().mockResolvedValue({ finalState: 'completed' }),
+        resume: vi.fn().mockResolvedValue({ runId, finalState: 'completed' }),
       },
     });
 
@@ -445,7 +594,7 @@ describe('permitCommand', () => {
     (resumeOrchestrator as Mock).mockResolvedValue({
       warnings: [],
       engine: {
-        resume: vi.fn().mockResolvedValue({ finalState: 'completed' }),
+        resume: vi.fn().mockResolvedValue({ runId, finalState: 'completed' }),
       },
     });
 
@@ -473,7 +622,7 @@ describe('permitCommand', () => {
     (resumeOrchestrator as Mock).mockResolvedValue({
       warnings: [],
       engine: {
-        resume: vi.fn().mockResolvedValue({ finalState: 'completed' }),
+        resume: vi.fn().mockResolvedValue({ runId, finalState: 'completed' }),
       },
     });
 
@@ -484,7 +633,7 @@ describe('permitCommand', () => {
     );
     expect(code).toBe(ExitCode.SUCCESS);
     const output = stdoutChunks.join('');
-    expect(output).toContain('Approved session permission');
+    expect(output).toContain('Permission grant response processed');
     expect(output).toContain('req-text-1');
     expect(output).toContain('completed');
   });
@@ -497,7 +646,7 @@ describe('permitCommand', () => {
     (resumeOrchestrator as Mock).mockResolvedValue({
       warnings: [],
       engine: {
-        resume: vi.fn().mockResolvedValue({ finalState: 'blocked' }),
+        resume: vi.fn().mockResolvedValue({ runId, finalState: 'blocked' }),
       },
     });
 
@@ -508,7 +657,7 @@ describe('permitCommand', () => {
     );
     expect(code).toBe(ExitCode.SUCCESS);
     const output = stdoutChunks.join('');
-    expect(output).toContain('Denied session permission');
+    expect(output).toContain('Permission denial response processed');
     expect(output).toContain('req-deny-1');
   });
 });

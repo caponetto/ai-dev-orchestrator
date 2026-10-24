@@ -9,7 +9,7 @@ name: pr-review
 version: 1.0.0
 initial_state: SETUP
 budget:
-  max_tokens_per_run: 3000000
+  max_tokens_per_run: 7000000
 terminal_states:
   - DONE
   - FAILED

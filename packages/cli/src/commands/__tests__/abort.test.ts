@@ -77,6 +77,33 @@ describe('abortCommand', () => {
     }
   });
 
+  it.each([true, false])('reports a success that wins the abort race (JSON: %s)', async (json) => {
+    const runId = createRunId();
+    const runsDir = getRunsDir();
+    await createAndSaveState(runsDir, runId, 'DONE');
+    const statePath = join(getRunDir(runId), 'state.yaml');
+    const completed = readFileSync(statePath, 'utf8');
+    await createAndSaveState(runsDir, runId, 'WAITING_FOR_HUMAN');
+    const store = new DefaultStatePersistence(runsDir);
+    const acquire = store.acquireLock.bind(store);
+    vi.spyOn(DefaultStatePersistence.prototype, 'acquireLock').mockImplementation((id) => {
+      writeFileSync(statePath, completed);
+      return acquire(id);
+    });
+    const formatter = new OutputFormatter({ json, noColor: true });
+    const code = await abortCommand({ runId, json, verbose: false, force: true }, formatter);
+    expect(code).toBe(ExitCode.SUCCESS);
+    if (json) {
+      expect(JSON.parse(stdoutChunks[0] ?? '')).toMatchObject({
+        status: 'already_terminal',
+        state: 'DONE',
+      });
+    } else {
+      expect(stdoutChunks.join('')).toContain('terminal state: DONE');
+    }
+    expect(readFileSync(statePath, 'utf8')).toBe(completed);
+  });
+
   it('returns GENERAL_ERROR when no run found', async () => {
     const formatter = new OutputFormatter({ noColor: true });
     const code = await abortCommand(
@@ -84,6 +111,25 @@ describe('abortCommand', () => {
       formatter,
     );
     expect(code).toBe(ExitCode.GENERAL_ERROR);
+  });
+
+  it('reports a failed abort save without claiming an abort or leaving its lock', async () => {
+    const runId = createRunId();
+    await createAndSaveState(getRunsDir(), runId, 'PLANNING');
+    const statePath = join(getRunDir(runId), 'state.yaml');
+    const before = readFileSync(statePath, 'utf8');
+    vi.spyOn(DefaultStatePersistence.prototype, 'save').mockRejectedValueOnce(
+      new Error('disk full'),
+    );
+    const formatter = new OutputFormatter({ json: true });
+    const reportError = vi.spyOn(formatter, 'error');
+    const code = await abortCommand({ runId, json: true, verbose: false, force: true }, formatter);
+    expect(code).toBe(ExitCode.GENERAL_ERROR);
+    expect(reportError).toHaveBeenCalledOnce();
+    expect(stdoutChunks.join('')).not.toContain('"status":"aborted"');
+    expect(readFileSync(statePath, 'utf8')).toBe(before);
+    expect(existsSync(join(getRunDir(runId), 'run.lock'))).toBe(false);
+    expect(existsSync(join(getRunDir(runId), 'journal.md'))).toBe(false);
   });
 
   it('returns SUCCESS when run already in terminal state', async () => {
@@ -108,6 +154,27 @@ describe('abortCommand', () => {
 
     const updatedYaml = readFileSync(join(getRunDir(runId), 'state.yaml'), 'utf8');
     expect(updatedYaml).toContain('ABORTED');
+  });
+
+  it('does not report an already-terminal success while cleanup is pending', async () => {
+    const runId = createRunId();
+    await createAndSaveState(getRunsDir(), runId, 'DONE');
+    const store = new DefaultStatePersistence(getRunsDir());
+    const state = store.load(runId);
+    expect(state).not.toBeNull();
+    if (!state) {
+      throw new Error('missing state');
+    }
+    await store.save({ ...state, pendingTerminalState: 'DONE', terminalRecoveryState: 'WORK' });
+    const code = await abortCommand(
+      { runId, json: true, verbose: false, force: true },
+      new OutputFormatter({ json: true }),
+    );
+    expect(code).toBe(ExitCode.RUN_ABORTED);
+    expect(JSON.parse(stdoutChunks[0] ?? '')).toMatchObject({
+      status: 'aborted',
+      finalState: 'ABORTED',
+    });
   });
 
   it('returns RUN_ABORTED exit code on successful abort', async () => {
@@ -208,7 +275,12 @@ describe('abortCommand', () => {
     const runDir = getRunDir(runId);
     const lockPath = join(runDir, 'run.lock');
     mkdirSync(runDir, { recursive: true });
-    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation((_pid, signal) => {
+      if (signal === 0) {
+        throw Object.assign(new Error('terminated'), { code: 'ESRCH' });
+      }
+      return true;
+    });
 
     writeFileSync(
       lockPath,

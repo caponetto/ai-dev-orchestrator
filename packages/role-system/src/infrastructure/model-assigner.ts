@@ -41,14 +41,14 @@ export class ModelAssigner {
     throw new ModelAssignmentError(roleId);
   }
 
-  getNextTier(roleId: RoleId): ModelAssignment | null {
+  getNextTier(roleId: RoleId, currentModel?: string): ModelAssignment | null {
     if (!this.config.tierConfig) {
       return null;
     }
 
-    const current = this.getModelAssignment(roleId);
+    const current = currentModel ?? this.getModelAssignment(roleId).model;
     const sortedTiers = [...this.config.tierConfig.tiers].sort((a, b) => a.tier - b.tier);
-    const currentTier = sortedTiers.find((t) => t.model === current.model);
+    const currentTier = sortedTiers.find((t) => t.model === current);
 
     if (!currentTier) {
       return null;

@@ -3,9 +3,26 @@ import { describe, expect, it } from 'vitest';
 import { DefaultIterationContractRegistry } from '../contract-registry';
 
 describe('DefaultIterationContractRegistry', () => {
-  it('loads four built-in contracts', () => {
+  it('counts decomposition review rounds across checkpoint restoration', () => {
     const registry = new DefaultIterationContractRegistry();
-    expect(registry.listContracts()).toHaveLength(4);
+    expect(registry.getContractForState('DECOMPOSITION_REVIEW')?.id).toBe(
+      'decomposition_review_loop',
+    );
+    registry.recordStateEntry('DECOMPOSITION');
+    registry.recordStateEntry('DECOMPOSITION_REVIEW');
+    expect(registry.getIterationState('decomposition_review_loop').currentIteration).toBe(1);
+    const restored = new DefaultIterationContractRegistry();
+    restored.restoreIterationCounts(new Map(registry.getIterationCounts()));
+    restored.recordStateEntry('DECOMPOSITION_REVIEW');
+    restored.recordStateEntry('DECOMPOSITION_REVIEW');
+    expect(restored.getIterationState('decomposition_review_loop')).toMatchObject({
+      currentIteration: 3,
+      status: 'failed',
+    });
+  });
+  it('loads five built-in contracts', () => {
+    const registry = new DefaultIterationContractRegistry();
+    expect(registry.listContracts()).toHaveLength(5);
   });
 
   it('retrieves contract by id', () => {
@@ -189,7 +206,7 @@ describe('DefaultIterationContractRegistry', () => {
       },
     };
     const registry = new DefaultIterationContractRegistry([custom]);
-    expect(registry.listContracts()).toHaveLength(5);
+    expect(registry.listContracts()).toHaveLength(6);
     expect(registry.getContract('custom_loop')).not.toBeNull();
   });
 

@@ -105,16 +105,24 @@ export function PermissionBanner({
   roleId?: string;
   reason?: string;
 }>) {
-  const [resolved, setResolved] = useState<'granted' | 'denied' | null>(initialResolved ?? null);
+  const [localDecision, setResolved] = useState<'granted' | 'denied' | null>(null);
+  const resolved =
+    reason === 'agent_finished'
+      ? (localDecision ?? initialResolved)
+      : (initialResolved ?? localDecision);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(!initialResolved);
 
   async function respond(granted: boolean) {
     setLoading(true);
+    setError(null);
     try {
       await api.respondPermission(runId, messageId, granted);
       setResolved(granted ? 'granted' : 'denied');
       setExpanded(false);
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : String(error));
     } finally {
       setLoading(false);
     }
@@ -127,7 +135,7 @@ export function PermissionBanner({
 
   if (resolved) {
     const isPreviouslyApproved = reason?.startsWith('previously_approved');
-    const isAgentFinished = reason === 'agent_finished';
+    const isAgentFinished = reason === 'agent_finished' && !localDecision;
     const icon = isPreviouslyApproved
       ? '↻'
       : isAgentFinished
@@ -228,6 +236,12 @@ export function PermissionBanner({
           </Button>
         </div>
       </div>
+
+      {error && (
+        <p role="alert" className="mt-2 text-xs text-destructive">
+          {error}
+        </p>
+      )}
 
       {hasExpandableContent && (
         <div className="mt-2">

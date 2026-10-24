@@ -20,6 +20,15 @@ function createArtifactFiles(dir: string, type: string, name: string, versions: 
 }
 
 describe('VersionManager', () => {
+  it('does not treat a longer name containing a version suffix as the requested artifact', () => {
+    const dir = tempArtifactsDir();
+    createArtifactFiles(dir, 'plan', 'plan', [1]);
+    createArtifactFiles(dir, 'plan', 'plan_v2_extra', [9]);
+    const manager = new VersionManager(dir);
+    expect(manager.listVersions('plan', 'plan')).toEqual([1]);
+    expect(manager.nextVersion('plan', 'plan')).toBe(2);
+  });
+
   it('returns 1 for the first version of a new artifact', () => {
     const dir = tempArtifactsDir();
     const mgr = new VersionManager(dir);
@@ -48,7 +57,7 @@ describe('VersionManager', () => {
     expect(mgr.nextVersion('plan', 'plan')).toBe(4);
   });
 
-  it('ignores meta.yaml files when scanning versions', () => {
+  it('does not double count content and metadata for the same version', () => {
     const dir = tempArtifactsDir();
     createArtifactFiles(dir, 'plan', 'plan', [1]);
     const mgr = new VersionManager(dir);

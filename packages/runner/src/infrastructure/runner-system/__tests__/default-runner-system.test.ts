@@ -3,6 +3,7 @@ import type {
   AgentSessionSupervisor,
   ArtifactStore,
   EventBus,
+  JournalWriter,
   PromptEngine,
   RoleRegistry,
 } from '@ai-dev-orchestrator/ports';
@@ -465,6 +466,50 @@ describe('DefaultRunnerSystem', () => {
     await dispatchPromise;
   });
 
+  it('signals every runner even when worker cancellation and another runner signal fail', async () => {
+    const first = {
+      ...makeMockAgentRunner(),
+      killAll: vi.fn(() => {
+        throw new Error('signal failed');
+      }),
+    };
+    const second = { ...makeMockAgentRunner(), killAll: vi.fn() };
+    const system = new DefaultRunnerSystem(
+      makeArtifactStore(),
+      makeRoleRegistry(),
+      makePromptEngine(),
+      makeEventBus(),
+      {
+        runnerRegistry: new Map<string, AgentRunner>([
+          ['cli', first],
+          ['second', second],
+        ]),
+      },
+    );
+    vi.spyOn(system, 'cancelWorker').mockRejectedValue(new Error('worker cancellation failed'));
+    // Register one real dispatch before cancellation so active-worker enumeration is exercised.
+    let finish!: (result: AgentResult) => void;
+    first.dispatch.mockReturnValueOnce(
+      new Promise<AgentResult>((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const dispatch = system.dispatch({
+      role: 'architect',
+      runId: createRunId('run-1'),
+      stateId: 'REVIEW',
+      inputArtifacts: [],
+    });
+    await vi.waitFor(() => {
+      expect(first.dispatch).toHaveBeenCalledOnce();
+    });
+    await system.cancelAllWorkers();
+    expect(first.killAll).toHaveBeenCalledOnce();
+    expect(second.killAll).toHaveBeenCalledOnce();
+    finish({ taskId: 'task', status: 'failure', durationMs: 0, error: 'cancelled' });
+    await dispatch;
+  });
+
   it('cancelAllWorkers calls killAll on runners that support it', async () => {
     resetWorkerCounter();
     const mockRunner = {
@@ -631,6 +676,8 @@ describe('DefaultRunnerSystem', () => {
       }),
     };
 
+    const append = vi.fn<JournalWriter['append']>();
+    const journalWriter: JournalWriter = { append, appendBatch: vi.fn() };
     const system = new DefaultRunnerSystem(
       makeArtifactStore(),
       makeRoleRegistry(),
@@ -639,6 +686,7 @@ describe('DefaultRunnerSystem', () => {
       {
         runnerRegistry: new Map<string, AgentRunner>([['cli', sessionRunner]]),
         sessionSupervisor: supervisor,
+        journalWriter,
       },
     );
 
@@ -655,6 +703,88 @@ describe('DefaultRunnerSystem', () => {
     expect(result.metrics.inputTokens).toBe(150);
     expect(result.metrics.outputTokens).toBe(75);
     expect(result.sessionRef?.sessionId).toBe('sess-2');
+    const completed = append.mock.calls
+      .map(([event]) => event)
+      .filter((event) => event.type === 'worker_completed');
+    expect(completed).toHaveLength(1);
+    expect(completed[0]?.data).toMatchObject({
+      inputTokens: 150,
+      outputTokens: 75,
+      workerId: result.workerId,
+      stateId: 'state-1',
+    });
+  });
+
+  it('journals and returns failure when the initial supervised session crashes', async () => {
+    resetWorkerCounter();
+    const sessionRunner = {
+      supportsResumableSessions: true as const,
+      dispatch: vi.fn(),
+      dispatchWithSession: vi.fn().mockResolvedValue({
+        kind: 'session' as const,
+        handle: {
+          ref: {
+            sessionId: 'sess-2',
+            runId: 'run-1',
+            stateId: 'state-1',
+            role: 'architect',
+            transport: 'stdio',
+          },
+          state: 'running',
+          pendingRequests: [],
+        },
+      }),
+    };
+
+    const supervisor: AgentSessionSupervisor = {
+      createSession: vi.fn(),
+      attach: vi.fn(),
+      sendHumanResponse: vi.fn(),
+      pause: vi.fn(),
+      abort: vi.fn(),
+      finalize: vi.fn(),
+      getSnapshot: vi.fn(),
+      getState: vi.fn(),
+      listByRun: vi.fn(),
+      waitForAdvance: vi.fn().mockResolvedValue({
+        kind: 'failed',
+        error: 'agent process crashed',
+      }),
+    };
+
+    const append = vi.fn<JournalWriter['append']>();
+    const journalWriter: JournalWriter = { append, appendBatch: vi.fn() };
+    const system = new DefaultRunnerSystem(
+      makeArtifactStore(),
+      makeRoleRegistry(),
+      makePromptEngine(),
+      makeEventBus(),
+      {
+        runnerRegistry: new Map<string, AgentRunner>([['cli', sessionRunner]]),
+        sessionSupervisor: supervisor,
+        journalWriter,
+      },
+    );
+
+    const result = await system.dispatch({
+      runId: createRunId('run-1'),
+      stateId: 'state-1',
+      role: 'architect',
+      inputArtifacts: [],
+    });
+
+    expect(result.status).toBe('failure');
+    expect(result.error?.message).toBe('agent process crashed');
+    expect(result.sessionOutcome).not.toBe('session_active');
+    const failed = append.mock.calls
+      .map(([event]) => event)
+      .filter((event) => event.type === 'worker_failed');
+    expect(failed).toHaveLength(1);
+    expect(failed[0]?.data).toMatchObject({
+      stateId: 'state-1',
+      error: 'agent process crashed',
+      status: 'failure',
+    });
   });
 
   it('handleSessionResult uses initial metrics when supervisor returns completed without tokenUsage', async () => {
@@ -721,7 +851,7 @@ describe('DefaultRunnerSystem', () => {
     expect(result.metrics.outputTokens).toBe(0);
   });
 
-  it('handleSessionResult returns session_active when supervisor returns unknown kind', async () => {
+  it('handleSessionResult propagates a crashed session as a worker failure', async () => {
     resetWorkerCounter();
     const sessionRunner = {
       supportsResumableSessions: true as const,
@@ -776,9 +906,9 @@ describe('DefaultRunnerSystem', () => {
       inputArtifacts: [],
     });
 
-    expect(result.status).toBe('success');
-    expect(result.sessionOutcome).toBe('session_active');
-    expect(result.sessionRef?.sessionId).toBe('sess-4');
+    expect(result.status).toBe('failure');
+    expect(result.error?.message).toBe('session crashed');
+    expect(result.sessionOutcome).toBeUndefined();
     expect(result.outputArtifacts).toHaveLength(0);
   });
 
@@ -885,5 +1015,47 @@ describe('DefaultRunnerSystem', () => {
 
     const taskArg = mockRunner.dispatch.mock.calls[0][0] as { modelHint?: string };
     expect(taskArg.modelHint).toBeUndefined();
+  });
+});
+
+describe('dispatch preparation cancellation', () => {
+  it('does not start an agent after cancellation during prompt assembly', async () => {
+    const prompts = makePromptEngine();
+    const agent = makeMockAgentRunner();
+    const render = vi.mocked(prompts).render.getMockImplementation();
+    if (!render) {
+      throw new Error('Missing render implementation');
+    }
+    let signal!: () => void;
+    let finish!: () => void;
+    const started = new Promise<void>((resolve) => {
+      signal = resolve;
+    });
+    const blocked = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    vi.mocked(prompts).render.mockImplementationOnce(async (...args) => {
+      signal();
+      await blocked;
+      return render(...args);
+    });
+    const system = new DefaultRunnerSystem(
+      makeArtifactStore(),
+      makeRoleRegistry(),
+      prompts,
+      makeEventBus(),
+      { runnerRegistry: new Map<string, AgentRunner>([['cli', agent]]) },
+    );
+    const running = system.dispatch({
+      runId: createRunId('cancelled'),
+      stateId: 'WORK',
+      role: 'architect',
+      inputArtifacts: [],
+    });
+    await started;
+    await system.cancelAllWorkers();
+    finish();
+    expect((await running).status).toBe('failure');
+    expect(agent.dispatch).not.toHaveBeenCalled();
   });
 });

@@ -11,6 +11,7 @@ import {
   guardSchema,
   guardTypeSchema,
   humanInputSchema,
+  runResultSchema,
   stateDefinitionSchema,
   stateTypeSchema,
   transitionContextSchema,
@@ -267,6 +268,12 @@ describe('waitingContextSchema', () => {
 });
 
 describe('engineStateSchema', () => {
+  it('accepts optional answer acceptance evidence while preserving legacy results', () => {
+    const evidence = runResultSchema.pick({ answerAccepted: true });
+    expect(evidence.parse({})).toEqual({});
+    expect(evidence.parse({ answerAccepted: false })).toEqual({ answerAccepted: false });
+    expect(evidence.safeParse({ answerAccepted: 'yes' }).success).toBe(false);
+  });
   it('validates engine state', () => {
     const data = {
       runId: 'r-1',
@@ -293,9 +300,29 @@ describe('engineStateSchema', () => {
 });
 
 describe('humanInputSchema', () => {
+  it('preserves optional session/request identity while accepting legacy unbound inputs', () => {
+    const targeted = {
+      type: 'approval',
+      content: 'yes',
+      sessionId: 'session',
+      requestId: 'request',
+    };
+    expect(humanInputSchema.parse(targeted)).toEqual(targeted);
+    expect(humanInputSchema.parse({ type: 'approval', content: 'yes' })).toEqual({
+      type: 'approval',
+      content: 'yes',
+    });
+    expect(humanInputSchema.safeParse({ ...targeted, requestId: '' }).success).toBe(false);
+    expect(humanInputSchema.safeParse({ ...targeted, sessionId: 1 }).success).toBe(false);
+  });
   it('validates text input', () => {
     const data = { type: 'text', content: 'Focus on performance' };
     expect(humanInputSchema.safeParse(data).success).toBe(true);
+    const waitIdentity = { stateId: 'WAIT', requestingState: 'WORK', waitingSince: 'wait-1' };
+    expect(humanInputSchema.parse({ ...data, waitIdentity }).waitIdentity).toEqual(waitIdentity);
+    expect(humanInputSchema.safeParse({ ...data, waitIdentity: { stateId: 'WAIT' } }).success).toBe(
+      false,
+    );
   });
 
   it('validates approval with artifact ref', () => {
@@ -376,6 +403,31 @@ describe('workerResultSchema', () => {
   it('validates a failed worker result', () => {
     const data = { role: 'implementer', success: false, error: 'Timeout', errorType: 'timeout' };
     expect(workerResultSchema.safeParse(data).success).toBe(true);
+  });
+});
+
+describe('worker session identity', () => {
+  it('preserves task identity and pending session metadata through serialization', () => {
+    const result = {
+      role: 'task_spec_writer',
+      success: true,
+      taskId: 'A',
+      sessionOutcome: 'awaiting_human',
+      sessionRef: {
+        sessionId: 'session-A',
+        runId: 'run',
+        stateId: 'SPEC',
+        role: 'task_spec_writer',
+        transport: 'remote',
+      },
+      pendingRequest: {
+        requestId: 'request-A',
+        kind: 'permission',
+        createdAt: '',
+        payload: { action: 'read', resource: '.' },
+      },
+    };
+    expect(workerResultSchema.parse(JSON.parse(JSON.stringify(result)))).toEqual(result);
   });
 });
 
