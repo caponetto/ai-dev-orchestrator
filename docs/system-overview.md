@@ -8,7 +8,7 @@ AI Dev Orchestrator is a local-first orchestration system for software-developme
 
 ## Package Layout
 
-The monorepo has twenty-seven packages:
+The monorepo has 26 packages:
 
 | Layer          | Package               | Responsibility                                                   |
 | -------------- | --------------------- | ---------------------------------------------------------------- |

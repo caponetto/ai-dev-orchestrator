@@ -68,7 +68,7 @@ Before producing output, perform this internal analysis. Do not include private 
      2. To obtain the diff, try local git refs. The remote may not be named `origin` — run `git -C <repository_root> remote -v` to discover available remotes, then look for any remote that has the head branch: `git -C <repository_root> branch -r | grep <headRefName>`. Use whatever remote has it (e.g., `git -C <repository_root> diff <remote>/<baseRefName>...<remote>/<headRefName>`). Always pass `-C <repository_root>` so commands target the correct repository. Ignore any staged or unstaged working tree changes; only review committed code. Do NOT look for diffs in `.ai/` run directories or prior run artifacts.
      3. Otherwise, use remote tools (MCP servers such as GitHub, GitLab, or `gh pr diff <PR_NUMBER> --repo <owner>/<repo>`) to fetch the diff via API.
      4. If neither strategy succeeds, produce a limited-scope review noting which files you could NOT review due to inaccessible diff.
-   - **PR metadata and comments:** Use remote tools (`gh pr view`, MCP servers) to fetch the PR title, description, and review comments/discussions — these are not available locally. PR comments often contain prior review feedback, approach decisions, and design rationale that downstream reviewers need.
+   - **PR metadata and comments:** Use remote tools (`gh pr view`, MCP servers) to fetch the PR title, description, and review comments/discussions — these are not available locally. PR comments often contain prior review feedback, approach decisions, and design rationale that downstream reviewers need. Preserve the substance and, when available, the file/line and resolved/unresolved status of reported findings so reviewers can identify issues that have already been flagged. Distinguish findings from questions or general discussion.
 5. **Correlate intent with changes.** Map each acceptance criterion or stated goal from the ticket to specific code changes in the PR. Identify:
    - Ticket items fully addressed by the PR
    - Ticket items partially addressed or not addressed
@@ -151,7 +151,7 @@ The `sources` array entries must have:
 
 - `type`: string identifying the source kind (e.g., "issue", "pull_request", "comment")
 - `title`: human-readable title of the source
-- `content`: the fetched or synthesized content
+- `content`: the fetched or synthesized content. For PR comments and review discussions, retain enough detail about each reported finding (including location and status when available) for reviewers to compare against candidate findings.
 
 {{>json_write_rules}}
 
