@@ -24,4 +24,4 @@ max_tokens: null
 dispatch_type: agent
 runner: opencode
 agent_config:
-  timeoutMs: 1800000
+  timeoutMs: 3600000

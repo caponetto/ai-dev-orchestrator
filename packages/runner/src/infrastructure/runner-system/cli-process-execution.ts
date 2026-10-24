@@ -180,6 +180,7 @@ export async function executeCliProcess(
           structuredData: {
             phase: 'done',
             sender: 'agent',
+            status: result.status,
           },
         });
         try {
