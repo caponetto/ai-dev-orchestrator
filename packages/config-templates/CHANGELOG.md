@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.10](https://github.com/caponetto/ai-dev-orchestrator/compare/config-templates-v0.1.9...config-templates-v0.1.10) (2026-10-24)
+
+
+### Bug Fixes
+
+* **runner:** retry agents that exit without output and show failed dispatches ([#82](https://github.com/caponetto/ai-dev-orchestrator/issues/82)) ([1881fdf](https://github.com/caponetto/ai-dev-orchestrator/commit/1881fdf18074d43702d5ff249e71ca8a6b3aae72))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @ai-dev-orchestrator/workflow bumped to 0.1.6
+
 ## [0.1.9](https://github.com/caponetto/ai-dev-orchestrator/compare/config-templates-v0.1.8...config-templates-v0.1.9) (2026-10-24)
 
 

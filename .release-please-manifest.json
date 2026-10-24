@@ -14,12 +14,12 @@
   "packages/recovery": "0.1.2",
   "packages/role-system": "0.1.2",
   "packages/run-manifest": "0.1.2",
-  "packages/runner": "0.1.6",
+  "packages/runner": "0.1.7",
   "packages/specification": "0.1.2",
   "packages/core": "0.1.2",
-  "packages/workflow": "0.1.5",
-  "packages/config-templates": "0.1.9",
-  "packages/dashboard-server": "0.1.4",
-  "packages/cli": "0.1.12",
-  "packages/execution-analytics": "0.1.3"
+  "packages/workflow": "0.1.6",
+  "packages/config-templates": "0.1.10",
+  "packages/dashboard-server": "0.1.5",
+  "packages/cli": "0.1.13",
+  "packages/execution-analytics": "0.1.4"
 }
