@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.11](https://github.com/caponetto/ai-dev-orchestrator/compare/config-templates-v0.1.10...config-templates-v0.1.11) (2026-11-07)
+
+
+### Bug Fixes
+
+* update opencode runner models to match CLI 1.19.5 ([#89](https://github.com/caponetto/ai-dev-orchestrator/issues/89)) ([654dfad](https://github.com/caponetto/ai-dev-orchestrator/commit/654dfada9b893f6504ab7ee0f873351494fc3945))
+
 ## [0.1.10](https://github.com/caponetto/ai-dev-orchestrator/compare/config-templates-v0.1.9...config-templates-v0.1.10) (2026-10-24)
 
 
