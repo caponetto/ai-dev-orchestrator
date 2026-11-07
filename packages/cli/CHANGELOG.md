@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.14](https://github.com/caponetto/ai-dev-orchestrator/compare/cli-v0.1.13...cli-v0.1.14) (2026-11-07)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @ai-dev-orchestrator/config-templates bumped to 0.1.11
+
 ## [0.1.13](https://github.com/caponetto/ai-dev-orchestrator/compare/cli-v0.1.12...cli-v0.1.13) (2026-10-24)
 
 
