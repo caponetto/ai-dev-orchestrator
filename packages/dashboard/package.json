@@ -31,12 +31,12 @@
     "@ai-dev-orchestrator/schemas": "workspace:*",
     "@ai-dev-orchestrator/utils": "workspace:*",
     "@tailwindcss/typography": "^0.5.20",
-    "@xyflow/react": "^12.12.0",
+    "@xyflow/react": "^12.12.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "elkjs": "^0.12.1",
     "highlight.js": "^11.12.0",
-    "lucide-react": "^1.65.0",
+    "lucide-react": "^1.70.0",
     "radix-ui": "^1.8.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
@@ -46,7 +46,7 @@
     "remark-gfm": "^4.0.1",
     "sonner": "^2.0.8",
     "tailwind-merge": "^3.7.0",
-    "timeago.js": "^4.0.2"
+    "timeago.js": "^4.3.0"
   },
   "devDependencies": {
     "@ai-dev-orchestrator/build-config": "workspace:*",
