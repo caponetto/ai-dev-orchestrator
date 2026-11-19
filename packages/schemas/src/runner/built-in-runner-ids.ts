@@ -4,6 +4,7 @@ export const BUILT_IN_CODING_RUNNER_ID = {
   CODEX: 'codex',
   CURSOR: 'cursor',
   OPENCODE: 'opencode',
+  PI: 'pi',
 } as const;
 
 export type BuiltInCodingRunnerId =
@@ -14,4 +15,5 @@ export const BUILT_IN_CODING_RUNNER_IDS: readonly BuiltInCodingRunnerId[] = [
   BUILT_IN_CODING_RUNNER_ID.CODEX,
   BUILT_IN_CODING_RUNNER_ID.CURSOR,
   BUILT_IN_CODING_RUNNER_ID.OPENCODE,
+  BUILT_IN_CODING_RUNNER_ID.PI,
 ];

@@ -56,7 +56,7 @@ Dashboard defaults are:
 ## Model Availability Before a New Run
 
 Before creating a run directory, `ai run` checks the effective model for every configured role
-using its selected built-in runner (`claude-code`, `cursor`, `codex`, or `opencode`). The check
+using its selected built-in runner (`claude-code`, `cursor`, `codex`, `opencode`, or `pi`). The check
 uses the same model precedence as dispatch: `agentConfig.model`, then the role model assignment.
 The `agent` sentinel checks the runner's default model.
 

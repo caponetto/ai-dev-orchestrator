@@ -21,6 +21,7 @@ const SUPPORTED_ADAPTERS: ReadonlySet<string> = new Set([
   BUILT_IN_CODING_RUNNER_ID.CODEX,
   BUILT_IN_CODING_RUNNER_ID.CURSOR,
   BUILT_IN_CODING_RUNNER_ID.OPENCODE,
+  BUILT_IN_CODING_RUNNER_ID.PI,
 ]);
 
 /** Retry only failures that happened before an agent could have changed the workspace. */

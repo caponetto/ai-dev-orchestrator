@@ -25,6 +25,14 @@ export {
   probeOpencodeCliCapabilities,
 } from './opencode-cli-capability-probe';
 
+export { PiCliAdapter, createPiCliAdapter } from './pi-cli-adapter';
+export type { PiProbeResult } from './pi-cli-capability-probe';
+export {
+  normalizePiProbeResult,
+  parseListModelsOutput,
+  probePiCliCapabilities,
+} from './pi-cli-capability-probe';
+
 export type { CursorProbeResult } from './cursor-cli-capability-probe';
 export {
   probeCursorCliCapabilities,
@@ -68,6 +76,20 @@ export type {
   OpenCodeToolPart,
   OpenCodeToolState,
   OpenCodeToolUseEvent,
+  PiAgentSettledEvent,
+  PiAgentStartEvent,
+  PiAssistantMessageEvent,
+  PiAutoRetryEndEvent,
+  PiCompactionEndEvent,
+  PiCompactionStartEvent,
+  PiMessageEndEvent,
+  PiMessageUpdateEvent,
+  PiSessionHeaderEvent,
+  PiStreamEvent,
+  PiTokenUsage,
+  PiToolExecutionEndEvent,
+  PiToolExecutionStartEvent,
+  PiTurnStartEvent,
   VendorAssistantMessage,
   VendorTokenUsage,
 } from './external-event-types';
@@ -77,4 +99,5 @@ export {
   parseCursorEvent,
   parseCodexEvent,
   parseOpenCodeEvent,
+  parsePiEvent,
 } from './external-event-types';

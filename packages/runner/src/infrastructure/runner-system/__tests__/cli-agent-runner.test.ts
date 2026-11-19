@@ -8,6 +8,7 @@ import {
   CodexCliAdapter,
   CursorCliAdapter,
   createOpencodeCliAdapter,
+  createPiCliAdapter,
 } from '@ai-dev-orchestrator/agent-adapters';
 import type { ProtocolMessage } from '@ai-dev-orchestrator/agent-protocol';
 import { createProtocolMessage } from '@ai-dev-orchestrator/agent-protocol';
@@ -967,6 +968,41 @@ fi`,
       );
     });
 
+    it('retries when Pi exits after a text-only intro without writing the artifact', async () => {
+      const counterPath = join(tempDir, 'attempts');
+      const task = makeTask({
+        agentConfig: {
+          command: 'bash',
+          args: [
+            '-c',
+            `count=$(cat ${JSON.stringify(counterPath)} 2>/dev/null || echo 0)
+count=$((count + 1))
+echo "$count" > ${JSON.stringify(counterPath)}
+if [ "$count" -eq 1 ]; then
+  echo '{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"Hi, I am the context analyst."}],"stopReason":"stop"}}'
+  echo '{"type":"agent_settled","aborted":false}'
+else
+  echo '{"summary":"done"}' > ${JSON.stringify(join(tempDir, 'output', 'implementation-task-1.json'))}
+  echo '{"type":"agent_settled","aborted":false}'
+fi`,
+          ],
+        },
+      });
+      const events: AgentOutputStreamEvent[] = [];
+      const runner = new CliAgentRunner({
+        command: 'bash',
+        adapter: createPiCliAdapter(),
+        handshakeTimeoutMs: 100,
+        retryBaseDelayMs: 1,
+      });
+
+      const result = await runner.dispatch(task, (event) => events.push(event));
+
+      expect(result.status).toBe('success');
+      expect(await readFile(counterPath, 'utf-8')).toBe('2\n');
+      expect(events.some((event) => event.content.includes('Retrying transient pi'))).toBe(true);
+    });
+
     it('does not retry a missing artifact after the agent used tools', async () => {
       const counterPath = join(tempDir, 'attempts');
       const task = makeTask({
@@ -1600,6 +1636,30 @@ describe('extractUsageFromRawLine', () => {
     });
     const usage = extractUsageFromRawLine(line);
     expect(usage).toEqual({ inputTokens: 800, outputTokens: 50, cumulative: true });
+  });
+
+  it('extracts Pi usage only from the authoritative message_end event', () => {
+    const deltaLine = JSON.stringify({
+      type: 'message_update',
+      usage: { input: 100, output: 5, cacheRead: 10, cacheWrite: 0, totalTokens: 115 },
+      assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: 'Hi' },
+    });
+    expect(extractUsageFromRawLine(deltaLine)).toBeNull();
+    const endLine = JSON.stringify({
+      type: 'message_end',
+      message: {
+        role: 'assistant',
+        content: [],
+        stopReason: 'stop',
+        usage: { input: 400, output: 60, cacheRead: 50, cacheWrite: 20, totalTokens: 530 },
+      },
+    });
+    expect(extractUsageFromRawLine(endLine)).toEqual({
+      inputTokens: 420,
+      outputTokens: 60,
+      isFinal: true,
+      cumulative: true,
+    });
   });
 
   it('returns null for non-JSON lines', () => {

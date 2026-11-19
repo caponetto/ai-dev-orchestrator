@@ -54,7 +54,7 @@ export async function runCommand(
 
   let ctx;
   try {
-    ctx = await createOrchestrator(repoRoot);
+    ctx = await createOrchestrator(repoRoot, options.workflow);
   } catch (error: unknown) {
     formatter.error(toCLIError(error));
     return ExitCode.CONFIGURATION_ERROR;

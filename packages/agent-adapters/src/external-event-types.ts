@@ -1,7 +1,8 @@
 /**
  * Discriminated union types for vendor CLI stream-json events.
  *
- * Claude Code, Cursor CLI, Codex CLI, and OpenCode CLI emit newline-delimited JSON on stdout.
+ * Claude Code, Cursor CLI, Codex CLI, OpenCode CLI, and Pi CLI emit newline-delimited JSON on
+ * stdout.
  * These types capture the event shapes each vendor produces, enabling
  * typed property access in the adapter mapping functions.
  */
@@ -49,10 +50,19 @@ export interface OpenCodeTokenUsage {
   };
 }
 
+export interface PiTokenUsage {
+  readonly input?: number;
+  readonly output?: number;
+  readonly cacheRead?: number;
+  readonly cacheWrite?: number;
+  readonly totalTokens?: number;
+}
+
 export type VendorTokenUsage = ClaudeTokenUsage &
   CursorTokenUsage &
   CodexTokenUsage &
-  OpenCodeTokenUsage;
+  OpenCodeTokenUsage &
+  PiTokenUsage;
 
 // ---------------------------------------------------------------------------
 // Claude Code stream events
@@ -303,6 +313,100 @@ export type OpenCodeStreamEvent =
   | OpenCodeErrorEvent;
 
 // ---------------------------------------------------------------------------
+// Pi CLI --mode json events
+// ---------------------------------------------------------------------------
+
+export interface PiSessionHeaderEvent {
+  readonly type: 'session';
+  readonly id?: string;
+  readonly version?: number;
+}
+
+export interface PiAgentStartEvent {
+  readonly type: 'agent_start';
+}
+
+export interface PiAgentSettledEvent {
+  readonly type: 'agent_settled';
+  readonly aborted?: boolean;
+}
+
+export interface PiTurnStartEvent {
+  readonly type: 'turn_start';
+}
+
+export interface PiMessageEndEvent {
+  readonly type: 'message_end';
+  readonly message?: VendorAssistantMessage & {
+    readonly role?: string;
+    readonly stopReason?: string;
+    readonly errorMessage?: string;
+    readonly usage?: VendorTokenUsage;
+  };
+}
+
+export interface PiAssistantMessageEvent {
+  readonly type: string;
+  readonly delta?: string;
+  readonly content?: string;
+  readonly toolName?: string;
+  readonly reason?: string;
+  readonly error?: string;
+}
+
+export interface PiMessageUpdateEvent {
+  readonly type: 'message_update';
+  readonly usage?: VendorTokenUsage;
+  readonly assistantMessageEvent?: PiAssistantMessageEvent;
+}
+
+export interface PiToolExecutionStartEvent {
+  readonly type: 'tool_execution_start';
+  readonly toolCallId?: string;
+  readonly toolName?: string;
+  readonly args?: Record<string, unknown>;
+}
+
+export interface PiToolExecutionEndEvent {
+  readonly type: 'tool_execution_end';
+  readonly toolCallId?: string;
+  readonly toolName?: string;
+  readonly isError?: boolean;
+  readonly result?: { readonly content?: readonly VendorContentBlock[] };
+}
+
+export interface PiCompactionStartEvent {
+  readonly type: 'compaction_start';
+  readonly reason?: string;
+}
+
+export interface PiCompactionEndEvent {
+  readonly type: 'compaction_end';
+  readonly reason?: string;
+  readonly aborted?: boolean;
+  readonly errorMessage?: string;
+}
+
+export interface PiAutoRetryEndEvent {
+  readonly type: 'auto_retry_end';
+  readonly success?: boolean;
+  readonly finalError?: string;
+}
+
+export type PiStreamEvent =
+  | PiSessionHeaderEvent
+  | PiAgentStartEvent
+  | PiAgentSettledEvent
+  | PiTurnStartEvent
+  | PiMessageEndEvent
+  | PiMessageUpdateEvent
+  | PiToolExecutionStartEvent
+  | PiToolExecutionEndEvent
+  | PiCompactionStartEvent
+  | PiCompactionEndEvent
+  | PiAutoRetryEndEvent;
+
+// ---------------------------------------------------------------------------
 // Parse / narrow helpers
 // ---------------------------------------------------------------------------
 
@@ -347,6 +451,24 @@ const OPENCODE_EVENT_TYPES: ReadonlySet<string> = new Set([
   'error',
 ]);
 
+const PI_EVENT_TYPES: ReadonlySet<string> = new Set([
+  'session',
+  'agent_start',
+  'agent_end',
+  'agent_settled',
+  'turn_start',
+  'turn_end',
+  'message_start',
+  'message_end',
+  'message_update',
+  'tool_execution_start',
+  'tool_execution_update',
+  'tool_execution_end',
+  'compaction_start',
+  'compaction_end',
+  'auto_retry_end',
+]);
+
 /** Narrow a pre-parsed JSON object to a Claude Code vendor event. */
 export function narrowClaudeCodeEvent(raw: Record<string, unknown>): ClaudeCodeStreamEvent | null {
   const type = raw['type'];
@@ -379,6 +501,14 @@ function narrowOpenCodeEvent(raw: Record<string, unknown>): OpenCodeStreamEvent 
     return null;
   }
   return raw as unknown as OpenCodeStreamEvent;
+}
+
+function narrowPiEvent(raw: Record<string, unknown>): PiStreamEvent | null {
+  const type = raw['type'];
+  if (typeof type !== 'string' || !PI_EVENT_TYPES.has(type)) {
+    return null;
+  }
+  return raw as unknown as PiStreamEvent;
 }
 
 /** Parse a raw JSON line into a typed Claude Code stream event. */
@@ -436,6 +566,19 @@ export function parseOpenCodeEvent(line: string): OpenCodeStreamEvent | null {
   }
   try {
     return narrowOpenCodeEvent(JSON.parse(trimmed) as Record<string, unknown>);
+  } catch {
+    return null;
+  }
+}
+
+/** Parse a raw JSON line emitted by `pi --mode json`. */
+export function parsePiEvent(line: string): PiStreamEvent | null {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith('{')) {
+    return null;
+  }
+  try {
+    return narrowPiEvent(JSON.parse(trimmed) as Record<string, unknown>);
   } catch {
     return null;
   }

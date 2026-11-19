@@ -48,7 +48,7 @@ describe('runner-registry', () => {
       expect(codex?.models).toContain('gpt-5.6-luna');
     });
 
-    it('opencode runner matches the available models reported by CLI 1.19.5', () => {
+    it('opencode runner advertises the supported models', () => {
       const opencode = loadRunnerRegistry().find((runner) => runner.id === 'opencode');
       expect(opencode?.models).toEqual([
         'opencode/big-pickle',
@@ -58,10 +58,7 @@ describe('runner-registry', () => {
         'opencode/nemotron-3.5-super-vl-free',
         'opencode/beam-free',
         'opencode/flint-40b-free',
-        'opencode/glm-5.3-flash-free',
-        'opencode/crouton-alpha-free',
         'opencode/iceman-free',
-        'opencode/inkling-2-small-free',
       ]);
     });
 

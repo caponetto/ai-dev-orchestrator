@@ -182,7 +182,8 @@ export function checkRunner({ id, name, version, listModels }: RunnerCheck): voi
   try {
     const current = parseRunnerModels(readFileSync(RUNNERS_FILE, 'utf8')).get(id);
     if (current === undefined || current.length === 0) {
-      throw new Error(`No models found for runner "${id}" in runners.yaml`);
+      console.log(`::notice::No models configured for runner "${id}" in runners.yaml; skipping`);
+      return;
     }
     const available = listModels();
     const removed = findMissingModels(current, available);

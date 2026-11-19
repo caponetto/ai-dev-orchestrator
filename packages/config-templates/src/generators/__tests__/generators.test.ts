@@ -240,7 +240,7 @@ describe('roles-generator', () => {
     const reportSynthesizer = parsed.roles.find((r) => r.id === 'report_synthesizer');
     expect(reportSynthesizer?.name).toBe('Report Synthesizer');
     expect(reportSynthesizer?.owned_artifacts).toContain('review_report');
-    expect(reportSynthesizer?.model).toBe('opencode/mimo-v2.6-flash-free');
+    expect(reportSynthesizer?.runner).toBe('opencode');
   });
 });
 

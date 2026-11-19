@@ -8,14 +8,17 @@ import {
   createCodexCliAdapter,
   createCursorCliAdapter,
   createOpencodeCliAdapter,
+  createPiCliAdapter,
   normalizeCodexProbeResult,
   normalizeCursorProbeResult,
   normalizeOpencodeProbeResult,
+  normalizePiProbeResult,
   normalizeProbeResult,
   probeClaudeCodeCapabilities,
   probeCodexCliCapabilities,
   probeCursorCliCapabilities,
   probeOpencodeCliCapabilities,
+  probePiCliCapabilities,
 } from '@ai-dev-orchestrator/agent-adapters';
 import {
   buildOwnershipOverrides,
@@ -126,8 +129,8 @@ import type { ConfigSnapshot } from './config-snapshot';
 import { configSnapshotSchema, resolveRunModelAssignments } from './config-snapshot';
 import { connectRemoteWebSocket } from './connect-remote-websocket';
 import { installShutdownDeadline } from './install-shutdown-deadline';
-import { validateSelectedModels } from './model-preflight';
-import { loadDefaultWorkflow, loadProjectConfig } from './project-config';
+import { collectDispatchedRoleIds, validateSelectedModels } from './model-preflight';
+import { loadDefaultWorkflow, loadProjectConfig, resolveProjectWorkflow } from './project-config';
 import { ResumeStatePersistence } from './resume-state-persistence';
 import { loadLatestRunState } from './run-state-recovery';
 import {
@@ -375,6 +378,31 @@ async function buildRunnerRegistry(
     );
   }
 
+  try {
+    const piProbe = await probePiCliCapabilities();
+    const { mode: piMode, summary: piSummary } = normalizePiProbeResult(piProbe);
+    if (piMode === 'unavailable' || piMode === 'unauthenticated') {
+      skippedAssignments.push(`${BUILT_IN_CODING_RUNNER_ID.PI} runner skipped: ${piSummary}`);
+    } else {
+      const piRunner = new CliAgentRunner({
+        command: 'pi',
+        args: ['--mode', 'json'],
+        adapter: createPiCliAdapter(),
+        availableModels: piProbe.availableModels,
+      });
+      piRunner.setPermissionPolicy(policy);
+      piRunner.setApprovalStore(approvalStore);
+      if (liveRequestStore) {
+        piRunner.setLiveRequestStore(liveRequestStore);
+      }
+      registry.set(BUILT_IN_CODING_RUNNER_ID.PI, piRunner);
+    }
+  } catch {
+    skippedAssignments.push(
+      'pi runner skipped: capability probe failed — Pi CLI adapter unavailable',
+    );
+  }
+
   return registry;
 }
 
@@ -413,24 +441,36 @@ function buildRoleRegistry(
 /** Verify configured models before allocating a run or spawning a detached CLI. */
 export async function preflightSelectedModels(
   repoRoot: string,
+  workflowName?: string,
 ): Promise<{ warnings: string[]; receipt?: string }> {
   const config = loadConfiguration();
   if (config.isFixture) {
     return { warnings: [] };
   }
+  const workflow = workflowName
+    ? loadWorkflowByName(workflowName)
+    : (loadWorkflowFromConfig() ?? resolveProjectWorkflow());
+  const roleFilter = workflow ? collectDispatchedRoleIds(workflow) : undefined;
   const registry = buildRoleRegistry(
     loadRoleContracts(),
     config.configModelAssignments,
     config.configDispatchOverrides,
   );
   const fingerprint = createHash('sha256')
-    .update(JSON.stringify({ repoRoot, config: config.mergedConfig, roles: registry.listRoles() }))
+    .update(
+      JSON.stringify({
+        repoRoot,
+        workflow: workflow?.name ?? workflowName ?? null,
+        config: config.mergedConfig,
+        roles: registry.listRoles(),
+      }),
+    )
     .digest('hex');
   const [verifiedFingerprint, checkedAt] =
     process.env['AI_ORCHESTRATOR_MODEL_PREFLIGHT']?.split(':') ?? [];
   const age = Date.now() - Number(checkedAt);
   const verified = verifiedFingerprint === fingerprint && age >= 0 && age < 60_000;
-  const warnings = await validateSelectedModels(registry, repoRoot, verified);
+  const warnings = await validateSelectedModels(registry, repoRoot, verified, roleFilter);
   return { warnings, receipt: `${fingerprint}:${String(Date.now())}` };
 }
 
@@ -676,8 +716,11 @@ async function buildOrchestratorInfra(params: InfraParams): Promise<InfraResult>
 // ---------------------------------------------------------------------------
 
 /** Wire all infrastructure and create a fresh orchestrator context for a new run. */
-export async function createOrchestrator(repoRoot: string): Promise<OrchestratorContext> {
-  const { warnings: modelWarnings } = await preflightSelectedModels(repoRoot);
+export async function createOrchestrator(
+  repoRoot: string,
+  workflowName?: string,
+): Promise<OrchestratorContext> {
+  const { warnings: modelWarnings } = await preflightSelectedModels(repoRoot, workflowName);
   const runId = createRunId();
   const runDir = getRunDir(runId);
   mkdirSync(runDir, { recursive: true });

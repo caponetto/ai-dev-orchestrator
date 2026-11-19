@@ -1,6 +1,6 @@
 # @ai-dev-orchestrator/agent-adapters
 
-CLI adapters that bridge vendor-specific coding agents (Claude Code, Cursor, Codex, OpenCode, GitHub CLI) into the orchestrator's unified agent protocol. Each adapter translates vendor stream events into protocol messages and probes for available capabilities.
+CLI adapters that bridge vendor-specific coding agents (Claude Code, Cursor, Codex, OpenCode, Pi, GitHub CLI) into the orchestrator's unified agent protocol. Each adapter translates vendor stream events into protocol messages and probes for available capabilities.
 
 ## Architecture Layer
 
@@ -55,3 +55,10 @@ src/
 **GitHub CLI**:
 
 - `probeGhCliCapabilities`, `normalizeGhCliProbeResult` -- capability detection
+
+**Pi**:
+
+- `PiCliAdapter`, `createPiCliAdapter` -- adapter for `pi --mode json`
+- `probePiCliCapabilities`, `normalizePiProbeResult`, `parseListModelsOutput` -- capability detection and model roster parsing
+- `PiStreamEvent`, `PiMessageUpdateEvent`, `PiToolExecutionStartEvent`, `PiToolExecutionEndEvent`, `PiAgentSettledEvent`, and related event types
+- `parsePiEvent` -- JSONL event parsing

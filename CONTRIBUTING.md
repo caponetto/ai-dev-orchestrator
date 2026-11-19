@@ -128,7 +128,7 @@ packages/
 ├── ports/              # Port interfaces (contracts between layers)
 ├── artifacts/          # Artifact system, ownership, agreements
 ├── agent-protocol/     # Agent-orchestrator protocol messages
-├── agent-adapters/     # CLI adapters for Claude Code, Cursor, Codex, OpenCode, gh-cli
+├── agent-adapters/     # CLI adapters for Claude Code, Cursor, Codex, OpenCode, Pi, gh-cli
 ├── dependency-graph/   # Artifact dependency graph, impact analysis
 ├── execution-analytics/ # Adaptive execution loop, statistical profiling
 ├── governance/         # Governance engine, iteration contracts

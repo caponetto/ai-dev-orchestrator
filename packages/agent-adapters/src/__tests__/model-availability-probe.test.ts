@@ -28,7 +28,7 @@ describe('probeModelAvailability', () => {
       const execFn = vi.fn((command: ModelProbeCommand) => {
         cwd = command.cwd;
         expect(existsSync(cwd)).toBe(true);
-        expect(command.timeoutMs).toBe(30_000);
+        expect(command.timeoutMs).toBe(60_000);
         expect(command.args).toContain('--model');
         expect(command.args).toContain('selected-model');
         expect(command.args).not.toContain('--auto');
@@ -58,8 +58,8 @@ describe('probeModelAvailability', () => {
     const execFn = vi.fn((_command: ModelProbeCommand) =>
       Promise.resolve({ stdout: success.codex, stderr: '', exitCode: 0 }),
     );
-    await probeModelAvailability('codex', 'model', { cwd: '/repo', execFn });
-    expect(execFn.mock.calls[0]?.[0].cwd).toBe('/repo');
+    await probeModelAvailability('codex', 'model', { cwd: process.cwd(), execFn });
+    expect(execFn.mock.calls[0]?.[0].cwd).toBe(process.cwd());
   });
 
   it('preserves OpenCode provider overrides while requiring tool approval', async () => {
@@ -170,17 +170,17 @@ describe('probeModelAvailability', () => {
     expect(execFile).toHaveBeenCalledWith(
       'codex',
       expect.any(Array),
-      expect.objectContaining({ timeout: 30_000, killSignal: 'SIGKILL', maxBuffer: 1024 * 1024 }),
+      expect.objectContaining({ timeout: 60_000, killSignal: 'SIGKILL', maxBuffer: 1024 * 1024 }),
       expect.any(Function),
     );
   });
 
   it.each([
     [{ killed: true }, 'timed out'],
-    [Object.assign(new Error('Executable missing'), { code: 'ENOENT' }), 'Executable missing'],
+    [Object.assign(new Error('spawn codex ENOENT'), { code: 'ENOENT' }), 'codex CLI not found'],
     [{ code: 1 }, 'Authentication failed'],
   ])('returns subprocess failures: %j', async (error, detail) => {
-    vi.mocked(execFile).mockImplementationOnce((...args: unknown[]) => {
+    vi.mocked(execFile).mockImplementation((...args: unknown[]) => {
       const callback = args[3] as (err: unknown, stdout: string, stderr: string) => void;
       callback(error, '', 'Authentication failed');
       return { stdin: { end: vi.fn() } } as unknown as ReturnType<typeof execFile>;
@@ -189,5 +189,78 @@ describe('probeModelAvailability', () => {
       available: false,
       detail: expect.stringContaining(detail) as unknown,
     });
+  });
+
+  it('retries a timed-out probe once before reporting the model available', async () => {
+    const timeoutError = new Error(
+      'Model check timed out after 60 seconds. Try again before starting.',
+    );
+    const execFn = vi
+      .fn()
+      .mockRejectedValueOnce(timeoutError)
+      .mockResolvedValueOnce({ stdout: success.codex, stderr: '', exitCode: 0 });
+    expect(await probeModelAvailability('codex', 'model', { execFn })).toEqual({ available: true });
+    expect(execFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries a timed-out probe only once before failing', async () => {
+    const timeoutError = new Error(
+      'Model check timed out after 60 seconds. Try again before starting.',
+    );
+    const execFn = vi.fn().mockRejectedValue(timeoutError);
+    expect(await probeModelAvailability('codex', 'model', { execFn })).toMatchObject({
+      available: false,
+      detail: expect.stringContaining('timed out') as unknown,
+    });
+    expect(execFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('falls back to a temporary directory when the supplied cwd no longer exists', async () => {
+    const execFn = vi.fn((_command: ModelProbeCommand) =>
+      Promise.resolve({ stdout: success.codex, stderr: '', exitCode: 0 }),
+    );
+    await probeModelAvailability('codex', 'model', {
+      cwd: '/nonexistent/deleted-checkout',
+      execFn,
+    });
+    expect(execFn).toHaveBeenCalledOnce();
+    const probedCwd = execFn.mock.calls[0]?.[0].cwd;
+    expect(probedCwd).not.toBe('/nonexistent/deleted-checkout');
+    expect(probedCwd).toMatch(/ai-model-preflight-/u);
+  });
+
+  it('retries a recoverable provider error once before reporting the model available', async () => {
+    const execFn = vi
+      .fn()
+      .mockResolvedValueOnce({
+        stdout: '{"type":"turn.failed","error":{"message":"rate limited"}}',
+        stderr: '',
+        exitCode: 0,
+      })
+      .mockResolvedValueOnce({ stdout: success.codex, stderr: '', exitCode: 0 });
+    expect(await probeModelAvailability('codex', 'model', { execFn })).toEqual({ available: true });
+    expect(execFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry a non-recoverable provider rejection', async () => {
+    const execFn = vi.fn().mockResolvedValue({
+      stdout: '{"type":"turn.failed","error":{"message":"model not found"}}',
+      stderr: '',
+      exitCode: 0,
+    });
+    expect(await probeModelAvailability('codex', 'model', { execFn })).toMatchObject({
+      available: false,
+      detail: 'model not found',
+    });
+    expect(execFn).toHaveBeenCalledOnce();
+  });
+
+  it('does not retry a probe that fails for a non-timeout reason', async () => {
+    const execFn = vi.fn().mockRejectedValue(new Error('Executable missing'));
+    expect(await probeModelAvailability('codex', 'model', { execFn })).toMatchObject({
+      available: false,
+      detail: 'Executable missing',
+    });
+    expect(execFn).toHaveBeenCalledTimes(1);
   });
 });
