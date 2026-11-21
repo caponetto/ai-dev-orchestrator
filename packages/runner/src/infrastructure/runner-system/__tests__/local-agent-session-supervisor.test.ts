@@ -1,5 +1,4 @@
-import type { ChildProcess } from 'node:child_process';
-import { EventEmitter } from 'node:events';
+import { ChildProcess } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -26,11 +25,11 @@ function createMockProcess(): ChildProcess & {
   const stdin = new PassThrough();
   const stdout = new PassThrough();
   const stderr = new PassThrough();
-  const proc = new EventEmitter() as ChildProcess & {
-    mockStdin: PassThrough;
-    mockStdout: PassThrough;
-    mockStderr: PassThrough;
-  };
+  const proc = Object.assign(new ChildProcess(), {
+    mockStdin: stdin,
+    mockStdout: stdout,
+    mockStderr: stderr,
+  });
   proc.stdin = stdin;
   proc.stdout = stdout;
   proc.stderr = stderr;
@@ -38,9 +37,6 @@ function createMockProcess(): ChildProcess & {
   Object.defineProperty(proc, 'exitCode', { value: null, writable: true });
   Object.defineProperty(proc, 'signalCode', { value: null, writable: true });
   proc.kill = () => true;
-  proc.mockStdin = stdin;
-  proc.mockStdout = stdout;
-  proc.mockStderr = stderr;
   return proc;
 }
 

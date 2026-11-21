@@ -63,7 +63,7 @@ These paths cannot affect the TypeScript program, the package graph, or the test
 - `pnpm test:integration:coverage` runs integration tests with coverage into `packages/<name>/coverage-integration/`
 - `pnpm coverage:merge` unions every package's Vitest blob reports into `coverage/lcov.info` for Codecov, using `vitest --merge-reports` (see [Coverage reporting](#coverage-reporting))
 - `pnpm test:integration` runs integration tests
-- `pnpm test:e2e` runs end-to-end tests
+- `pnpm test:e2e` installs the Playwright Chromium browser and runs end-to-end tests
 - `pnpm test:results:merge` merges the JUnit reports into `test-results/junit.xml` for Codecov Test Analytics (requires `CI=true`, which is what turns the reporter on). Pass `--suites=unit,integration,scripts` or `--suites=e2e` to merge a subset; no flag merges all four kinds.
 
 To widen or narrow the tier-1 allowlist, edit `NON_CODE_PATTERN` and `SOURCE_TREE_PATTERN` in [`.husky/pre-commit`](.husky/pre-commit). Config files that gate the toolchain — `package.json`, `pnpm-lock.yaml`, `turbo.json`, `tsconfig*.json`, `.npmrc`, `.nvmrc`, `.prettierignore`, `.prettierrc`, `eslint.config.js` — are deliberately not on the allowlist, so editing them always runs the full gate.
