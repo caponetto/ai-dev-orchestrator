@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.3](https://github.com/caponetto/ai-dev-orchestrator/compare/prompt-engine-v0.1.2...prompt-engine-v0.1.3) (2026-11-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @ai-dev-orchestrator/artifacts bumped to 0.1.3
+    * @ai-dev-orchestrator/ports bumped to 0.1.3
+    * @ai-dev-orchestrator/schemas bumped to 0.1.5
+
 ## [0.1.2](https://github.com/caponetto/ai-dev-orchestrator/compare/prompt-engine-v0.1.1...prompt-engine-v0.1.2) (2026-10-24)
 
 
