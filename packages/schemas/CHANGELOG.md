@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/caponetto/ai-dev-orchestrator/compare/schemas-v0.1.4...schemas-v0.1.5) (2026-11-21)
+
+
+### Features
+
+* **runner:** add pi CLI runner with JSON event streaming ([#99](https://github.com/caponetto/ai-dev-orchestrator/issues/99)) ([82ced9b](https://github.com/caponetto/ai-dev-orchestrator/commit/82ced9ba5056a5b2b2a2913a4f91c87060a7c067))
+
 ## [0.1.4](https://github.com/caponetto/ai-dev-orchestrator/compare/schemas-v0.1.3...schemas-v0.1.4) (2026-10-24)
 
 

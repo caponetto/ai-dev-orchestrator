@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.5](https://github.com/caponetto/ai-dev-orchestrator/compare/execution-analytics-v0.1.4...execution-analytics-v0.1.5) (2026-11-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @ai-dev-orchestrator/ports bumped to 0.1.3
+    * @ai-dev-orchestrator/schemas bumped to 0.1.5
+
 ## [0.1.4](https://github.com/caponetto/ai-dev-orchestrator/compare/execution-analytics-v0.1.3...execution-analytics-v0.1.4) (2026-10-24)
 
 

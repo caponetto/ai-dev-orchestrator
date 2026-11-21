@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.1.8](https://github.com/caponetto/ai-dev-orchestrator/compare/runner-v0.1.7...runner-v0.1.8) (2026-11-21)
+
+
+### Features
+
+* **runner:** add pi CLI runner with JSON event streaming ([#99](https://github.com/caponetto/ai-dev-orchestrator/issues/99)) ([82ced9b](https://github.com/caponetto/ai-dev-orchestrator/commit/82ced9ba5056a5b2b2a2913a4f91c87060a7c067))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @ai-dev-orchestrator/agent-adapters bumped to 0.1.7
+    * @ai-dev-orchestrator/agent-protocol bumped to 0.1.3
+    * @ai-dev-orchestrator/artifacts bumped to 0.1.3
+    * @ai-dev-orchestrator/ports bumped to 0.1.3
+    * @ai-dev-orchestrator/prompt-engine bumped to 0.1.3
+    * @ai-dev-orchestrator/schemas bumped to 0.1.5
+
 ## [0.1.7](https://github.com/caponetto/ai-dev-orchestrator/compare/runner-v0.1.6...runner-v0.1.7) (2026-10-24)
 
 

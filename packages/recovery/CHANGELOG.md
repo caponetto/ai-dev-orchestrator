@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.3](https://github.com/caponetto/ai-dev-orchestrator/compare/recovery-v0.1.2...recovery-v0.1.3) (2026-11-21)
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @ai-dev-orchestrator/ports bumped to 0.1.3
+    * @ai-dev-orchestrator/schemas bumped to 0.1.5
+  * devDependencies
+    * @ai-dev-orchestrator/core bumped to 0.1.3
+
 ## [0.1.2](https://github.com/caponetto/ai-dev-orchestrator/compare/recovery-v0.1.1...recovery-v0.1.2) (2026-10-24)
 
 

@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.12](https://github.com/caponetto/ai-dev-orchestrator/compare/config-templates-v0.1.11...config-templates-v0.1.12) (2026-11-21)
+
+
+### Features
+
+* **runner:** add pi CLI runner with JSON event streaming ([#99](https://github.com/caponetto/ai-dev-orchestrator/issues/99)) ([82ced9b](https://github.com/caponetto/ai-dev-orchestrator/commit/82ced9ba5056a5b2b2a2913a4f91c87060a7c067))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @ai-dev-orchestrator/schemas bumped to 0.1.5
+    * @ai-dev-orchestrator/workflow bumped to 0.1.7
+
 ## [0.1.11](https://github.com/caponetto/ai-dev-orchestrator/compare/config-templates-v0.1.10...config-templates-v0.1.11) (2026-11-07)
 
 
