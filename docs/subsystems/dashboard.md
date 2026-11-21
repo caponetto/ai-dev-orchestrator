@@ -139,7 +139,7 @@ Tests assert both rendered outcomes and persisted decisions, fail on unhandled p
 and clean up processes, sockets, locks, and temporary directories. Browser requests receive no
 canned success payloads. Failure cases deliberately reject storage or interrupt transport.
 
-Run the full browser suite with `pnpm test:e2e`. After workspace builds are ready, a focused run is
+Run the full browser suite with `pnpm test:e2e`, which installs Playwright Chromium first. After workspace builds are ready, a focused run is
 `pnpm --filter @ai-dev-orchestrator/dashboard exec playwright test e2e/live-flows.e2e.ts --workers=2`.
 Keep precise timing and component error branches covered by Vitest as well; browser tests exercise
 integration behavior and do not replace the package coverage thresholds.

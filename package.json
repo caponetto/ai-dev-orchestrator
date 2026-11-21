@@ -24,7 +24,7 @@
     "link:cli": "pnpm build:prod && pnpm add -g ./packages/cli",
     "lint": "turbo lint && turbo run //#lint:scripts:run",
     "prepare": "husky",
-    "test:e2e": "turbo test:e2e",
+    "test:e2e": "pnpm test:e2e:install && turbo test:e2e",
     "test:e2e:install": "pnpm --dir ./packages/dashboard exec playwright install chromium --with-deps",
     "test:integration": "turbo test:integration",
     "test:integration:coverage": "turbo test:integration -- --coverage",
