@@ -17,7 +17,7 @@ AI coding agents work best with structure. Without it, they skip steps, ignore r
 
 **25 built-in roles.** Requirements Analyst, Planner, Implementer, seven specialized reviewers (static, security, performance, design, adversarial, docs, UX), Verifier, Judge, and more. Each role gets its own prompt template, model assignment, and artifact ownership.
 
-**Agent runners.** Dispatches work through Claude Code, Cursor, Codex, and OpenCode CLIs, each with its own model roster. Runner-specific execution logic handles output parsing, retries, and protocol adaptation for each vendor CLI.
+**Agent runners.** Dispatches work through Claude Code, Cursor, Codex, OpenCode, and Pi CLIs, each with its own model roster. Runner-specific execution logic handles output parsing, retries, and protocol adaptation for each vendor CLI.
 
 **Artifact system.** Immutable, versioned, SHA-256 checksummed. 34 schema-validated types. A dependency graph tracks staleness and impact across artifacts.
 

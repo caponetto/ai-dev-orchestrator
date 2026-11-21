@@ -3,6 +3,7 @@ import {
   parseClaudeCodeEvent,
   parseCodexEvent,
   parseOpenCodeEvent,
+  parsePiEvent,
 } from '@ai-dev-orchestrator/agent-adapters';
 
 export function extractArtifactTokenUsage(
@@ -39,6 +40,14 @@ function parseVendorUsage(u: VendorTokenUsage): {
     };
   }
 
+  if (isPiUsageShape(u)) {
+    // Pi reports cacheRead as already included in input; cacheWrite is separate work.
+    return {
+      inputTokens: num(u.input) + num(u.cacheWrite),
+      outputTokens: num(u.output),
+    };
+  }
+
   const anthropicInput =
     num(u.input_tokens) + num(u.cache_creation_input_tokens) + num(u.cache_read_input_tokens);
   const anthropicOutput = num(u.output_tokens);
@@ -59,6 +68,10 @@ function isOpenCodeUsageShape(usage: VendorTokenUsage): boolean {
 
 function isCodexUsageShape(usage: VendorTokenUsage): boolean {
   return 'cached_input_tokens' in usage || 'reasoning_output_tokens' in usage;
+}
+
+function isPiUsageShape(usage: VendorTokenUsage): boolean {
+  return 'totalTokens' in usage || ('cacheRead' in usage && 'cacheWrite' in usage);
 }
 
 export interface ExtractedUsage {
@@ -94,6 +107,16 @@ export function extractUsageFromRawLine(line: string): ExtractedUsage | null {
   const opencodeEvent = parseOpenCodeEvent(line);
   if (opencodeEvent?.type === 'step_finish' && opencodeEvent.part?.tokens) {
     return parseVendorUsage(opencodeEvent.part.tokens);
+  }
+
+  const piEvent = parsePiEvent(line);
+  if (piEvent) {
+    // Only message_end carries the authoritative final usage for an assistant message.
+    // message_update fires per content-block delta and would flood the stream with
+    // usage_update events; its cumulative usage is superseded by message_end anyway.
+    if (piEvent.type === 'message_end' && piEvent.message?.usage) {
+      return { ...parseVendorUsage(piEvent.message.usage), isFinal: true, cumulative: true };
+    }
   }
 
   return null;

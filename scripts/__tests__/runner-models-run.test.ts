@@ -75,9 +75,14 @@ describe('checkRunner', () => {
     expect(console.error).toHaveBeenCalledWith(expect.stringContaining(String(removed)));
   });
 
-  it('fails when the runner is unknown', () => {
-    checkRunner({ id: 'nope', name: 'Nope', version: () => '1', listModels: () => '' });
-    expect(process.exitCode).toBe(1);
+  it('skips when the runner has no configured models', () => {
+    const listModels = vi.fn(() => '');
+    checkRunner({ id: 'pi', name: 'Pi', version: () => '1', listModels });
+    expect(process.exitCode).toBeUndefined();
+    expect(listModels).not.toHaveBeenCalled();
+    expect(console.log).toHaveBeenCalledWith(
+      '::notice::No models configured for runner "pi" in runners.yaml; skipping',
+    );
   });
 
   it('fails when listing models throws', () => {

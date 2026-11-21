@@ -51,20 +51,27 @@ The adapter architecture translates input and output for an `AgentRunner` implem
   - Implement the `AgentAdapter` interface.
   - Set `name = BUILT_IN_CODING_RUNNER_ID.<NAME>`, default command, and CLI arguments (e.g., non-interactive flags, stream format).
   - Set `supportsProtocolHandshake = false` if the CLI is prompt/CLI-driven rather than an interactive orchestrator-protocol agent.
-  - Implement `translateOutput(line: string): ProtocolMessage | null` mapping vendor events into `progress`, `done`, or `error` messages.
+  - Implement `translateOutput(line: string): ProtocolMessage | null` mapping vendor events into `progress`, `done`, or `error` messages. Derive completion and failure from event semantics rather than exit codes — some CLIs (e.g. Pi) exit zero even when a response fails or is aborted.
+  - Map complete messages, not per-token deltas: many CLIs emit a delta event per token, and mapping each one to a protocol message fragments the run stream with hundreds of tiny or blank entries. Prefer the CLI's end-of-message event for full text, and skip echoed user/system messages (only assistant output is agent progress).
+  - Prefer tool-execution lifecycle events over tool-call declaration events when the CLI offers both — the execution events carry richer detail (resolved arguments, results, error flags).
 - **Capability Probe** (`src/<name>-cli-capability-probe.ts`):
   - Implement `probe<Name>CliCapabilities(options)`: checks `--version`, verifies `--help` flags (e.g. JSON format, model options), and tests auth or model availability.
   - Implement `normalize<Name>ProbeResult(result)`: returns standardized mode (`'streaming' | 'text-only' | 'unauthenticated' | 'unavailable'`) and user-facing summary.
 - **Barrel Exports** (`src/index.ts`):
   - Export adapter, capability probe, normalization function, and event types.
+- **Model Preflight** (`src/model-availability-probe.ts`):
+  - Add a `case` for the runner ID in `probeConfig` with side-effect-free CLI flags (e.g. ephemeral session, no tools) so the `ai run` model availability preflight can actually verify the configured model. Without it, preflight only warns that checks are unsupported for the runner.
 
 ### 3. Wire Subprocess & Token Usage in Runner (`packages/runner`)
 
-- In `packages/runner/src/infrastructure/runner-system/cli-agent-runner.ts`:
+- In `packages/runner/src/infrastructure/runner-system/cli-invocation.ts`:
   - Add the runner ID to `PROMPT_BASED_ADAPTERS` if the CLI accepts the prompt as an argument.
   - Configure `stdin` handling in `resolveCliSubprocessStdinOption` (e.g. `'ignore'` to prevent CLI from waiting on stdin).
-  - Add vendor usage shape detection and parse logic to `parseVendorUsage`.
-  - Wire the event parser in `extractUsageFromRawLine(line)` to extract input/output tokens per step or on final completion.
+- In `packages/runner/src/infrastructure/runner-system/cli-token-usage.ts`:
+  - Add vendor usage shape detection (`is<Name>UsageShape`) and parse logic to `parseVendorUsage`.
+  - Wire the event parser in `extractUsageFromRawLine(line)` to extract input/output tokens per step or on final completion. Extract usage only from authoritative events (end-of-message or turn-completion events), not from per-delta update events — a delta event carrying cumulative usage will emit one `usage_update` stream event per token.
+- In `packages/runner/src/infrastructure/runner-system/cli-retry-policy.ts`:
+  - Add the runner ID to `SUPPORTED_ADAPTERS` so the shared transient retry policy covers the new runner. Without it, a flaky first response (for example an agent that greets and exits without using a tool or writing its artifact) fails the dispatch instead of being retried.
 
 ### 4. Wire Runner in CLI (`packages/cli`)
 
@@ -77,6 +84,7 @@ The adapter architecture translates input and output for an `AgentRunner` implem
 ### 5. Add Static Runner Config & Models (`packages/config-templates`)
 
 - Add the runner ID, display name, and supported default models to `packages/config-templates/src/static/runners.yaml`.
+- Add a model-listing script `scripts/runner-models/<runner>.ts` that calls `checkRunner` with the CLI's model listing command, add an `IGNORED_MODELS` entry in `scripts/runner-models/ignored-models.ts`, and add a job to `.github/workflows/runner-models.yml` that installs the CLI and runs the script. Without these, the scheduled model-roster drift check never covers the new runner.
 
 ### 6. Update Dashboard Labels (`packages/dashboard`)
 
@@ -96,6 +104,7 @@ The CLI probes local runner capabilities before registering runtime runners. Exi
 - **Cursor**: probes `agent --version`, stream-json output format, and `agent status`.
 - **Codex**: probes `codex --version`, `exec --help` for `--json` / `--sandbox`, and `codex login status`.
 - **OpenCode**: probes `opencode --version`, `run --help` for `--format json` / `--auto`, and `opencode models`.
+- **Pi**: probes `pi --version`, `--help` for `--mode json` / `--model`, and `pi --list-models`.
 
 If a new adapter needs multiple modes, prefer a capability probe plus explicit mode normalization instead of hardcoding assumptions.
 
@@ -118,4 +127,16 @@ Prefer:
 - `packages/agent-protocol/src/agent-protocol-types.ts`
 - `packages/agent-adapters/src/`
 - `packages/runner/src/infrastructure/runner-system/cli-agent-runner.ts`
+- `packages/runner/src/infrastructure/runner-system/cli-invocation.ts`
+- `packages/runner/src/infrastructure/runner-system/cli-token-usage.ts`
 - `packages/cli/src/composition-root.ts`
+
+## Common Pitfalls
+
+Lessons from integrating real runners — check these before debugging deeper:
+
+- **`spawn <cli> ENOENT` is ambiguous.** It means the command is not on the spawning process's `PATH` — _or_ the spawn `cwd` does not exist. Both produce the identical error. The model preflight already falls back to a temporary directory when a caller-supplied cwd has disappeared (e.g. a rerun whose original checkout was cleaned up), so a remaining ENOENT usually means PATH. Remember that dashboard-spawned runs inherit the **dashboard server's** environment, not the user's shell: the CLI must be on the PATH of whatever process started the server.
+- **`--thinking`-style reasoning flags can blow the preflight timeout.** Models that reason by default can spend longer thinking than the probe's timeout allows for a trivial "reply OK" check. Pass the CLI's thinking-disable flag in the `probeConfig` entry for the preflight only — real dispatches keep the model's default behavior.
+- **Weak models can greet and exit.** A model may answer a task prompt with a conversational introduction and stop without using any tool or writing its artifact. The shared transient retry policy absorbs this (an agent that exits without using a tool and without its artifact is safe to retry), but a model that does it consistently on a role's prompt should be reassigned to a stronger model rather than retried forever.
+- **Transient provider errors are retried automatically.** The model preflight retries timeouts and recoverable errors (as classified by `isTransientCliError`) once; error messages surfaced by the adapter should carry the vendor's underlying error text (e.g. an `errorMessage` field) so the classifier and the user can tell transient blips from configuration problems.
+- **Verify against the real CLI before trusting mock tests.** Unit tests with recorded event fixtures cannot catch vendor-side quirks: tail latency, default thinking modes, model-ID formats with unexpected separators (e.g. slashes), or exit-code conventions. Run the capability probe and a live model preflight against an installed CLI as a final check.

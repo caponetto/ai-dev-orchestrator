@@ -8,12 +8,14 @@ import {
   normalizeCodexProbeResult,
   normalizeGhCliProbeResult,
   normalizeOpencodeProbeResult,
+  normalizePiProbeResult,
   normalizeProbeResult,
   probeClaudeCodeCapabilities,
   probeCodexCliCapabilities,
   probeCursorCliCapabilities,
   probeGhCliCapabilities,
   probeOpencodeCliCapabilities,
+  probePiCliCapabilities,
 } from '@ai-dev-orchestrator/agent-adapters';
 import { loadRunnerRegistry } from '@ai-dev-orchestrator/config-templates';
 import { createLogger } from '@ai-dev-orchestrator/core';
@@ -199,6 +201,25 @@ export async function dashboardCommand(
       available: false,
       status: 'degraded',
       summary: 'Probe failed — OpenCode CLI adapter unavailable',
+    });
+  }
+  try {
+    const piProbe = await probePiCliCapabilities();
+    const { mode, summary } = normalizePiProbeResult(piProbe);
+    const available = mode !== 'unavailable' && mode !== 'unauthenticated';
+    runnerHealthEntries.push({
+      id: BUILT_IN_CODING_RUNNER_ID.PI,
+      available,
+      status: mode === 'unauthenticated' ? 'unhealthy' : available ? 'healthy' : 'degraded',
+      summary,
+      version: piProbe.rawVersion ?? undefined,
+    });
+  } catch {
+    runnerHealthEntries.push({
+      id: BUILT_IN_CODING_RUNNER_ID.PI,
+      available: false,
+      status: 'degraded',
+      summary: 'Probe failed — Pi CLI adapter unavailable',
     });
   }
   try {

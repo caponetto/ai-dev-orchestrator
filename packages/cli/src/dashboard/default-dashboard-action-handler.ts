@@ -286,7 +286,7 @@ export class DefaultDashboardActionHandler implements DashboardActionHandler {
     const repoRoot = options.repoRoot;
 
     try {
-      const preflight = await preflightSelectedModels(repoRoot ?? tmpdir());
+      const preflight = await preflightSelectedModels(repoRoot ?? tmpdir(), options.workflow);
       const args = runCreationParamsToCliArgs({ ...options, prompt });
       await spawnDetachedCli(repoRoot ?? tmpdir(), args, undefined, preflight.receipt);
 

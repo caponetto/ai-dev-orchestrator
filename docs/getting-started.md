@@ -6,7 +6,7 @@ This guide reflects the current implementation in `packages/cli`, `packages/core
 
 - Node.js 22 or later
 - pnpm 11 or later
-- At least one supported local runner environment that the CLI can probe successfully, currently `claude-code`, `cursor`, `codex`, `opencode`, or `gh-cli`
+- At least one supported local runner environment that the CLI can probe successfully, currently `claude-code`, `cursor`, `codex`, `opencode`, `pi`, or `gh-cli`
 
 ## Build the Monorepo
 
@@ -50,6 +50,7 @@ Notes:
 - `config.yaml`, `roles.yaml`, and `governance.yaml` are the required runtime config files.
 - `runners.yaml` is generated from the built-in runner registry that ships with the repository.
 - To use the `codex` runner, install the Codex CLI and authenticate it with `codex login`. Codex executes tasks with workspace-write sandboxing, enables outbound network access for tools like `gh`, and reports token usage from its JSONL completion event.
+- To use the `pi` runner, install the Pi CLI (`npm install -g @earendil-works/pi-coding-agent`) and authenticate a provider (see `pi auth`). Pi executes tasks with its default `read`, `bash`, `edit`, and `write` tools and streams JSONL events from `pi --mode json`.
 - `templates/` contains per-role prompt templates that can be overridden per project.
 - `runs/` stores per-run state, artifacts, journals, manifests, reports, session snapshots, and live request files.
 
