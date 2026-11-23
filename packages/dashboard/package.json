@@ -31,7 +31,7 @@
     "@ai-dev-orchestrator/schemas": "workspace:*",
     "@ai-dev-orchestrator/utils": "workspace:*",
     "@tailwindcss/typography": "^0.5.20",
-    "@xyflow/react": "^12.12.1",
+    "@xyflow/react": "^13.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "elkjs": "^0.12.1",
